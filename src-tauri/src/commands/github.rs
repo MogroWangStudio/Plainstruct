@@ -391,10 +391,12 @@ async fn github_sync_inner(app: &AppHandle, state: &AppState, cfg: GithubConfig)
     }
 
     let branch_ref = format!("refs/heads/{}", cfg.branch);
-    // 引用查询/更新用 heads/{branch} 形式(GitHub 文档用法)。实测完整形式
-    // refs%2Fheads%2F{branch} 对已存在的分支也返回 404,会导致增量发布被
-    // 误判为「分支不存在」而走创建,进而撞上 422 reference already exists
+    // 引用 API 的路径形式(经 GitHub 文档确认,三个端点并不一致):
+    //   读取:GET  /git/ref/{ref}(单数 ref),ref 用 heads/{分支}
+    //   更新:PATCH /git/refs/{ref}(复数 refs!打到单数路径会 404)
+    //   创建:POST /git/refs,body 里的 ref 用完整 refs/heads/{分支}
     let ref_url = repo_api(&cfg, &format!("/git/ref/heads/{}", cfg.branch.replace('/', "%2F")));
+    let ref_update_url = repo_api(&cfg, &format!("/git/refs/heads/{}", cfg.branch.replace('/', "%2F")));
 
     // 3. 取基准提交。分支不存在时不预建空树(Git API 拒绝空 tree 数组,会 422),
     //    直接以本次站点提交(无 parents)作为发布分支的初始提交,提交后再创建 ref。
@@ -588,7 +590,7 @@ async fn github_sync_inner(app: &AppHandle, state: &AppState, cfg: GithubConfig)
         let (ref_status, ref_body) = request(
             &http,
             reqwest::Method::PATCH,
-            &ref_url,
+            &ref_update_url,
             &cfg.token,
             Some(patch_body.clone()),
         )
@@ -617,7 +619,7 @@ async fn github_sync_inner(app: &AppHandle, state: &AppState, cfg: GithubConfig)
             let (patch_status, patch_body) = request(
                 &http,
                 reqwest::Method::PATCH,
-                &ref_url,
+                &ref_update_url,
                 &cfg.token,
                 Some(patch_body.clone()),
             )
