@@ -258,7 +258,7 @@ pub async fn github_preflight(
     let mut remote_dirty = false;
     if !cfg.owner.is_empty() && !cfg.repo.is_empty() && !cfg.branch.trim().is_empty() {
         let http = state.http.clone();
-        let ref_url = repo_api(&cfg, &format!("/git/ref/refs/heads/{}", cfg.branch.replace('/', "%2F")));
+        let ref_url = repo_api(&cfg, &format!("/git/ref/heads/{}", cfg.branch.replace('/', "%2F")));
         let (ref_status, ref_body) = request(&http, reqwest::Method::GET, &ref_url, &cfg.token, None).await?;
         if ref_status == 200 {
             let cloud_commit = ref_body["object"]["sha"].as_str().unwrap_or("").to_string();
@@ -366,7 +366,10 @@ pub async fn github_sync(
     }
 
     let branch_ref = format!("refs/heads/{}", cfg.branch);
-    let ref_url = repo_api(&cfg, &format!("/git/ref/{}", branch_ref.replace('/', "%2F")));
+    // 引用查询/更新用 heads/{branch} 形式(GitHub 文档用法)。实测完整形式
+    // refs%2Fheads%2F{branch} 对已存在的分支也返回 404,会导致增量发布被
+    // 误判为「分支不存在」而走创建,进而撞上 422 reference already exists
+    let ref_url = repo_api(&cfg, &format!("/git/ref/heads/{}", cfg.branch.replace('/', "%2F")));
 
     // 3. 取基准提交。分支不存在时不预建空树(Git API 拒绝空 tree 数组,会 422),
     //    直接以本次站点提交(无 parents)作为发布分支的初始提交,提交后再创建 ref。
@@ -532,11 +535,7 @@ pub async fn github_sync(
             if !already_exists {
                 return Err(format!("创建发布分支失败({created}): {msg}"));
             }
-            // 分支实际已存在:重查后强推更新
-            let (get_status, get_body) = request(&http, reqwest::Method::GET, &ref_url, &cfg.token, None).await?;
-            if get_status != 200 {
-                return Err(format!("创建发布分支失败({created}): {msg}"));
-            }
+            // 分支实际已存在:直接强推更新(不再依赖重查,避免查询侧偏差再次误判)
             let (patch_status, patch_body) = request(
                 &http,
                 reqwest::Method::PATCH,
