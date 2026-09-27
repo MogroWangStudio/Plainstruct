@@ -831,7 +831,7 @@ defineExpose({
         <AppIcon name="wrapText" :size="15" />
       </button>
       <span class="tb-sep" />
-      <button class="tb-btn" :title="t('editor.toolbar.frontmatter')" @click="openFmEditor">
+      <button class="tb-btn" :title="t('editor.toolbar.frontmatter')" @click="openFmEditor()">
         <AppIcon name="filePlus" :size="15" />
       </button>
     </div>
