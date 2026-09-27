@@ -1,18 +1,18 @@
-# 素构 Plainstruct —— 推送版本标签后自动构建,产物作为 GitHub Release 草稿发布。
+# 素构 Plainstruct —— 推送 main 或手动触发时构建,产物作为 Artifact 留档。
 # 触发方式:
-#   - 推送版本标签(自动构建并创建 GitHub Release 草稿)——发布站点产物的唯一途径
-#     兼容 v1.2.3 与 1.2.3 两种标签写法
+#   - 推送 main 分支(构建验证与留档)
 #   - 手动触发(workflow_dispatch)
-# 平时推送到 main 不再触发构建,避免发布 Release 后的日常提交重复消耗构建时长。
+# 打版本标签不再触发构建:发布 Release 时从对应提交的构建工件(Artifacts)
+# 下载产物手动上传,产物命名已由流水线统一,无需改名。
 #
 # 产物形态:Windows x64 免安装 zip(内含 exe,不再构建安装包)与 macOS arm64 dmg / zip,
-# 命名统一为 Plainstruct_版本号_平台架构。
+# 命名统一为 Plainstruct_版本号_平台架构(版本取自 Cargo.toml)。
 
 name: Build Plainstruct
 
 on:
   push:
-    tags: ["v*", "[0-9]*"]
+    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -24,9 +24,6 @@ jobs:
           - os: windows-latest
           - os: macos-latest # Apple Silicon (arm64) runner
     runs-on: ${{ matrix.os }}
-    env:
-      # 版本号取自已打的标签(剥离可选的 v 前缀),未打标签时回退到 dev
-      APP_VERSION: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'dev' }}
 
     steps:
       - name: Checkout
@@ -80,7 +77,8 @@ jobs:
           set -e
           APP="src-tauri/target/release/bundle/macos/Plainstruct.app"
           [ -d "$APP" ]
-          VERSION="${APP_VERSION#v}"
+          # 版本取自构建产物(与 tauri.conf.json/Cargo.toml 同源),产物命名不依赖触发方式
+          VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")
           STAGING="$(mktemp -d)"
           cp -R "$APP" "$STAGING/"
           ln -s /Applications "$STAGING/Applications"
@@ -113,32 +111,3 @@ jobs:
             src-tauri/target/release/bundle/macos/Plainstruct_*_macOS_arm64.dmg
             src-tauri/target/release/bundle/macos/Plainstruct_*_macOS_arm64.zip
           if-no-files-found: error
-
-  # 推送版本标签时,汇总两个平台的产物创建 Release 草稿
-  release:
-    if: startsWith(github.ref, 'refs/tags/')
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-          merge-multiple: true
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          draft: true
-          name: Plainstruct ${{ github.ref_name }}
-          body: |
-            自动构建的 Plainstruct ${{ github.ref_name }} 安装包。
-
-            - Windows x64:免安装版 zip,解压后双击 `plainstruct.exe` 即用,自动更新也以此包覆盖升级(不再提供安装包)
-            - macOS(Apple Silicon):磁盘镜像(dmg)拖入「应用程序」,或压缩包(zip)解压后移入「应用程序」。应用为开源软件,采用 ad-hoc 签名、未经 Apple 公证,首次打开若提示「已损坏」,双击包内的**「损坏修复.command」**并输入开机密码(仅用于移除隔离标记)即可;也可在终端手动执行(装到「应用程序」后):
-              `sudo xattr -r -d com.apple.quarantine /Applications/Plainstruct.app`
-          files: |
-            artifacts/**/*.zip
-            artifacts/**/*.dmg
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
