@@ -162,7 +162,10 @@ export const useSiteStore = defineStore("site", {
     async createDoc(dir: string, name: string, title?: string, description?: string) {
       const path = await ipc.createDoc(dir, name, title, description);
       await this.refreshTree();
-      await useEditorStore().openDoc(this.findDoc(path) ?? { name, path, type: "file" });
+      const editor = useEditorStore();
+      await editor.openDoc(this.findDoc(path) ?? { name, path, type: "file" });
+      // 新建文档即弹出配置头表单:创建时便可直接设置标题/描述/日期/封面
+      editor.fmPending = true;
     },
 
     async createFolder(parent: string, name: string) {

@@ -323,7 +323,7 @@ function frontMatterEnd(doc: Text): number | null {
 const FM_KEYS = ["title", "description", "date", "order", "cover"];
 
 const fmOpen = ref(false);
-const fmForm = reactive({ title: "", description: "", date: "", order: "", cover: "" });
+const fmForm = reactive({ title: "", description: "", date: "", cover: "" });
 
 /** 站点 images 文件夹里的图(按当前文档位置换算为可直接使用的路径建议) */
 const coverSuggestions = computed(() => {
@@ -335,14 +335,20 @@ const coverSuggestions = computed(() => {
     .map((n) => prefix + n.name);
 });
 
-/** 打开表单:预填当前配置头的字段值(没有配置头时 title/date 给出默认) */
-function openFmEditor() {
+/** 今天的本地日期(YYYY-MM-DD;toISOString 按 UTC 会在东八区晚间差一天) */
+function todayLocal(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** 打开表单:预填当前配置头的字段值(没有配置头时 title/date 给出默认;新建文档 date 一律填当天) */
+function openFmEditor(fromCreate = false) {
   if (!view) return;
   const parsed = parseFrontMatter(view.state.sliceDoc(0, view.state.doc.length));
-  fmForm.title = parsed.data.title ?? (frontMatterEnd(view.state.doc) === null ? editor.docTitle : "");
+  const isNew = frontMatterEnd(view.state.doc) === null;
+  fmForm.title = parsed.data.title ?? (isNew ? editor.docTitle : "");
   fmForm.description = parsed.data.description ?? "";
-  fmForm.date = parsed.data.date ?? (frontMatterEnd(view.state.doc) === null ? new Date().toISOString().slice(0, 10) : "");
-  fmForm.order = parsed.data.order === undefined ? "" : String(parsed.data.order);
+  fmForm.date = parsed.data.date ?? (isNew || fromCreate ? todayLocal() : "");
   fmForm.cover = parsed.data.cover ?? "";
   fmOpen.value = true;
 }
@@ -354,14 +360,12 @@ function writeFrontMatter() {
     title: fmForm.title.trim(),
     description: fmForm.description.trim(),
     date: fmForm.date,
-    order: fmForm.order.trim(),
     cover: fmForm.cover.trim(),
   };
   const fields = [
     ...(v.title ? [`title: ${v.title}`] : []),
     ...(v.description ? [`description: ${v.description}`] : []),
     ...(v.date ? [`date: ${v.date}`] : []),
-    ...(v.order ? [`order: ${v.order}`] : []),
     ...(v.cover ? [`cover: ${v.cover}`] : []),
   ];
   const { state } = view;
@@ -721,7 +725,23 @@ onMounted(() => {
   });
   // 注册到右键菜单:编辑器内的右键文本操作直接作用于 CodeMirror 选区
   registerCmView(host.value!, view);
+  // 新建文档:编辑器就绪即弹出配置头表单(创建时便可直接设置标题/描述/日期/封面)
+  if (editor.fmPending) {
+    editor.fmPending = false;
+    openFmEditor(true);
+  }
 });
+
+// 新建标志在编辑器已挂载时到达(如快速连续创建)也即时响应
+watch(
+  () => editor.fmPending,
+  (pending) => {
+    if (pending && view) {
+      editor.fmPending = false;
+      openFmEditor(true);
+    }
+  },
+);
 
 // 设置变更即时重配写作键位与空白标记
 watch(
@@ -829,16 +849,10 @@ defineExpose({
           <span class="field-label">{{ t("editor.fmDescription") }}</span>
           <input v-model="fmForm.description" class="input" type="text" />
         </label>
-        <div class="flex gap-3">
-          <label class="flex flex-1 flex-col gap-1">
-            <span class="field-label">{{ t("editor.fmDate") }}</span>
-            <input v-model="fmForm.date" class="input" type="date" />
-          </label>
-          <label class="flex w-24 flex-col gap-1">
-            <span class="field-label">{{ t("editor.fmOrder") }}</span>
-            <input v-model="fmForm.order" class="input" type="number" step="1" />
-          </label>
-        </div>
+        <label class="flex flex-col gap-1">
+          <span class="field-label">{{ t("editor.fmDate") }}</span>
+          <input v-model="fmForm.date" class="input" type="date" />
+        </label>
         <label class="flex flex-col gap-1">
           <span class="field-label">{{ t("editor.fmCover") }}</span>
           <input v-model="fmForm.cover" class="input" type="text" list="fmCoverOptions" :placeholder="t('editor.fmCoverHint')" />

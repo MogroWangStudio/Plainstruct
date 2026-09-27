@@ -141,7 +141,6 @@ export default {
     fmTitle: "Title",
     fmDescription: "Description",
     fmDate: "Date",
-    fmOrder: "Order",
     fmCover: "Cover image",
     fmCoverHint: "Pick from the site's images folder, or type a path/URL",
     fmHint: "Saving writes these back to the front-matter at the top of the document; empty fields are omitted, custom fields you wrote by hand are kept as-is.",

@@ -141,7 +141,6 @@ export default {
     fmTitle: "标题",
     fmDescription: "描述",
     fmDate: "日期",
-    fmOrder: "排序",
     fmCover: "封面图",
     fmCoverHint: "从站点 images 选择,或输入路径/外链",
     fmHint: "保存后写回文档开头的配置头;留空的字段不会写入,文档排序等自定义字段会原样保留。",

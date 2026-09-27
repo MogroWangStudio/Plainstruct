@@ -14,6 +14,8 @@ interface State {
   activePath: string | null;
   /** 内容树中选中的图片文件(显示预览而非编辑器),与 activePath 互斥展示 */
   activeImage: string | null;
+  /** 新建文档后置位:编辑器就绪时自动弹出配置头表单 */
+  fmPending: boolean;
   content: string;
   savedContent: string;
   saving: boolean;
@@ -31,6 +33,7 @@ export const useEditorStore = defineStore("editor", {
   state: (): State => ({
     activePath: null,
     activeImage: null,
+    fmPending: false,
     content: "",
     savedContent: "",
     saving: false,
