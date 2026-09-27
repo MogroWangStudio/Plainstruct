@@ -2,6 +2,7 @@
 import { computed, inject, ref, type Ref } from "vue";
 import type { TreeNode } from "@/ipc/types";
 import { useEditorStore } from "@/stores/editor";
+import { isImageFile } from "@/lib/paths";
 import AppIcon from "./AppIcon.vue";
 
 export interface SelectClick {
@@ -47,7 +48,9 @@ let expandTimer: number | undefined;
 
 const isDir = computed(() => props.node.type === "dir");
 const label = computed(() => (isDir.value ? props.node.name : props.node.name.replace(/\.md$/i, "")));
-const isActive = computed(() => !isDir.value && editor.activePath === props.node.path);
+const isActive = computed(
+  () => !isDir.value && (editor.activePath === props.node.path || editor.activeImage === props.node.path),
+);
 const isCollapsed = computed(() => collapsed.value.has(props.node.path));
 const isSelected = computed(() => props.selectedPaths.has(props.node.path));
 /** 本行在拖动集合中(多选拖拽 = 全部选中项一起淡化) */
@@ -72,6 +75,8 @@ function onRowClick(e: MouseEvent) {
     return;
   }
   if (isDir.value) toggle();
+  // 图片文件不读入编辑器:显示图片预览
+  else if (isImageFile(props.node.path)) editor.openImage(props.node.path);
   else editor.openDoc(props.node);
 }
 

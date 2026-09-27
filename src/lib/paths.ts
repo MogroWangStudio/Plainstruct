@@ -10,6 +10,11 @@ export function basename(p: string): string {
   return i === -1 ? p : p.slice(i + 1);
 }
 
+/** 是否为图片文件(资产页与内容树共用同一判定) */
+export function isImageFile(p: string): boolean {
+  return /\.(png|jpe?g|gif|webp|svg|avif|bmp|ico)$/i.test(p);
+}
+
 export function stripExt(p: string): string {
   const i = p.lastIndexOf(".");
   return i <= p.lastIndexOf("/") ? p : p.slice(0, i);

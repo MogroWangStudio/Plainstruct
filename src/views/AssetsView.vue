@@ -4,7 +4,7 @@ import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { collectDocPaths } from "@/lib/builder";
 import { countImageRefs, findImageRefs, replaceImageRefs, type ImageRef } from "@/lib/imageRefs";
-import { basename } from "@/lib/paths";
+import { basename, isImageFile } from "@/lib/paths";
 import { siteUrl } from "@/lib/preview";
 import { ipc } from "@/ipc/ipc";
 import type { TreeNode } from "@/ipc/types";
@@ -21,12 +21,10 @@ const site = useSiteStore();
 const editor = useEditorStore();
 const ui = useUiStore();
 
-const IMAGE_EXT = /\.(png|jpe?g|gif|webp|svg|avif|bmp|ico)$/i;
-
 /** content/images/ 下的图片文件(与构建复制同源) */
 const images = computed<TreeNode[]>(() => {
   const dir = site.tree.find((n) => n.type === "dir" && n.name.toLowerCase() === "images");
-  return (dir?.children ?? []).filter((n) => n.type === "file" && IMAGE_EXT.test(n.name));
+  return (dir?.children ?? []).filter((n) => n.type === "file" && isImageFile(n.name));
 });
 
 /* ---------- 引用索引:全部文档读取一次,重命名/删除后刷新 ---------- */

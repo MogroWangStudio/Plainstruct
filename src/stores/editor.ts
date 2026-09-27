@@ -12,6 +12,8 @@ export type EditorMode = "edit" | "split" | "preview";
 
 interface State {
   activePath: string | null;
+  /** 内容树中选中的图片文件(显示预览而非编辑器),与 activePath 互斥展示 */
+  activeImage: string | null;
   content: string;
   savedContent: string;
   saving: boolean;
@@ -28,6 +30,7 @@ let openSeq = 0;
 export const useEditorStore = defineStore("editor", {
   state: (): State => ({
     activePath: null,
+    activeImage: null,
     content: "",
     savedContent: "",
     saving: false,
@@ -62,10 +65,18 @@ export const useEditorStore = defineStore("editor", {
       const [text] = await ipc.readDocs([node.path]);
       // 等待期间用户已打开其他文档或重置:丢弃过期结果,避免内容错乱
       if (seq !== openSeq) return;
+      this.activeImage = null;
       this.activePath = node.path;
       this.content = text ?? "";
       this.savedContent = text ?? "";
       this.headings = extractHeadings(this.content);
+    },
+
+    /** 选中内容树中的图片文件:显示图片预览(编辑中的文档保持原状,不打断保存) */
+    openImage(path: string) {
+      const app = useAppStore();
+      if (app.view !== "editor") app.setView("editor");
+      this.activeImage = path;
     },
 
     /** 编辑器内容变更(来自 CodeMirror) */

@@ -1,8 +1,11 @@
 <script setup lang="ts">
-/** 内容工作区:文件树 + 编辑器 + 实时预览(可拖动分栏,比例同步滚动) */
-import { onBeforeUnmount, onMounted, ref } from "vue";
+/** 内容工作区:文件树 + 编辑器 + 实时预览(可拖动分栏,比例同步滚动);选中图片文件时显示图片预览 */
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { useAppStore } from "@/stores/app";
 import { useEditorStore, type EditorMode } from "@/stores/editor";
+import { basename } from "@/lib/paths";
+import { siteUrl } from "@/lib/preview";
 import FileTree from "@/components/FileTree.vue";
 import MarkdownEditor from "@/components/MarkdownEditor.vue";
 import DocPreview from "@/components/DocPreview.vue";
@@ -10,6 +13,14 @@ import AppIcon from "@/components/AppIcon.vue";
 
 const { t } = useI18n();
 const editor = useEditorStore();
+const app = useAppStore();
+
+/** 选中图片的预览地址;浏览器 mock 无 site:// 资源服务,降级为文件名占位 */
+const imageUrl = computed(() =>
+  editor.activeImage && app.platform !== "browser"
+    ? siteUrl(app.platform, `content/${editor.activeImage}`)
+    : "",
+);
 
 const editorRef = ref<InstanceType<typeof MarkdownEditor>>();
 const previewRef = ref<InstanceType<typeof DocPreview>>();
@@ -67,7 +78,25 @@ onBeforeUnmount(() => {
 
     <!-- 主区 -->
     <section class="flex min-w-0 flex-1 flex-col bg-bg">
-      <template v-if="editor.activePath">
+      <!-- 图片预览(内容树选中图片文件时,不读入编辑器) -->
+      <template v-if="editor.activeImage">
+        <header class="flex h-11 shrink-0 items-center gap-3 border-b border-line bg-surface px-4">
+          <AppIcon name="image" :size="15" class="shrink-0 text-ink-3" />
+          <span class="min-w-0 flex-1 truncate text-[13.5px] font-semibold">{{ basename(editor.activeImage) }}</span>
+          <span class="mono shrink-0 text-[12px] text-ink-3">{{ editor.activeImage }}</span>
+        </header>
+        <div class="flex min-h-0 flex-1 items-center justify-center p-8">
+          <img
+            v-if="imageUrl"
+            :src="imageUrl"
+            :alt="basename(editor.activeImage)"
+            class="max-h-full max-w-full rounded-md border border-line object-contain"
+          />
+          <span v-else class="text-[13px] text-ink-3">{{ basename(editor.activeImage) }}</span>
+        </div>
+      </template>
+
+      <template v-else-if="editor.activePath">
         <!-- 文档工具条 -->
         <header class="flex h-11 shrink-0 items-center gap-3 border-b border-line bg-surface px-4">
           <span class="min-w-0 flex-1 truncate text-[13.5px] font-semibold">{{ editor.docTitle }}</span>
