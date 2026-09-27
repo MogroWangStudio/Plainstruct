@@ -498,21 +498,26 @@ pub async fn github_sync(
     }
     let commit_sha = commit["sha"].as_str().ok_or("提交缺少 sha")?.to_string();
 
-    // 6. 分支已存在则强推更新;首次发布则创建发布分支指向该提交
+    // 6. 更新发布分支引用(幂等收敛,杜绝引用状态冲突):
+    //    每次发布都基于云端最新提交(parent = base)生成单线历史;更新失败
+    //    (分支被删)自动转为创建,创建失败(already exists,探测有偏差或
+    //    并发所致)自动转为重查后强推更新 —— 无论上游状态如何漂移都能收敛
+    let patch_body = json!({ "sha": commit_sha, "force": true });
+    let mut ref_updated = false;
     if branch_exists {
         let (ref_status, ref_body) = request(
             &http,
             reqwest::Method::PATCH,
             &ref_url,
             &cfg.token,
-            Some(json!({ "sha": commit_sha, "force": true })),
+            Some(patch_body.clone()),
         )
         .await?;
-        if ref_status != 200 {
-            let msg = ref_body["message"].as_str().unwrap_or("");
-            return Err(format!("更新分支失败({ref_status}): {msg}"));
+        if ref_status == 200 {
+            ref_updated = true;
         }
-    } else {
+    }
+    if !ref_updated {
         let (created, ref_body) = request(
             &http,
             reqwest::Method::POST,
@@ -522,8 +527,28 @@ pub async fn github_sync(
         )
         .await?;
         if created != 201 {
-            let msg = ref_body["message"].as_str().unwrap_or("");
-            return Err(format!("创建发布分支失败({created}): {msg}"));
+            let msg = ref_body["message"].as_str().unwrap_or("").to_string();
+            let already_exists = created == 422 && msg.to_lowercase().contains("exist");
+            if !already_exists {
+                return Err(format!("创建发布分支失败({created}): {msg}"));
+            }
+            // 分支实际已存在:重查后强推更新
+            let (get_status, get_body) = request(&http, reqwest::Method::GET, &ref_url, &cfg.token, None).await?;
+            if get_status != 200 {
+                return Err(format!("创建发布分支失败({created}): {msg}"));
+            }
+            let (patch_status, patch_body) = request(
+                &http,
+                reqwest::Method::PATCH,
+                &ref_url,
+                &cfg.token,
+                Some(patch_body.clone()),
+            )
+            .await?;
+            if patch_status != 200 {
+                let msg = patch_body["message"].as_str().unwrap_or("");
+                return Err(format!("更新分支失败({patch_status}): {msg}"));
+            }
         }
     }
 

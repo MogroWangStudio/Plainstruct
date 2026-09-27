@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { usePublishStore } from "@/stores/publish";
 import { useBuilderStore } from "@/stores/builder";
@@ -8,6 +8,14 @@ import AppIcon from "@/components/AppIcon.vue";
 const { t } = useI18n();
 const publish = usePublishStore();
 const builder = useBuilderStore();
+
+// 目标仓库等配置变更后,上一次的验证结果不再可信:清空,直到重新点「验证连接」
+watch(
+  () => [publish.config.owner, publish.config.repo, publish.config.branch],
+  () => {
+    publish.verifyResult = null;
+  },
+);
 
 const canPublish = computed(() => Boolean(publish.config.owner && publish.config.repo && publish.config.token && builder.report));
 
