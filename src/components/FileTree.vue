@@ -4,10 +4,11 @@ import { useI18n } from "vue-i18n";
 import type { TreeNode } from "@/ipc/types";
 import { useSiteStore } from "@/stores/site";
 import { useEditorStore } from "@/stores/editor";
-import { useThemeStore } from "@/stores/theme";
 import { useUiStore } from "@/stores/ui";
 import { useContextMenuStore, type MenuItem } from "@/stores/contextMenu";
 import { ipc } from "@/ipc/ipc";
+import { applyFrontMatter } from "@/lib/frontmatter";
+import NewDocModal from "@/components/NewDocModal.vue";
 import { basename, dirname, safeName, stripExt } from "@/lib/paths";
 import AppIcon from "./AppIcon.vue";
 import FileTreeNode, { type DropMark, type SelectClick } from "./FileTreeNode.vue";
@@ -16,7 +17,6 @@ import PromptModal from "./PromptModal.vue";
 const { t } = useI18n();
 const site = useSiteStore();
 const editor = useEditorStore();
-const theme = useThemeStore();
 const ui = useUiStore();
 const ctxMenu = useContextMenuStore();
 
@@ -223,26 +223,19 @@ async function batchMoveTo(targetDir: string) {
 /* ---------- Prompt ---------- */
 
 type Prompt =
-  | { mode: "newDoc"; dir: string }
   | { mode: "newFolder"; parent: string }
   | { mode: "rename"; node: TreeNode }
   | null;
 
 const prompt = ref<Prompt>(null);
 
-const promptTitle = () =>
-  prompt.value?.mode === "newDoc"
-    ? t("tree.newDocTitle")
-    : prompt.value?.mode === "newFolder"
-      ? t("tree.newFolder")
-      : t("tree.renameTitle");
+/** 新建文档弹窗(内嵌配置头设置):名称 + 标题/描述/日期/封面一次填好 */
+const newDocOpen = ref(false);
+const newDocDir = ref("");
 
-const promptLabel = () =>
-  prompt.value?.mode === "newDoc"
-    ? t("tree.docName")
-    : prompt.value?.mode === "newFolder"
-      ? t("tree.folderName")
-      : t("common.rename");
+const promptTitle = () => (prompt.value?.mode === "newFolder" ? t("tree.newFolder") : t("tree.renameTitle"));
+
+const promptLabel = () => (prompt.value?.mode === "newFolder" ? t("tree.folderName") : t("common.rename"));
 
 const promptInitial = () => {
   const p = prompt.value;
@@ -250,16 +243,42 @@ const promptInitial = () => {
   return "";
 };
 
-async function onPromptConfirm(value: string, extra = "") {
+/** 新建文档弹窗确认:创建后把表单里的配置头字段一并写回 */
+async function onNewDocConfirm(payload: {
+  name: string;
+  title: string;
+  description: string;
+  date: string;
+  cover: string;
+}) {
+  newDocOpen.value = false;
+  try {
+    // 标题/描述由创建命令写入 front-matter
+    await site.createDoc(newDocDir.value, payload.name, payload.title || undefined, payload.description || undefined);
+    const editor = useEditorStore();
+    if (editor.activePath) {
+      // 标题留空时以文档名为准(与创建命令的语义一致)
+      const next = applyFrontMatter(editor.content, { ...payload, title: payload.title || payload.name });
+      if (next !== editor.content) {
+        await ipc.saveDoc(editor.activePath, next);
+        site.updateDocCache(editor.activePath, next);
+        editor.externalReplace = true;
+        editor.content = next;
+        editor.savedContent = next;
+      }
+    }
+  } catch (e) {
+    ui.toast(t("ui.operationFailed", { msg: ipc.errText(e) }), "error");
+  }
+}
+
+async function onPromptConfirm(value: string) {
   const p = prompt.value;
   prompt.value = null;
   if (!p) return;
   const name = safeName(value);
   try {
-    if (p.mode === "newDoc") {
-      // 博客文章的副标题即 front-matter description
-      await site.createDoc(p.dir, name, undefined, extra || undefined);
-    } else if (p.mode === "newFolder") {
+    if (p.mode === "newFolder") {
       await site.createFolder(p.parent, name);
     } else {
       await site.renameItem(p.node.path, p.node.type === "file" ? `${name}.md` : name);
@@ -312,7 +331,10 @@ function openTreeMenu(e: MouseEvent) {
       id: "newDoc",
       label: t("tree.newDoc"),
       icon: "filePlus",
-      run: () => (prompt.value = { mode: "newDoc", dir }),
+      run: () => {
+        newDocDir.value = dir;
+        newDocOpen.value = true;
+      },
     },
     {
       id: "newFolder",
@@ -531,7 +553,7 @@ async function onTreeDrop(e: DragEvent) {
         >
           <AppIcon name="checkSquare" :size="15" />
         </button>
-        <button class="btn-icon !h-7 !w-7" :title="t('tree.newDoc')" @click="prompt = { mode: 'newDoc', dir: '' }">
+        <button class="btn-icon !h-7 !w-7" :title="t('tree.newDoc')" @click="newDocDir = ''; newDocOpen = true">
           <AppIcon name="filePlus" :size="15" />
         </button>
         <button class="btn-icon !h-7 !w-7" :title="t('tree.newFolder')" @click="prompt = { mode: 'newFolder', parent: '' }">
@@ -591,7 +613,7 @@ async function onTreeDrop(e: DragEvent) {
           :depth="0"
           :selected-paths="selectedPaths"
           :select-mode="selectMode"
-          @new-doc-in="(dir: string) => (prompt = { mode: 'newDoc', dir })"
+          @new-doc-in="(dir: string) => ((newDocDir = dir), (newDocOpen = true))"
           @rename="(n: TreeNode) => (prompt = { mode: 'rename', node: n })"
           @remove="onRemove"
           @move="onMove"
@@ -627,12 +649,13 @@ async function onTreeDrop(e: DragEvent) {
       :label="promptLabel()"
       :placeholder="t('tree.namePlaceholder')"
       :initial="promptInitial()"
-      :extra-label="prompt?.mode === 'newDoc' && theme.siteType === 'blog' ? t('tree.subtitle') : undefined"
-      :extra-placeholder="t('tree.subtitlePlaceholder')"
-      :confirm-text="prompt?.mode === 'newDoc' || prompt?.mode === 'newFolder' ? t('common.create') : t('common.confirm')"
+      :confirm-text="prompt?.mode === 'newFolder' ? t('common.create') : t('common.confirm')"
       @confirm="onPromptConfirm"
       @cancel="prompt = null"
     />
+
+    <!-- 新建文档:名称与配置头(标题/描述/日期/封面)一次填好 -->
+    <NewDocModal :open="newDocOpen" :dir="newDocDir" @confirm="onNewDocConfirm" @cancel="newDocOpen = false" />
 
     <!-- 移动目标文件夹选择对话框 -->
     <Teleport to="body">

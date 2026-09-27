@@ -60,9 +60,25 @@ const refCounts = computed(() =>
 /* ---------- 选中与引用详情 ---------- */
 
 const selected = ref<string | null>(null);
+
+/* ---------- 详情窗宽度可拖拽(右侧面板) ---------- */
+const splitHost = ref<HTMLElement>();
+const detailW = ref(300);
+
+function onDividerDown(e: PointerEvent) {
+  (e.target as HTMLElement).setPointerCapture(e.pointerId);
+}
+
+function onDividerMove(e: PointerEvent) {
+  if (!(e.buttons & 1) || !splitHost.value) return;
+  const rect = splitHost.value.getBoundingClientRect();
+  detailW.value = Math.min(520, Math.max(220, rect.right - e.clientX));
+}
 const selectedRefs = computed<ImageRef[]>(() =>
   selected.value ? findImageRefs(selected.value, Object.keys(docs.value), docs.value) : [],
 );
+
+const selectedNode = computed(() => images.value.find((i) => i.path === selected.value));
 
 function select(path: string) {
   selected.value = selected.value === path ? null : path;
@@ -136,7 +152,8 @@ async function rename(img: TreeNode) {
       if (updated === content) continue;
       await ipc.saveDoc(r.docPath, updated);
       if (isOpen) {
-        // 编辑器离开工作区时已卸载,直接同步 store,切回后按新内容重建
+        // 编辑器离开工作区时已卸载,直接同步 store;若仍在挂载中则让 CM 同步新内容
+        editor.externalReplace = true;
         editor.content = updated;
         editor.savedContent = updated;
       } else {
@@ -194,8 +211,9 @@ function thumbUrl(path: string): string {
       </button>
     </header>
 
-    <!-- 图片网格 -->
-    <div class="min-h-0 flex-1 overflow-y-auto p-5">
+    <!-- 左:图片网格 | 右:详情窗(宽度可拖拽) -->
+    <div ref="splitHost" class="flex min-h-0 flex-1">
+    <div class="min-w-0 flex-1 overflow-y-auto p-5">
       <p v-if="!images.length" class="rounded-lg border border-dashed border-line px-4 py-10 text-center text-[13px] leading-relaxed text-ink-3">
         {{ t("assets.empty") }}
       </p>
@@ -236,41 +254,49 @@ function thumbUrl(path: string): string {
       </div>
     </div>
 
-    <!-- 引用详情 -->
-    <div v-if="selected" class="shrink-0 border-t border-line bg-surface px-5 py-3">
-      <div class="flex items-start gap-4">
-        <img
-          v-if="thumbUrl(selected) && !brokenThumbs.has(selected)"
-          :key="selected"
-          :src="thumbUrl(selected)"
-          :alt="basename(selected)"
-          class="h-16 w-24 shrink-0 rounded-md border border-line object-contain"
-          @error="brokenThumbs.add(selected)"
-        />
-        <span v-else class="thumb-fallback h-16 w-24 shrink-0 rounded-md border border-line">{{ basename(selected) }}</span>
-        <div class="min-w-0 flex-1">
-          <p class="truncate text-[13px] font-medium" :title="basename(selected)">{{ basename(selected) }}</p>
-          <p class="mono truncate text-[11px] text-ink-3">{{ selected }}</p>
-          <div class="mt-2 flex flex-wrap items-center gap-1.5">
-            <template v-if="selectedRefs.length">
-              <button
-                v-for="(r, i) in selectedRefs"
-                :key="i"
-                class="ref-chip"
-                :title="t('assets.openReferrer')"
-                @click="openDoc(r.docPath)"
-              >
-                <AppIcon name="doc" :size="12" />
-                <span class="max-w-40 truncate">{{ r.docPath }}</span>
-              </button>
-            </template>
-            <span v-else class="text-[12px] text-ink-3">{{ t("assets.noRefs") }}</span>
-          </div>
+    <!-- 右:详情窗(引用位置以列表呈现) -->
+    <template v-if="selected">
+      <div class="divider w-px shrink-0 cursor-col-resize bg-line" @pointerdown="onDividerDown" @pointermove="onDividerMove" />
+      <aside class="shrink-0 overflow-y-auto border-l border-line bg-surface px-4 py-4" :style="{ width: detailW + 'px' }">
+        <div class="flex items-center gap-1">
+          <span class="min-w-0 flex-1 truncate text-[13.5px] font-semibold" :title="basename(selected)">{{ basename(selected) }}</span>
+          <button v-if="selectedNode" class="btn-icon !h-7 !w-7" :title="t('assets.rename')" @click="rename(selectedNode)">
+            <AppIcon name="pencil" :size="14" />
+          </button>
+          <button v-if="selectedNode" class="btn-icon !h-7 !w-7 hover:!text-danger" :title="t('common.delete')" @click="remove(selectedNode)">
+            <AppIcon name="trash" :size="14" />
+          </button>
+          <button class="btn-icon !h-7 !w-7" :title="t('common.close')" @click="selected = null">
+            <AppIcon name="x" :size="14" />
+          </button>
         </div>
-        <button class="btn-icon !h-7 !w-7 shrink-0" :title="t('common.close')" @click="selected = null">
-          <AppIcon name="x" :size="14" />
-        </button>
-      </div>
+
+        <div class="detail-preview mt-3">
+          <img
+            v-if="thumbUrl(selected) && !brokenThumbs.has(selected)"
+            :key="selected"
+            :src="thumbUrl(selected)"
+            :alt="basename(selected)"
+            @error="brokenThumbs.add(selected)"
+          />
+          <span v-else class="thumb-fallback h-full w-full">{{ basename(selected) }}</span>
+        </div>
+        <p class="mono mt-2 break-all text-[11px] text-ink-3">{{ selected }}</p>
+
+        <h3 class="field-label mt-4">{{ t("assets.refsHeading") }}</h3>
+        <ul v-if="selectedRefs.length" class="mt-1 flex flex-col">
+          <li v-for="(r, i) in selectedRefs" :key="i">
+            <button class="ref-row" :title="t('assets.openReferrer')" @click="openDoc(r.docPath)">
+              <AppIcon name="doc" :size="13" />
+              <span class="min-w-0 flex-1 truncate text-left">{{ r.docPath }}</span>
+              <AppIcon name="arrowRight" :size="12" class="shrink-0 text-ink-3" />
+            </button>
+          </li>
+        </ul>
+        <p v-else class="mt-1 text-[12px] text-ink-3">{{ t("assets.noRefs") }}</p>
+      </aside>
+    </template>
+
     </div>
 
     <!-- 重命名 -->
@@ -344,21 +370,35 @@ function thumbUrl(path: string): string {
   opacity: 0.7;
 }
 
-.ref-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  max-width: 200px;
-  padding: 3px 8px;
-  border-radius: 6px;
+.detail-preview {
+  aspect-ratio: 4 / 3;
+  border-radius: 8px;
   border: 1px solid var(--color-line);
-  background: var(--color-bg);
+  background:
+    repeating-conic-gradient(var(--color-surface-2) 0 25%, transparent 0 50%) 0 0 / 16px 16px;
+  overflow: hidden;
+}
+.detail-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.ref-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
   color: var(--color-ink-2);
-  font-size: 11.5px;
+  font-size: 12.5px;
   cursor: pointer;
   transition: background-color var(--duration-base) var(--ease-plain);
 }
-.ref-chip:hover {
+.ref-row:hover {
   background: var(--color-surface-2);
   color: var(--color-ink);
 }

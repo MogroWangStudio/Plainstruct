@@ -14,8 +14,8 @@ interface State {
   activePath: string | null;
   /** 内容树中选中的图片文件(显示预览而非编辑器),与 activePath 互斥展示 */
   activeImage: string | null;
-  /** 新建文档后置位:编辑器就绪时自动弹出配置头表单 */
-  fmPending: boolean;
+  /** 外部(非编辑器)写回内容时置位:MarkdownEditor 据此把新内容同步进 CodeMirror */
+  externalReplace: boolean;
   content: string;
   savedContent: string;
   saving: boolean;
@@ -33,7 +33,7 @@ export const useEditorStore = defineStore("editor", {
   state: (): State => ({
     activePath: null,
     activeImage: null,
-    fmPending: false,
+    externalReplace: false,
     content: "",
     savedContent: "",
     saving: false,

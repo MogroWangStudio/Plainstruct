@@ -58,7 +58,7 @@ body.font-custom {
   display: flex;
   align-items: center;
   gap: 24px;
-  max-width: calc(var(--ps-content-w) + 236px);
+  max-width: var(--ps-topbar-w, 916px);
   margin: 0 auto;
   padding: 0 24px;
   height: var(--ps-topbar-h);
@@ -827,6 +827,14 @@ a.blog-page-step:active {
 .blog-entry-cover img {
   display: block;
   width: 100%;
-  aspect-ratio: 2 / 1;
+  height: var(--ps-cover-h, 220px);
   object-fit: cover;
+}
+
+/* 文章卡片流多列(主题配置「文章卡片并排」) */
+.blog-stream {
+  display: grid;
+  grid-template-columns: repeat(var(--ps-nav-columns, 1), 1fr);
+  gap: 0 28px;
+  align-items: start;
 }

@@ -1,3 +1,30 @@
+/** 素构识别的配置头字段(写回时以表单值为准重建这些行) */
+export const FM_KEYS = ["title", "description", "date", "order", "cover"];
+
+/**
+ * 把表单值写回文档内容:识别字段以表单为准(留空不写),用户手写的其它行原样保留;
+ * 文档没有配置头时在最前生成完整块。
+ */
+export function applyFrontMatter(
+  content: string,
+  values: { title?: string; description?: string; date?: string; cover?: string },
+): string {
+  const fields = [
+    ...(values.title?.trim() ? [`title: ${values.title.trim()}`] : []),
+    ...(values.description?.trim() ? [`description: ${values.description.trim()}`] : []),
+    ...(values.date?.trim() ? [`date: ${values.date.trim()}`] : []),
+    ...(values.cover?.trim() ? [`cover: ${values.cover.trim()}`] : []),
+  ];
+  const m = content.match(/^---\r?\n([\s\S]*?)\r?\n(?:---|\.\.\.)(?:\r?\n|$)/);
+  if (!m) {
+    return `---\n${fields.join("\n")}\n---\n\n${content}`;
+  }
+  const kept = m[1]
+    .split(/\r?\n/)
+    .filter((l) => l.trim() && !FM_KEYS.some((k) => l.toLowerCase().trimStart().startsWith(`${k}:`)));
+  return `---\n${[...fields, ...kept].join("\n")}\n---\n${content.slice(m[0].length)}`;
+}
+
 /** 极简 front-matter:文件起始 --- 包围块,支持 title / order / description / date */
 
 export interface FrontMatter {

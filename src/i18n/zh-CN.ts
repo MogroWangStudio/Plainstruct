@@ -73,6 +73,7 @@ export default {
     delete: "删除",
     newDocTitle: "新建文档",
     docName: "文档名称",
+    newDocFmHint: "标题、描述、日期与封面会写入文档开头的配置头,留空的字段不会写入。",
     subtitle: "副标题(可选)",
     subtitlePlaceholder: "展示在文章列表卡片上的一句话",
     folderName: "文件夹名称",
@@ -143,6 +144,7 @@ export default {
     fmDate: "日期",
     fmCover: "封面图",
     fmCoverHint: "从站点 images 选择,或输入路径/外链",
+    fmCoverImport: "导入图片",
     fmHint: "保存后写回文档开头的配置头;留空的字段不会写入,文档排序等自定义字段会原样保留。",
     fmTitlePlaceholder: "文档标题",
   },
@@ -164,6 +166,7 @@ export default {
     deleteBodyReferenced: "「{name}」正被 {n} 处文档引用,删除后这些引用将失效。确定删除?图片将移入系统回收站。",
     deleted: "「{name}」已删除",
     noRefs: "暂无文档引用此图片",
+    refsHeading: "引用位置",
     openReferrer: "打开引用此图片的文档",
   },
   site: {

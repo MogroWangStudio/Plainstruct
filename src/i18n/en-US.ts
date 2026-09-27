@@ -73,6 +73,7 @@ export default {
     delete: "Delete",
     newDocTitle: "New document",
     docName: "Document name",
+    newDocFmHint: "Title, description, date and cover are written to the document's front-matter; empty fields are omitted.",
     subtitle: "Subtitle (optional)",
     subtitlePlaceholder: "One line shown on the post card",
     folderName: "Folder name",
@@ -143,6 +144,7 @@ export default {
     fmDate: "Date",
     fmCover: "Cover image",
     fmCoverHint: "Pick from the site's images folder, or type a path/URL",
+    fmCoverImport: "Import",
     fmHint: "Saving writes these back to the front-matter at the top of the document; empty fields are omitted, custom fields you wrote by hand are kept as-is.",
     fmTitlePlaceholder: "Document title",
   },
@@ -164,6 +166,7 @@ export default {
     deleteBodyReferenced: "\"{name}\" is referenced by {n} documents; those references will break after deletion. Delete anyway? The image moves to the system trash.",
     deleted: "\"{name}\" deleted",
     noRefs: "Not referenced by any document",
+    refsHeading: "Referenced in",
     openReferrer: "Open the document referencing this image",
   },
   site: {

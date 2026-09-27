@@ -14,7 +14,7 @@ import { useAppStore } from "@/stores/app";
 import { useSiteStore } from "@/stores/site";
 import { useUiStore } from "@/stores/ui";
 import { ipc } from "@/ipc/ipc";
-import { parseFrontMatter } from "@/lib/frontmatter";
+import { applyFrontMatter, parseFrontMatter } from "@/lib/frontmatter";
 import { encodePath, stripExt } from "@/lib/paths";
 import { registerCmView, unregisterCmView } from "@/lib/contextMenu";
 import AppIcon from "@/components/AppIcon.vue";
@@ -320,19 +320,21 @@ function frontMatterEnd(doc: Text): number | null {
 
 /* ---------- 配置头可视化编辑:表单弹窗,确认后就地写回 ---------- */
 
-const FM_KEYS = ["title", "description", "date", "order", "cover"];
-
 const fmOpen = ref(false);
 const fmForm = reactive({ title: "", description: "", date: "", cover: "" });
+
+/** 当前文档位置引用 images/ 的路径前缀(根级 images/…,子目录 ../images/…) */
+function coverPrefix(): string {
+  const depth = editor.activePath ? editor.activePath.split("/").length - 1 : 0;
+  return "../".repeat(depth) + "images/";
+}
 
 /** 站点 images 文件夹里的图(按当前文档位置换算为可直接使用的路径建议) */
 const coverSuggestions = computed(() => {
   const dir = site.tree.find((n) => n.type === "dir" && n.name.toLowerCase() === "images");
-  const depth = editor.activePath ? editor.activePath.split("/").length - 1 : 0;
-  const prefix = "../".repeat(depth) + "images/";
   return (dir?.children ?? [])
     .filter((n) => n.type === "file")
-    .map((n) => prefix + n.name);
+    .map((n) => coverPrefix() + n.name);
 });
 
 /** 今天的本地日期(YYYY-MM-DD;toISOString 按 UTC 会在东八区晚间差一天) */
@@ -356,37 +358,26 @@ function openFmEditor(fromCreate = false) {
 /** 把表单值写回 front-matter:识别字段以表单为准,用户手写的其它字段原样保留 */
 function writeFrontMatter() {
   if (!view) return;
-  const v = {
-    title: fmForm.title.trim(),
-    description: fmForm.description.trim(),
+  const next = applyFrontMatter(view.state.doc.toString(), {
+    title: fmForm.title,
+    description: fmForm.description,
     date: fmForm.date,
-    cover: fmForm.cover.trim(),
-  };
-  const fields = [
-    ...(v.title ? [`title: ${v.title}`] : []),
-    ...(v.description ? [`description: ${v.description}`] : []),
-    ...(v.date ? [`date: ${v.date}`] : []),
-    ...(v.cover ? [`cover: ${v.cover}`] : []),
-  ];
-  const { state } = view;
-  const fmEnd = frontMatterEnd(state.doc);
-  if (fmEnd === null) {
-    // 无配置头:生成完整块,正文原样保留在后
-    const insert = `---\n${fields.join("\n")}\n---\n\n`;
-    commit(0, 0, insert, insert.length, insert.length);
-    fmOpen.value = false;
-    return;
-  }
-  // 已有配置头:保留非素构字段的行,替换整个块
-  const endLine = state.doc.lineAt(fmEnd).number;
-  const kept: string[] = [];
-  for (let n = 2; n < endLine; n++) {
-    const text = state.doc.line(n).text;
-    if (!FM_KEYS.some((k) => text.toLowerCase().trimStart().startsWith(`${k}:`))) kept.push(text);
-  }
-  const block = `---\n${[...fields, ...kept].join("\n")}\n---`;
-  commit(0, fmEnd, block, block.length, block.length);
+    cover: fmForm.cover,
+  });
+  commit(0, view.state.doc.length, next, next.length, next.length);
   fmOpen.value = false;
+}
+
+/** 直接选取本地图片导入 images,作为表单里的封面图 */
+async function importCover() {
+  try {
+    const files = await ipc.pickImages();
+    if (!files?.length) return;
+    const names = await site.importSiteImages(files);
+    if (names.length) fmForm.cover = coverPrefix() + names[0];
+  } catch (e) {
+    ui.toast(t("editor.imageImportFailed", { msg: ipc.errText(e) }), "error");
+  }
 }
 
 /**
@@ -402,10 +393,8 @@ async function insertImage() {
   try {
     const names = await site.importSiteImages(files);
     if (!names.length) return;
-    const depth = editor.activePath ? editor.activePath.split("/").length - 1 : 0;
-    const prefix = "../".repeat(depth) + "images/";
     const markdown = names
-      .map((name) => `![${stripExt(name) || t("editor.toolbar.imageAlt")}](${encodePath(prefix + name)})`)
+      .map((name) => `![${stripExt(name) || t("editor.toolbar.imageAlt")}](${encodePath(coverPrefix() + name)})`)
       .join("\n");
     const { state } = view;
     const range = state.selection.main;
@@ -725,21 +714,16 @@ onMounted(() => {
   });
   // 注册到右键菜单:编辑器内的右键文本操作直接作用于 CodeMirror 选区
   registerCmView(host.value!, view);
-  // 新建文档:编辑器就绪即弹出配置头表单(创建时便可直接设置标题/描述/日期/封面)
-  if (editor.fmPending) {
-    editor.fmPending = false;
-    openFmEditor(true);
-  }
 });
 
-// 新建标志在编辑器已挂载时到达(如快速连续创建)也即时响应
+// 外部写回(新建文档配置头、资产页重命名联动):把 store 的新内容同步进 CodeMirror
 watch(
-  () => editor.fmPending,
-  (pending) => {
-    if (pending && view) {
-      editor.fmPending = false;
-      openFmEditor(true);
-    }
+  () => editor.content,
+  (next) => {
+    if (!editor.externalReplace || !view) return;
+    editor.externalReplace = false;
+    const cur = view.state.doc.toString();
+    if (next !== cur) view.dispatch({ changes: { from: 0, to: cur.length, insert: next } });
   },
 );
 
@@ -855,7 +839,13 @@ defineExpose({
         </label>
         <label class="flex flex-col gap-1">
           <span class="field-label">{{ t("editor.fmCover") }}</span>
-          <input v-model="fmForm.cover" class="input" type="text" list="fmCoverOptions" :placeholder="t('editor.fmCoverHint')" />
+          <div class="flex gap-2">
+            <input v-model="fmForm.cover" class="input min-w-0 flex-1" type="text" list="fmCoverOptions" :placeholder="t('editor.fmCoverHint')" />
+            <button type="button" class="btn btn-secondary shrink-0" @click="importCover">
+              <AppIcon name="download" :size="14" />
+              {{ t("editor.fmCoverImport") }}
+            </button>
+          </div>
           <datalist id="fmCoverOptions">
             <option v-for="s in coverSuggestions" :key="s" :value="s" />
           </datalist>
