@@ -218,7 +218,9 @@ pub async fn github_sync(
             reqwest::Method::POST,
             &format!("{API}/user/repos"),
             &cfg.token,
-            Some(json!({ "name": cfg.repo, "private": false, "auto_init": false })),
+            // auto_init:完全空仓库无法通过 Git API 创建首个分支引用(会 409),
+            // 让 GitHub 自带初始提交把仓库初始化
+            Some(json!({ "name": cfg.repo, "private": false, "auto_init": true })),
         )
         .await?;
         if create_status != 201 && create_status != 202 {
@@ -233,13 +235,39 @@ pub async fn github_sync(
     let ref_url = repo_api(&cfg, &format!("/git/ref/{}", branch_ref.replace('/', "%2F")));
 
     // 3. 取基准提交。分支不存在时不预建空树(Git API 拒绝空 tree 数组,会 422),
-    //    直接以本次站点提交(无 parents)作为发布分支的初始提交,提交后再创建 ref
+    //    直接以本次站点提交(无 parents)作为发布分支的初始提交,提交后再创建 ref。
+    //    完全空仓库(无任何提交)的 ref 查询返回 409「Git Repository is empty」,
+    //    且 Git API 无法在空仓库直接创建 ref:先用 Contents API 在发布分支放入
+    //    种子文件生成初始提交,再以该提交为基准发布(站点提交随后全量替换种子文件)
     let (ref_status, ref_body) = request(&http, reqwest::Method::GET, &ref_url, &cfg.token, None).await?;
     let mut base_commit: Option<String> = None;
     let mut branch_exists = false;
     if ref_status == 200 {
         base_commit = ref_body["object"]["sha"].as_str().map(|s| s.to_string());
         branch_exists = true;
+    } else if ref_status == 409 {
+        let (seed_status, seed_body) = request(
+            &http,
+            reqwest::Method::PUT,
+            &repo_api(&cfg, "/contents/plainstruct-init.md"),
+            &cfg.token,
+            Some(json!({
+                "message": "plainstruct: init publish branch",
+                "content": B64.encode(b"# Plainstruct\n\nThis branch is published by Plainstruct. Site content replaces this file on first publish.\n"),
+                "branch": cfg.branch,
+            })),
+        )
+        .await?;
+        if seed_status != 201 && seed_status != 200 {
+            let msg = seed_body["message"].as_str().unwrap_or("");
+            return Err(format!("初始化发布分支失败({seed_status}): {msg}"));
+        }
+        // 种子提交已创建发布分支,重新取基准;此后走常规的分支更新路径
+        let (ref_status, ref_body) = request(&http, reqwest::Method::GET, &ref_url, &cfg.token, None).await?;
+        if ref_status == 200 {
+            base_commit = ref_body["object"]["sha"].as_str().map(|s| s.to_string());
+            branch_exists = true;
+        }
     }
 
     // 4. 逐文件建 blob(全量替换,天然处理删除)

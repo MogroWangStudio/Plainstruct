@@ -18,7 +18,7 @@ pub struct RecentSite {
 /// 数据文件(当前数据目录的 app.json)。
 /// custom_data_dir 仅在默认目录的 app.json 中作为「引导指针」有意义:
 /// 启动时按它把数据目录切到自定义位置,其余字段为真实数据。
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct AppData {
     #[serde(default)]
@@ -26,7 +26,7 @@ pub(crate) struct AppData {
     #[serde(default)]
     recent_sites: Vec<RecentSite>,
     #[serde(default)]
-    custom_data_dir: Option<String>,
+    pub(crate) custom_data_dir: Option<String>,
 }
 
 #[derive(Serialize)]
