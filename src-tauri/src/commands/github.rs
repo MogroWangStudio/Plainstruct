@@ -410,28 +410,59 @@ async fn github_sync_inner(app: &AppHandle, state: &AppState, cfg: GithubConfig)
         branch_exists = true;
         emit_log(app, "info", "发布分支已存在,将基于云端最新提交增量更新");
     } else if ref_status == 409 {
-        emit_log(app, "info", "仓库为空,正在初始化发布分支…");
+        // 完全空仓库:Git API 无法直接创建引用(409),而 Contents API 的首个写入
+        // 只接受仓库默认分支(指定其他分支会 404 Not Found)。因此:
+        // 先把种子提交写到默认分支,仓库不再为空后,再用 Git API 从该提交创建发布分支
+        emit_log(app, "info", "仓库为空,正在初始化…");
+        let (info_status, repo_info) = request(&http, reqwest::Method::GET, &repo_api(&cfg, ""), &cfg.token, None).await?;
+        if info_status != 200 {
+            return Err(format!("访问仓库失败({info_status})"));
+        }
+        let default_branch = repo_info["default_branch"].as_str().unwrap_or("main").to_string();
+        emit_log(app, "info", format!("向默认分支 {default_branch} 写入初始化提交…"));
         let (seed_status, seed_body) = request(
             &http,
             reqwest::Method::PUT,
             &repo_api(&cfg, "/contents/plainstruct-init.md"),
             &cfg.token,
             Some(json!({
-                "message": "plainstruct: init publish branch",
+                "message": "plainstruct: init repository",
                 "content": B64.encode(b"# Plainstruct\n\nThis branch is published by Plainstruct. Site content replaces this file on first publish.\n"),
-                "branch": cfg.branch,
+                "branch": default_branch,
             })),
         )
         .await?;
         if seed_status != 201 && seed_status != 200 {
             let msg = seed_body["message"].as_str().unwrap_or("");
-            return Err(format!("初始化发布分支失败({seed_status}): {msg}"));
+            return Err(format!("初始化仓库失败({seed_status}): {msg}"));
         }
-        // 种子提交已创建发布分支,重新取基准;此后走常规的分支更新路径
+        let seed_commit = seed_body["commit"]["sha"]
+            .as_str()
+            .ok_or("初始化响应缺少提交 SHA")?
+            .to_string();
+        // 仓库已有提交:从种子提交创建发布分支(非空仓库 Git API 正常)
+        emit_log(app, "info", format!("创建发布分支 {}…", cfg.branch));
+        let (created, create_body) = request(
+            &http,
+            reqwest::Method::POST,
+            &repo_api(&cfg, "/git/refs"),
+            &cfg.token,
+            Some(json!({ "ref": branch_ref, "sha": seed_commit })),
+        )
+        .await?;
+        if created != 201 {
+            let msg = create_body["message"].as_str().unwrap_or("").to_string();
+            let already_exists = created == 422 && msg.to_lowercase().contains("exist");
+            if !already_exists {
+                return Err(format!("创建发布分支失败({created}): {msg}"));
+            }
+        }
+        // 重新取发布分支基准;此后走常规的分支更新路径
         let (ref_status, ref_body) = request(&http, reqwest::Method::GET, &ref_url, &cfg.token, None).await?;
         if ref_status == 200 {
             base_commit = ref_body["object"]["sha"].as_str().map(|s| s.to_string());
             branch_exists = true;
+            emit_log(app, "info", "发布分支已就绪,开始写入站点内容");
         }
     } else {
         emit_log(app, "info", format!("发布分支不存在(ref 查询返回 {ref_status}),将创建分支并写入首个站点提交"));
