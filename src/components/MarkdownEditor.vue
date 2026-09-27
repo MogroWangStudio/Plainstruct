@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /** CodeMirror 6 Markdown 编辑器 -- 格式工具栏 + 快捷键 + 列表续行 + 空白标记,素构浅色高亮 */
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { Decoration, DecorationSet, EditorView, keymap, KeyBinding, ViewPlugin, ViewUpdate, WidgetType } from "@codemirror/view";
 import { Compartment, EditorState, type Extension, type Text, RangeSetBuilder } from "@codemirror/state";
@@ -14,9 +14,11 @@ import { useAppStore } from "@/stores/app";
 import { useSiteStore } from "@/stores/site";
 import { useUiStore } from "@/stores/ui";
 import { ipc } from "@/ipc/ipc";
+import { parseFrontMatter } from "@/lib/frontmatter";
 import { encodePath, stripExt } from "@/lib/paths";
 import { registerCmView, unregisterCmView } from "@/lib/contextMenu";
 import AppIcon from "@/components/AppIcon.vue";
+import Modal from "@/components/Modal.vue";
 
 const { t } = useI18n();
 const editor = useEditorStore();
@@ -316,49 +318,71 @@ function frontMatterEnd(doc: Text): number | null {
   return null;
 }
 
-/** 素构识别的配置头字段与快速生成的默认值(日期为当天) */
-function fmDefaults(): { key: string; line: string }[] {
-  const today = new Date().toISOString().slice(0, 10);
-  return [
-    { key: "title", line: `title: ${editor.docTitle || t("editor.fmTitlePlaceholder")}` },
-    { key: "description", line: "description:" },
-    { key: "date", line: `date: ${today}` },
-    { key: "order", line: "order: 0" },
-  ];
+/* ---------- 配置头可视化编辑:表单弹窗,确认后就地写回 ---------- */
+
+const FM_KEYS = ["title", "description", "date", "order", "cover"];
+
+const fmOpen = ref(false);
+const fmForm = reactive({ title: "", description: "", date: "", order: "", cover: "" });
+
+/** 站点 images 文件夹里的图(按当前文档位置换算为可直接使用的路径建议) */
+const coverSuggestions = computed(() => {
+  const dir = site.tree.find((n) => n.type === "dir" && n.name.toLowerCase() === "images");
+  const depth = editor.activePath ? editor.activePath.split("/").length - 1 : 0;
+  const prefix = "../".repeat(depth) + "images/";
+  return (dir?.children ?? [])
+    .filter((n) => n.type === "file")
+    .map((n) => prefix + n.name);
+});
+
+/** 打开表单:预填当前配置头的字段值(没有配置头时 title/date 给出默认) */
+function openFmEditor() {
+  if (!view) return;
+  const parsed = parseFrontMatter(view.state.sliceDoc(0, view.state.doc.length));
+  fmForm.title = parsed.data.title ?? (frontMatterEnd(view.state.doc) === null ? editor.docTitle : "");
+  fmForm.description = parsed.data.description ?? "";
+  fmForm.date = parsed.data.date ?? (frontMatterEnd(view.state.doc) === null ? new Date().toISOString().slice(0, 10) : "");
+  fmForm.order = parsed.data.order === undefined ? "" : String(parsed.data.order);
+  fmForm.cover = parsed.data.cover ?? "";
+  fmOpen.value = true;
 }
 
-/**
- * 配置头快速添加:文档没有 front-matter 时在开头生成完整配置头(title/date 自动填充);
- * 已有配置头时仅在闭合围栏前补齐缺失的识别字段,已有字段保持原样,不做重复添加。
- */
-function insertFrontMatter() {
+/** 把表单值写回 front-matter:识别字段以表单为准,用户手写的其它字段原样保留 */
+function writeFrontMatter() {
   if (!view) return;
+  const v = {
+    title: fmForm.title.trim(),
+    description: fmForm.description.trim(),
+    date: fmForm.date,
+    order: fmForm.order.trim(),
+    cover: fmForm.cover.trim(),
+  };
+  const fields = [
+    ...(v.title ? [`title: ${v.title}`] : []),
+    ...(v.description ? [`description: ${v.description}`] : []),
+    ...(v.date ? [`date: ${v.date}`] : []),
+    ...(v.order ? [`order: ${v.order}`] : []),
+    ...(v.cover ? [`cover: ${v.cover}`] : []),
+  ];
   const { state } = view;
-  const doc = state.doc;
-  const fmEnd = frontMatterEnd(doc);
+  const fmEnd = frontMatterEnd(state.doc);
   if (fmEnd === null) {
-    // 无配置头:生成完整模板,光标落到 title 值处便于直接修改
-    const lines = fmDefaults().map((f) => f.line);
-    const insert = `---\n${lines.join("\n")}\n---\n\n`;
-    const titleFrom = 4 + "title: ".length;
-    commit(0, 0, insert, titleFrom, titleFrom + (editor.docTitle || t("editor.fmTitlePlaceholder")).length);
+    // 无配置头:生成完整块,正文原样保留在后
+    const insert = `---\n${fields.join("\n")}\n---\n\n`;
+    commit(0, 0, insert, insert.length, insert.length);
+    fmOpen.value = false;
     return;
   }
-  // 已有配置头:收集出现过的字段,缺失的补在闭合围栏之前
-  const endLine = doc.lineAt(fmEnd).number;
-  const present = new Set<string>();
+  // 已有配置头:保留非素构字段的行,替换整个块
+  const endLine = state.doc.lineAt(fmEnd).number;
+  const kept: string[] = [];
   for (let n = 2; n < endLine; n++) {
-    const m = doc.line(n).text.match(/^([A-Za-z_][\w-]*)\s*:/);
-    if (m) present.add(m[1].toLowerCase());
+    const text = state.doc.line(n).text;
+    if (!FM_KEYS.some((k) => text.toLowerCase().trimStart().startsWith(`${k}:`))) kept.push(text);
   }
-  const missing = fmDefaults().filter((f) => !present.has(f.key));
-  if (!missing.length) {
-    ui.toast(t("editor.fmComplete"), "info");
-    return;
-  }
-  const closeLine = doc.line(endLine);
-  const insert = missing.map((f) => f.line).join("\n") + "\n";
-  commit(closeLine.from, closeLine.from, insert, closeLine.from, closeLine.from);
+  const block = `---\n${[...fields, ...kept].join("\n")}\n---`;
+  commit(0, fmEnd, block, block.length, block.length);
+  fmOpen.value = false;
 }
 
 /**
@@ -787,12 +811,48 @@ defineExpose({
         <AppIcon name="wrapText" :size="15" />
       </button>
       <span class="tb-sep" />
-      <button class="tb-btn" :title="t('editor.toolbar.frontmatter')" @click="insertFrontMatter">
+      <button class="tb-btn" :title="t('editor.toolbar.frontmatter')" @click="openFmEditor">
         <AppIcon name="filePlus" :size="15" />
       </button>
     </div>
 
     <div ref="host" class="min-h-0 flex-1 overflow-hidden" />
+
+    <!-- 配置头可视化编辑:表单控件替代手写字段,确认后就地写回 front-matter -->
+    <Modal v-if="fmOpen" :title="t('editor.fmEditorTitle')" :width="400" @cancel="fmOpen = false">
+      <div class="flex flex-col gap-3">
+        <label class="flex flex-col gap-1">
+          <span class="field-label">{{ t("editor.fmTitle") }}</span>
+          <input v-model="fmForm.title" class="input" type="text" :placeholder="t('editor.fmTitlePlaceholder')" />
+        </label>
+        <label class="flex flex-col gap-1">
+          <span class="field-label">{{ t("editor.fmDescription") }}</span>
+          <input v-model="fmForm.description" class="input" type="text" />
+        </label>
+        <div class="flex gap-3">
+          <label class="flex flex-1 flex-col gap-1">
+            <span class="field-label">{{ t("editor.fmDate") }}</span>
+            <input v-model="fmForm.date" class="input" type="date" />
+          </label>
+          <label class="flex w-24 flex-col gap-1">
+            <span class="field-label">{{ t("editor.fmOrder") }}</span>
+            <input v-model="fmForm.order" class="input" type="number" step="1" />
+          </label>
+        </div>
+        <label class="flex flex-col gap-1">
+          <span class="field-label">{{ t("editor.fmCover") }}</span>
+          <input v-model="fmForm.cover" class="input" type="text" list="fmCoverOptions" :placeholder="t('editor.fmCoverHint')" />
+          <datalist id="fmCoverOptions">
+            <option v-for="s in coverSuggestions" :key="s" :value="s" />
+          </datalist>
+        </label>
+        <p class="text-[12px] leading-relaxed text-ink-3">{{ t("editor.fmHint") }}</p>
+      </div>
+      <template #footer>
+        <button class="btn btn-secondary" @click="fmOpen = false">{{ t("common.cancel") }}</button>
+        <button class="btn btn-primary" @click="writeFrontMatter">{{ t("common.save") }}</button>
+      </template>
+    </Modal>
   </div>
 </template>
 
