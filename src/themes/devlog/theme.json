@@ -1,11 +1,40 @@
 {
   "id": "devlog",
   "name": "日志",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "author": "MogroWang Studio",
   "type": "blog",
   "description": "极客日志风:等宽排印,日期戳记,终端余温。",
   "config": [
+    {
+      "key": "navMode",
+      "label": "右上角导航",
+      "type": "select",
+      "default": "全部",
+      "options": [
+        "全部",
+        "自定义"
+      ]
+    },
+    {
+      "key": "navPicked",
+      "label": "选择要显示的文章或文件夹",
+      "type": "navlist",
+      "default": "",
+      "visibleIf": {
+        "key": "navMode",
+        "equals": "自定义"
+      }
+    },
+    {
+      "key": "navMaxItems",
+      "label": "右上角导航最多显示(项)",
+      "type": "number",
+      "default": 6,
+      "min": 1,
+      "max": 12,
+      "step": 1
+    },
     {
       "key": "accentColor",
       "label": "强调色",

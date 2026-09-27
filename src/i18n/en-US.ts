@@ -222,12 +222,15 @@ export default {
     resetConfigBody: "Restore all settings of “{name}” to their defaults?",
     resetConfirm: "Reset",
     resetDone: "Theme settings reset",
+    navlistEmpty: "No articles or folders to show yet.",
+    navlistMax: "Up to {n} items",
     fields: {
       color: "Color",
       text: "Text",
       number: "Number",
       select: "Choice",
       boolean: "Toggle",
+      navlist: "Nav picker",
     },
   },
   publish: {

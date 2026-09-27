@@ -21,6 +21,8 @@ interface RawNav {
   title: string;
   htmlPath?: string;
   children: RawNav[];
+  /** 文件夹项(配置面板的顶栏导航选择列表据此区分) */
+  dir?: boolean;
 }
 
 export type DocsCache = Record<string, string>;
@@ -107,6 +109,7 @@ function buildNav(nodes: TreeNode[], metas: Map<string, DocMeta>): RawNav[] {
           ? mdToHtml(indexChild.path)
           : mdToHtml(node.path ? `${node.path}/index.md` : "index.md"),
         children,
+        dir: true,
       });
     } else if (isMarkdown(node.path) && node.path.toLowerCase() !== "index.md") {
       // 根级 index.md 即站点首页(站点名入口),不重复出现在导航
@@ -188,6 +191,43 @@ export function postsPerPageOf(config: Record<string, string | number | boolean>
   return Number.isFinite(n) ? Math.min(50, Math.max(3, n)) : 10;
 }
 
+/** 博客顶栏导航数量上限的缺省值(上限可配 1–12,顶栏宽度有限,超出一律截断) */
+export const BLOG_NAV_MAX_DEFAULT = 6;
+const BLOG_NAV_MAX_CEIL = 12;
+
+/** 右上角导航数量上限(主题配置 navMaxItems,越界时收敛) */
+export function navMaxOf(config: Record<string, string | number | boolean>): number {
+  const n = Math.floor(Number(config.navMaxItems));
+  return Number.isFinite(n) ? Math.min(BLOG_NAV_MAX_CEIL, Math.max(1, n)) : BLOG_NAV_MAX_DEFAULT;
+}
+
+/**
+ * 博客顶栏导航:navMode 为"自定义"时按选择(htmlPath 按行分隔)保留,顺序仍随内容树;
+ * 选择为空或全部失效时回退为全部,避免导航意外消失。任何模式都受数量上限收敛。
+ */
+export function blogTopNav(config: Record<string, string | number | boolean>, raw: RawNav[]): RawNav[] {
+  const picked = String(config.navPicked ?? "")
+    .split("\n")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const chosen =
+    String(config.navMode ?? "") === "自定义" && picked.length
+      ? raw.filter((item) => item.htmlPath !== undefined && picked.includes(item.htmlPath))
+      : raw;
+  return chosen.slice(0, navMaxOf(config));
+}
+
+/** 配置面板用:顶层导航项(与构建同源),key 为 htmlPath(blogTopNav 按它匹配) */
+export function topNavItems(
+  tree: TreeNode[],
+  cache: DocsCache,
+): { key: string; title: string; dir: boolean }[] {
+  const metas = buildMetas(collectDocPaths(tree), cache);
+  return buildNav(tree, metas)
+    .filter((item) => item.htmlPath !== undefined)
+    .map((item) => ({ key: item.htmlPath!, title: item.title, dir: item.dir === true }));
+}
+
 /** 博客首页系列的 extras:当前页文章切片 + 分页信息(url 由 renderOnePage 按页深换算) */
 function blogHomeExtras(
   siteType: SiteType,
@@ -266,7 +306,8 @@ function renderOnePage(
       toc: isBlog && !pagination ? extractHeadings(doc.body) : undefined,
       pagination,
     },
-    nav: navForPage(navRaw, htmlPath, outDir),
+    // 博客顶栏按主题配置裁剪(自定义选择 + 数量上限);上/下篇与面包屑仍按完整导航树计算
+    nav: navForPage(isBlog ? blogTopNav(config, navRaw) : navRaw, htmlPath, outDir),
     prev: prev ? { title: prev.title, url: encodePath(relPosix(outDir, prev.htmlPath!)) } : undefined,
     next: next ? { title: next.title, url: encodePath(relPosix(outDir, next.htmlPath!)) } : undefined,
     posts: isBlog

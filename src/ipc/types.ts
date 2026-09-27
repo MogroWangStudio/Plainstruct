@@ -89,7 +89,7 @@ export interface TreeNode {
   children?: TreeNode[];
 }
 
-export type ThemeFieldType = "color" | "text" | "number" | "select" | "boolean";
+export type ThemeFieldType = "color" | "text" | "number" | "select" | "boolean" | "navlist";
 
 export interface ThemeField {
   key: string;

@@ -222,12 +222,15 @@ export default {
     resetConfigBody: "将「{name}」的全部配置恢复为默认值?",
     resetConfirm: "重置",
     resetDone: "主题配置已重置",
+    navlistEmpty: "暂无可显示的文章或文件夹。",
+    navlistMax: "已达最多显示 {n} 项",
     fields: {
       color: "颜色",
       text: "文本",
       number: "数值",
       select: "选项",
       boolean: "开关",
+      navlist: "导航选择",
     },
   },
   publish: {
