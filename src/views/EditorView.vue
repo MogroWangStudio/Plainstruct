@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /** 内容工作区:文件树 + 编辑器 + 实时预览(可拖动分栏,比例同步滚动);选中图片文件时显示图片预览 */
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useAppStore } from "@/stores/app";
 import { useEditorStore, type EditorMode } from "@/stores/editor";
@@ -21,6 +21,10 @@ const imageUrl = computed(() =>
     ? siteUrl(app.platform, `content/${editor.activeImage}`)
     : "",
 );
+
+/** 图片加载失败时渲染受控占位,避免 Chromium 的失败占位文本盖满窗口 */
+const imageFailed = ref(false);
+watch(() => editor.activeImage, () => (imageFailed.value = false));
 
 const editorRef = ref<InstanceType<typeof MarkdownEditor>>();
 const previewRef = ref<InstanceType<typeof DocPreview>>();
@@ -87,12 +91,18 @@ onBeforeUnmount(() => {
         </header>
         <div class="flex min-h-0 flex-1 items-center justify-center p-8">
           <img
-            v-if="imageUrl"
+            v-if="imageUrl && !imageFailed"
+            :key="editor.activeImage"
             :src="imageUrl"
             :alt="basename(editor.activeImage)"
             class="max-h-full max-w-full rounded-md border border-line object-contain"
+            @error="imageFailed = true"
           />
-          <span v-else class="text-[13px] text-ink-3">{{ basename(editor.activeImage) }}</span>
+          <div v-else class="flex flex-col items-center gap-3 text-ink-3">
+            <AppIcon name="image" :size="40" />
+            <span class="text-[13px]">{{ basename(editor.activeImage) }}</span>
+            <span v-if="imageFailed" class="text-[12px]">{{ t("editor.imageLoadFailed") }}</span>
+          </div>
         </div>
       </template>
 

@@ -60,6 +60,12 @@ watch(
 );
 
 const logoUrl = () => (site.config?.logo ? siteUrl(app.platform, `.plainstruct/assets/${site.config.logo}`) : "");
+/** Logo 加载失败时显示占位图标,不渲染 Chromium 的失败占位 */
+const logoFailed = ref(false);
+watch(
+  () => site.config?.logo,
+  () => (logoFailed.value = false),
+);
 
 async function save() {
   if (!form.name.trim()) return;
@@ -160,8 +166,18 @@ function openFolder() {
           <div>
             <label class="field-label">{{ t("site.logo") }}</label>
             <div class="flex items-center gap-4">
-              <img v-if="site.config?.logo" :src="logoUrl()" alt="logo" class="h-12 w-12 rounded-lg border border-line object-cover" />
-              <div v-else class="flex h-12 w-12 items-center justify-center rounded-lg border border-dashed border-line">
+              <img
+                v-if="site.config?.logo && !logoFailed"
+                :src="logoUrl()"
+                alt="logo"
+                class="h-12 w-12 rounded-lg border border-line object-cover"
+                @error="logoFailed = true"
+              />
+              <div
+                v-else
+                class="flex h-12 w-12 items-center justify-center rounded-lg border border-line bg-surface-2"
+                :class="{ 'border-dashed': !site.config?.logo }"
+              >
                 <AppIcon name="image" :size="18" class="text-ink-3" />
               </div>
               <div class="flex gap-2">

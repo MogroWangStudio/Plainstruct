@@ -137,6 +137,7 @@ export default {
     imageImported: "Copied {n} image(s) to the site's images folder",
     imageImportFailed: "Failed to import images: {msg}",
     fmComplete: "Front-matter fields are already complete",
+    imageLoadFailed: "Image failed to load",
     fmTitlePlaceholder: "Document title",
   },
   assets: {

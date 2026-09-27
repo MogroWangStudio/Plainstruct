@@ -31,6 +31,8 @@ const images = computed<TreeNode[]>(() => {
 
 const docs = ref<Record<string, string>>({});
 const loading = ref(false);
+/** 加载失败的图片路径:渲染受控占位,避免 Chromium 失败占位盖满窗口 */
+const brokenThumbs = ref(new Set<string>());
 
 async function loadDocs() {
   const paths = collectDocPaths(site.tree);
@@ -207,7 +209,13 @@ function thumbUrl(path: string): string {
           @click="select(img.path)"
         >
           <div class="thumb">
-            <img v-if="thumbUrl(img.path)" :src="thumbUrl(img.path)" :alt="img.name" loading="lazy" />
+            <img
+              v-if="thumbUrl(img.path) && !brokenThumbs.has(img.path)"
+              :src="thumbUrl(img.path)"
+              :alt="img.name"
+              loading="lazy"
+              @error="brokenThumbs.add(img.path)"
+            />
             <span v-else class="thumb-fallback">{{ img.name }}</span>
           </div>
           <p class="truncate px-2 pt-1.5 text-[12px]" :title="img.name">{{ img.name }}</p>
@@ -232,10 +240,12 @@ function thumbUrl(path: string): string {
     <div v-if="selected" class="shrink-0 border-t border-line bg-surface px-5 py-3">
       <div class="flex items-start gap-4">
         <img
-          v-if="thumbUrl(selected)"
+          v-if="thumbUrl(selected) && !brokenThumbs.has(selected)"
+          :key="selected"
           :src="thumbUrl(selected)"
           :alt="basename(selected)"
           class="h-16 w-24 shrink-0 rounded-md border border-line object-contain"
+          @error="brokenThumbs.add(selected)"
         />
         <span v-else class="thumb-fallback h-16 w-24 shrink-0 rounded-md border border-line">{{ basename(selected) }}</span>
         <div class="min-w-0 flex-1">

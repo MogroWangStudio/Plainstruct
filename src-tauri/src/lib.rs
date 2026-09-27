@@ -77,8 +77,13 @@ fn handle_site<R: tauri::Runtime>(
     }
 
     // 拒绝隐藏文件/目录(以 . 开头的路径段):.plainstruct 存放站点配置(可能含
-    // GitHub Token),不应通过预览协议暴露给构建产物中的不可信脚本
-    if rel.split('/').any(|seg| seg.starts_with('.')) {
+    // GitHub Token),不应通过预览协议暴露给构建产物中的不可信脚本。
+    // 唯一例外:.plainstruct/assets/ 的顶层文件(站点 Logo 等图片,不含敏感数据),
+    // 站点设置页需要在应用内预览 Logo。
+    let hidden = rel.split('/').any(|seg| seg.starts_with('.'));
+    let rest = rel.strip_prefix(".plainstruct/assets/").map(|r| r.trim_start_matches('/')).unwrap_or("");
+    let allowed_hidden = !rest.is_empty() && !rest.contains('/');
+    if hidden && !allowed_hidden {
         return serve_response(StatusCode::FORBIDDEN, "text/plain; charset=utf-8", b"forbidden".to_vec());
     }
 

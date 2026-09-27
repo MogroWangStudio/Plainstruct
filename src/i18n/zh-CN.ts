@@ -137,6 +137,7 @@ export default {
     imageImported: "已复制 {n} 张图片到站点 images 文件夹",
     imageImportFailed: "图片导入失败:{msg}",
     fmComplete: "配置头字段已齐全",
+    imageLoadFailed: "图片无法加载",
     fmTitlePlaceholder: "文档标题",
   },
   assets: {
