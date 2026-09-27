@@ -818,3 +818,15 @@ a.blog-page-step:active {
     font-size: 25px;
   }
 }
+
+/* 文章流封面图:条目顶部,纯排印无圆角 */
+.blog-entry-cover {
+  display: block;
+  margin: 0 0 18px;
+}
+.blog-entry-cover img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 2 / 1;
+  object-fit: cover;
+}

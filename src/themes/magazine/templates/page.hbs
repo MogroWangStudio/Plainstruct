@@ -5,6 +5,7 @@
     <div class="blog-stream">
       {{#each posts}}
         <article class="blog-entry">
+          {{#if this.cover}}<a class="blog-entry-cover" href="{{this.url}}"><img src="{{this.cover}}" alt="{{this.title}}" loading="lazy"></a>{{/if}}
           {{#if this.date}}<time class="blog-entry-date">{{this.date}}</time>{{/if}}
           <h2 class="blog-entry-title"><a href="{{this.url}}">{{this.title}}</a></h2>
           {{#if this.description}}<p class="blog-entry-desc">{{this.description}}</p>{{/if}}

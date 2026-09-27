@@ -3,8 +3,8 @@
 import { ipc } from "@/ipc/ipc";
 import type { BuildReport, BuildWarning, CopyItem, OutputFile, Platform, SiteConfig, SiteType, TreeNode } from "@/ipc/types";
 import { parseFrontMatter } from "./frontmatter";
-import { renderMarkdown, extractHeadings, type MdEnv } from "./markdown";
-import { basename, dirname, encodePath, isMarkdown, mdToHtml, relPosix, relPrefix, stripExt } from "./paths";
+import { renderMarkdown, decodeHref, splitHash, extractHeadings, type MdEnv } from "./markdown";
+import { basename, dirname, encodePath, isMarkdown, joinPosix, mdToHtml, relPosix, relPrefix, stripExt } from "./paths";
 import { compileTheme, mergeConfigDefaults, type NavItem, type PageContext, type PaginationInfo, type PostSummary, type ThemeBundle } from "./theme-engine";
 import { siteUrl } from "./preview";
 
@@ -14,6 +14,8 @@ export interface DocMeta {
   order: number;
   description?: string;
   date?: string;
+  /** 封面图:文档中的原始写法(相对本文档路径或外链 URL) */
+  cover?: string;
   body: string;
 }
 
@@ -65,10 +67,19 @@ function buildMetas(paths: string[], cache: DocsCache): Map<string, DocMeta> {
       order: data.order ?? 0,
       description: data.description,
       date: data.date,
+      cover: data.cover,
       body: stripLeadingTitle(body, title),
     });
   }
   return metas;
+}
+
+/** 封面图统一为 content/ 相对路径(外链 URL 原样保留),供文章流与预览换算页面地址 */
+function coverOf(meta: DocMeta): string | undefined {
+  const raw = meta.cover?.trim();
+  if (!raw) return undefined;
+  if (/^(https?:|data:)/i.test(raw)) return raw;
+  return joinPosix(dirname(meta.path), decodeHref(splitHash(raw)[0]));
 }
 
 /** 博客文章流:排除各级 index.md,有 date 的按日期倒序在前,无 date 的按标题排在后 */
@@ -80,6 +91,7 @@ function buildPosts(metas: Map<string, DocMeta>): PostSummary[] {
       htmlPath: mdToHtml(m.path),
       date: m.date,
       description: m.description,
+      cover: coverOf(m),
     }));
   const withDate = posts
     .filter((p) => p.date)
@@ -320,7 +332,11 @@ function renderOnePage(
     prev: prev ? { title: prev.title, url: encodePath(relPosix(outDir, prev.htmlPath!)) } : undefined,
     next: next ? { title: next.title, url: encodePath(relPosix(outDir, next.htmlPath!)) } : undefined,
     posts: isBlog
-      ? extras?.posts?.map((p) => ({ ...p, url: encodePath(relPosix(outDir, p.htmlPath)) }))
+      ? extras?.posts?.map((p) => ({
+          ...p,
+          url: encodePath(relPosix(outDir, p.htmlPath)),
+          cover: p.cover && !/^(https?:|data:)/i.test(p.cover) ? encodePath(relPosix(outDir, p.cover)) : p.cover,
+        }))
       : undefined,
     config,
   };

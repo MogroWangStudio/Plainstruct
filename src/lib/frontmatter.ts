@@ -6,6 +6,8 @@ export interface FrontMatter {
   description?: string;
   /** 发布日期,如 2026-09-26;原样保留,展示格式由主题决定 */
   date?: string;
+  /** 封面图(博客文章流展示):图片路径(相对本文档)或外链 URL */
+  cover?: string;
 }
 
 export interface ParsedDoc {
@@ -32,6 +34,7 @@ export function parseFrontMatter(src: string): ParsedDoc {
     const key = m[1].toLowerCase();
     const value = m[2].trim().replace(/^["']|["']$/g, "");
     if (key === "title") data.title = value;
+    else if (key === "cover") data.cover = value;
     else if (key === "order") {
       const n = Number(value);
       if (Number.isFinite(n)) data.order = n;

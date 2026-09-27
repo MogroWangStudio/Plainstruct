@@ -15,6 +15,18 @@ export interface ImageRef {
 const MD_IMAGE = /!\[([^\]]*)\]\(\s*([^)\s]+)(?:\s+"[^"]*")?\s*\)/g;
 /** 内联 HTML 图片:<img src="..."> */
 const HTML_IMAGE = /<img\b[^>]*\bsrc=["']([^"']+)["']/gi;
+/** front-matter 块(--- 包围的配置头) */
+const FRONT_MATTER = /^---\r?\n([\s\S]*?)\r?\n(?:---|\.\.\.)(?:\r?\n|$)/;
+/** 配置头中的封面图行 */
+const COVER_LINE = /^cover:\s*(.+)$/m;
+
+/** front-matter 中声明的封面图写法(原样,相对本文档路径或外链) */
+function coverRefsOf(content: string): string[] {
+  const fm = content.match(FRONT_MATTER);
+  if (!fm) return [];
+  const cover = fm[1].match(COVER_LINE)?.[1]?.trim().replace(/^["']|["']$/g, "");
+  return cover ? [cover] : [];
+}
 
 /** 站点图片的统一标识(content/ 相对路径)是否被某文档引用的路径写法命中 */
 function resolveRef(docPath: string, raw: string): string | null {
@@ -46,6 +58,7 @@ export function findImageRefs(
     };
     for (const m of content.matchAll(MD_IMAGE)) push(m[2], m[1]);
     for (const m of content.matchAll(HTML_IMAGE)) push(m[1], "");
+    for (const raw of coverRefsOf(content)) push(raw, "cover");
   }
   return refs;
 }
@@ -77,6 +90,7 @@ export function countImageRefs(
     };
     for (const m of content.matchAll(MD_IMAGE)) hit(m[2]);
     for (const m of content.matchAll(HTML_IMAGE)) hit(m[1]);
+    for (const raw of coverRefsOf(content)) hit(raw);
   }
   return counts;
 }

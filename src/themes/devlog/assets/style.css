@@ -873,3 +873,16 @@ a.blog-page-step:active {
     font-size: 18px;
   }
 }
+
+/* 文章流封面图:实线边框,匹配终端气质 */
+.blog-entry-cover {
+  display: block;
+  margin: 0 0 16px;
+  border: 1px solid var(--ps-line);
+}
+.blog-entry-cover img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 2 / 1;
+  object-fit: cover;
+}

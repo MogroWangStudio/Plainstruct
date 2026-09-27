@@ -23,6 +23,8 @@ export interface PostSummary {
   url?: string;
   date?: string;
   description?: string;
+  /** 封面图:content/ 相对路径或外链 URL,渲染时换算为页面相对地址 */
+  cover?: string;
 }
 
 export interface TocEntry {
