@@ -708,35 +708,38 @@ pub async fn update_download(
         return Err("already-latest".into());
     }
 
-    // 2. 选择当前平台的安装包:便携版(marker 标记)用 zip 解压覆盖,安装版用 NSIS 静默安装
+    // 2. 选择当前平台的更新包:按发行形态以关键字符匹配(大小写不敏感),不依赖文件名里的
+    //    版本号与分隔符写法——Windows 便携版(marker 标记)的更新包是免安装 zip(解压覆盖更新),
+    //    安装版是 NSIS 安装器(静默安装);macOS 用 dmg。x64 字样用于区分架构,官方产物名均携带。
     let portable = std::env::current_exe()
         .ok()
         .and_then(|exe| exe.parent().map(|p| p.join("portable.marker").exists()))
         .unwrap_or(false);
-    let want = |name: &str, suffix: &str| -> bool {
+    let want = |name: &str| -> bool {
         let n = name.to_ascii_lowercase();
         #[cfg(target_os = "windows")]
         {
-            n.ends_with(suffix) && n.contains("x64")
-                && if portable { n.contains("portable") } else { n.contains("setup") }
+            let shape = if portable {
+                n.ends_with(".zip") && n.contains("portable")
+            } else {
+                n.ends_with(".exe") && n.contains("setup")
+            };
+            shape && n.contains("x64")
         }
         #[cfg(target_os = "macos")]
         {
-            let _ = (name, suffix, portable);
+            let _ = portable;
             n.ends_with(".dmg")
         }
         #[cfg(not(any(target_os = "windows", target_os = "macos")))]
         {
-            let _ = (n, suffix, portable);
+            let _ = (n, portable);
             false
         }
     };
     let asset = body["assets"]
         .as_array()
-        .and_then(|list| {
-            list.iter()
-                .find(|a| want(a["name"].as_str().unwrap_or(""), ".exe") || want(a["name"].as_str().unwrap_or(""), ".dmg"))
-        })
+        .and_then(|list| list.iter().find(|a| want(a["name"].as_str().unwrap_or(""))))
         .ok_or("Release 中没有当前平台的安装包")?;
     let asset_name = asset["name"].as_str().unwrap_or("").to_string();
     let asset_url = asset["browser_download_url"].as_str().unwrap_or("").to_string();

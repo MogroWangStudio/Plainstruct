@@ -1,7 +1,7 @@
 {
   "id": "terminal",
   "name": "终端",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "type": "docs",
   "author": "MogroWang Studio",
   "description": "命令行风:等宽排印,暗色窗口,提示符导航。",

@@ -1,7 +1,7 @@
 {
   "id": "devlog",
   "name": "日志",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "author": "MogroWang Studio",
   "type": "blog",
   "description": "极客日志风:等宽排印,日期戳记,终端余温。",
