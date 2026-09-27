@@ -124,12 +124,46 @@ function onEditorFontCustom(e: Event) {
   void app.setAppearance({ editorFontCustom: (e.target as HTMLInputElement).value });
 }
 
+/* ---------- 数据存储位置 ---------- */
+
+const dataMoving = ref(false);
+const dataError = ref("");
+
+async function pickDataDir() {
+  const dir = await ipc.pickDirectory();
+  if (!dir) return;
+  dataMoving.value = true;
+  dataError.value = "";
+  try {
+    await app.setDataDir(dir);
+  } catch (e) {
+    dataError.value = ipc.errText(e);
+  }
+  dataMoving.value = false;
+}
+
+async function resetDataDir() {
+  dataMoving.value = true;
+  dataError.value = "";
+  try {
+    await app.setDataDir(null);
+  } catch (e) {
+    dataError.value = ipc.errText(e);
+  }
+  dataMoving.value = false;
+}
+
+function openDataDir() {
+  void ipc.openDataDir();
+}
+
 /* ---------- 类别分页:一次只显示一个类别,按导航次序决定滑入方向 ---------- */
 
 const sections = computed(() => [
   { id: "language", label: t("settings.sectionLanguage") },
   { id: "editor", label: t("settings.sectionEditor") },
   { id: "personalization", label: t("settings.sectionPersonalization") },
+  { id: "data", label: t("settings.sectionData") },
   { id: "about", label: t("settings.sectionAbout") },
 ]);
 
@@ -380,6 +414,54 @@ function openRelease(url: string) {
                     </div>
                   </div>
                   <SelectMenu v-model="editorFontModel" :options="editorFontOptions" align="right" class="shrink-0" />
+                </div>
+              </div>
+            </template>
+
+            <!-- 数据 -->
+            <template v-else-if="active === 'data'">
+              <h3 class="settings-heading" style="--i: 0">
+                {{ t("settings.sectionData") }}
+              </h3>
+              <div class="settings-card">
+                <div class="settings-row" style="--i: 0">
+                  <div class="min-w-0">
+                    <p class="text-[13.5px] font-medium">{{ t("settings.dataDir") }}</p>
+                    <p class="mt-0.5 break-all text-[12px] leading-relaxed text-ink-3 mono">
+                      {{ app.bootstrap?.appDataDir || "—" }}
+                    </p>
+                    <p class="mt-1 text-[11.5px] leading-relaxed text-ink-3">{{ t("settings.dataDirHint") }}</p>
+                  </div>
+                  <button class="btn btn-secondary shrink-0" @click="openDataDir">
+                    <AppIcon name="folder" :size="14" />
+                    {{ t("settings.openFolder") }}
+                  </button>
+                </div>
+
+                <div class="settings-row" style="--i: 1">
+                  <div class="min-w-0">
+                    <p class="text-[13.5px] font-medium">{{ t("settings.moveData") }}</p>
+                    <p class="mt-0.5 text-[12px] leading-relaxed text-ink-3">{{ t("settings.moveDataHint") }}</p>
+                    <p
+                      v-if="dataError"
+                      class="mt-1 text-[11.5px] leading-relaxed text-danger"
+                    >
+                      {{ dataError }}
+                    </p>
+                  </div>
+                  <div class="flex shrink-0 items-center gap-2">
+                    <button
+                      v-if="app.bootstrap?.customDataDir"
+                      class="btn btn-secondary"
+                      :disabled="dataMoving"
+                      @click="resetDataDir"
+                    >
+                      {{ t("settings.resetDataDir") }}
+                    </button>
+                    <button class="btn btn-primary" :disabled="dataMoving" @click="pickDataDir">
+                      {{ t("settings.pickDataDir") }}
+                    </button>
+                  </div>
                 </div>
               </div>
             </template>

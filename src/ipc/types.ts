@@ -43,7 +43,10 @@ export interface RecentSite {
 export interface Bootstrap {
   version: string;
   platform: Platform;
+  /** 当前生效的数据目录(自定义或默认) */
   appDataDir: string;
+  /** 用户自定义的数据目录(null = 使用默认位置) */
+  customDataDir: string | null;
   settings: AppSettings;
   recentSites: RecentSite[];
 }

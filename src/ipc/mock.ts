@@ -277,6 +277,7 @@ export const mock = {
       version: __APP_VERSION__,
       platform: "browser",
       appDataDir: "(browser)",
+      customDataDir: null,
       settings,
       recentSites: recent,
     };
@@ -288,6 +289,11 @@ export const mock = {
     lsSet(LS_SETTINGS, settings);
     return settings;
   },
+
+  /** 浏览器预览无数据目录概念:保持 no-op */
+  async setDataDir(_path: string | null): Promise<void> {},
+
+  async openDataDir(): Promise<void> {},
 
   async createSite(dir: string, name: string, description?: string, siteType?: string): Promise<SiteConfig> {
     ensureInit();

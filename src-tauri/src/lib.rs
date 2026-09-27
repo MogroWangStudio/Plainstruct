@@ -120,6 +120,7 @@ pub fn run() {
             commands::save_settings,
             commands::log_frontend,
             commands::check_update,
+            commands::set_data_dir,
             // 站点
             commands::create_site,
             commands::open_site,
@@ -159,24 +160,36 @@ pub fn run() {
             commands::github_sync,
             // 系统
             commands::open_path,
+            commands::open_data_dir,
             commands::open_external,
             commands::reload_webview,
         ])
         .setup(|app| {
             let state = app.state::<AppState>();
-            // 便携版策略:数据库目录固定为可执行文件所在根目录下的 data/,数据随程序
+            // 便携版策略:默认数据目录为可执行文件所在根目录下的 data/,数据随程序
             // 一起迁移;exe 所在目录不可写(如安装进 Program Files)时回退系统 AppData
             let portable = std::env::current_exe().ok().and_then(|exe| {
                 let dir = exe.parent()?.join("data");
                 std::fs::create_dir_all(&dir).ok()?;
                 Some(dir)
             });
-            let dir = match portable {
+            let default_dir = match portable {
                 Some(dir) => dir,
                 None => app.path().app_data_dir().unwrap_or_default(),
             };
+            // 数据目录引导:默认目录 app.json 记录的自定义位置(目录存在时启用,
+            // 不可用则回退默认目录,默认目录中仍保留迁移前的数据备份)
+            let mut data_dir = default_dir.clone();
+            if let Some(custom) = commands::app::read_app_data_at(&default_dir).custom_data_dir {
+                if !custom.is_empty() && std::path::Path::new(&custom).is_dir() {
+                    data_dir = std::path::PathBuf::from(custom);
+                }
+            }
+            if let Ok(mut guard) = state.default_data_dir.lock() {
+                *guard = default_dir;
+            }
             if let Ok(mut guard) = state.app_data_dir.lock() {
-                *guard = dir;
+                *guard = data_dir;
             }
             // 平台窗口装饰:macOS 保留原生圆角与红绿灯(conf 里 titleBarStyle Overlay + hiddenTitle),
             // 其余平台维持无边框自绘标题栏;窗口初始隐藏,装饰调整完成后再显示,避免启动闪烁

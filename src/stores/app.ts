@@ -178,5 +178,11 @@ export const useAppStore = defineStore("app", {
       const boot = await ipc.getBootstrap();
       this.bootstrap = { ...this.bootstrap!, recentSites: boot.recentSites };
     },
+
+    /** 更改数据存储位置(null = 恢复默认);迁移完成后以服务端状态为准刷新 */
+    async setDataDir(path: string | null) {
+      await ipc.setDataDir(path);
+      this.bootstrap = await ipc.getBootstrap();
+    },
   },
 });

@@ -44,6 +44,13 @@ export const ipc = {
   checkUpdate(): Promise<UpdateInfo> {
     return inTauri ? invoke<UpdateInfo>("check_update") : mock.checkUpdate();
   },
+  /** 更改数据存储位置(null = 恢复默认),数据迁移后立即生效 */
+  setDataDir(path: string | null): Promise<void> {
+    return inTauri ? invoke<void>("set_data_dir", { path }) : mock.setDataDir(path);
+  },
+  openDataDir(): Promise<void> {
+    return inTauri ? invoke<void>("open_data_dir") : mock.openDataDir();
+  },
 
   /* ---------- 站点 ---------- */
   createSite(dir: string, name: string, description?: string, siteType?: string): Promise<SiteConfig> {

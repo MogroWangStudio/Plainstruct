@@ -33,6 +33,16 @@ pub fn open_external(app: AppHandle, window: tauri::WebviewWindow, url: String) 
     app.opener().open_url(url, None::<&str>).map_err(|e| e.to_string())
 }
 
+/// 打开当前数据目录(路径来自全局状态而非前端输入,无任意路径风险)
+#[tauri::command]
+pub fn open_data_dir(app: AppHandle, state: State<'_, AppState>, window: tauri::WebviewWindow) -> Result<(), String> {
+    ensure_main(&window)?;
+    let dir = state.app_data();
+    app.opener()
+        .open_path(dir.to_string_lossy(), None::<&str>)
+        .map_err(|e| e.to_string())
+}
+
 /// 原地刷新指定 webview(不销毁窗口,保持位置与尺寸),用于独立预览窗口加载最新构建产物
 #[tauri::command]
 pub fn reload_webview(app: AppHandle, window: tauri::WebviewWindow, label: String) -> Result<(), String> {

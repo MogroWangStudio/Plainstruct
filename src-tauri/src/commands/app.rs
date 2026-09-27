@@ -1,6 +1,7 @@
-/** 应用级命令:bootstrap、设置、日志 */
+/** 应用级命令:bootstrap、设置、日志、数据存储位置 */
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::State;
 
@@ -14,6 +15,9 @@ pub struct RecentSite {
     pub opened_at: u64,
 }
 
+/// 数据文件(当前数据目录的 app.json)。
+/// custom_data_dir 仅在默认目录的 app.json 中作为「引导指针」有意义:
+/// 启动时按它把数据目录切到自定义位置,其余字段为真实数据。
 #[derive(Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct AppData {
@@ -21,6 +25,8 @@ pub(crate) struct AppData {
     settings: Value,
     #[serde(default)]
     recent_sites: Vec<RecentSite>,
+    #[serde(default)]
+    custom_data_dir: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -29,6 +35,8 @@ pub struct Bootstrap {
     version: String,
     platform: String,
     app_data_dir: String,
+    /// 用户自定义的数据目录(None = 使用默认位置)
+    custom_data_dir: Option<String>,
     settings: Value,
     recent_sites: Vec<RecentSite>,
 }
@@ -41,7 +49,11 @@ fn now_millis() -> u64 {
 }
 
 pub fn read_app_data(state: &AppState) -> AppData {
-    let file = state.app_data().join("app.json");
+    read_app_data_at(&state.app_data())
+}
+
+pub fn read_app_data_at(dir: &Path) -> AppData {
+    let file = dir.join("app.json");
     std::fs::read_to_string(&file)
         .ok()
         .and_then(|s| serde_json::from_str(&s).ok())
@@ -49,8 +61,11 @@ pub fn read_app_data(state: &AppState) -> AppData {
 }
 
 pub fn write_app_data(state: &AppState, data: &AppData) -> Result<(), String> {
-    let dir = state.app_data();
-    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    write_app_data_to(&state.app_data(), data)
+}
+
+pub fn write_app_data_to(dir: &Path, data: &AppData) -> Result<(), String> {
+    std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
     let file = dir.join("app.json");
     let json = serde_json::to_string_pretty(data).map_err(|e| e.to_string())?;
     std::fs::write(file, json).map_err(|e| e.to_string())
@@ -87,6 +102,7 @@ pub fn get_bootstrap(state: State<'_, AppState>, window: tauri::WebviewWindow) -
         version: env!("CARGO_PKG_VERSION").to_string(),
         platform: platform.to_string(),
         app_data_dir: state.app_data().to_string_lossy().to_string(),
+        custom_data_dir: read_app_data_at(&state.default_data_dir()).custom_data_dir,
         settings: if data.settings.is_null() {
             serde_json::json!({ "locale": "zh-CN", "autosave": true, "theme": "system", "uiFont": "system", "editorFont": "default" })
         } else {
@@ -118,6 +134,62 @@ pub fn save_settings(state: State<'_, AppState>, window: tauri::WebviewWindow, p
 pub fn log_frontend(window: tauri::WebviewWindow, msg: String) -> Result<(), String> {
     ensure_main(&window)?;
     println!("[frontend] {msg}");
+    Ok(())
+}
+
+/// 更改数据存储位置:None 恢复默认,Some(path) 迁移到自定义目录。
+///
+/// 数据本体始终存于「当前数据目录」的 app.json;默认目录的 app.json 额外承担
+/// 引导指针(customDataDir),重启时据此切回自定义位置。迁移采用复制并在原
+/// 目录保留备份,不删除任何文件。
+#[tauri::command]
+pub fn set_data_dir(
+    state: State<'_, AppState>,
+    window: tauri::WebviewWindow,
+    path: Option<String>,
+) -> Result<(), String> {
+    ensure_main(&window)?;
+    let default_dir = state.default_data_dir();
+    let target: PathBuf = match &path {
+        None => default_dir.clone(),
+        Some(p) => {
+            if p.trim().is_empty() {
+                return Err("empty-path".into());
+            }
+            let dir = PathBuf::from(p);
+            std::fs::create_dir_all(&dir).map_err(|e| format!("无法创建目录: {e}"))?;
+            // 可写探测:实际写入并删除一个探测文件
+            let probe = dir.join(".plainstruct-write-test");
+            std::fs::write(&probe, b"ok").map_err(|e| format!("目录不可写: {e}"))?;
+            let _ = std::fs::remove_file(&probe);
+            dir
+        }
+    };
+    let current_dir = state.app_data();
+    let current = read_app_data(state.inner());
+
+    // 数据落到目标目录(指针字段不属于数据本体)
+    if target != current_dir {
+        let mut data = current.clone();
+        data.custom_data_dir = None;
+        write_app_data_to(&target, &data)?;
+    }
+
+    // 默认目录的引导文件:更新指针;恢复默认时把当前数据写回
+    let mut pointer = if path.is_none() {
+        let mut data = current.clone();
+        data.custom_data_dir = None;
+        data
+    } else {
+        read_app_data_at(&default_dir)
+    };
+    pointer.custom_data_dir = path;
+    write_app_data_to(&default_dir, &pointer)?;
+
+    // 运行时切换当前数据目录(读写即时生效,无需重启)
+    if let Ok(mut guard) = state.app_data_dir.lock() {
+        *guard = target;
+    }
     Ok(())
 }
 

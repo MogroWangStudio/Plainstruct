@@ -36,7 +36,7 @@ Plain (素) structure (构): gray-white palette, a single ink accent, system fon
 Download an installer for your platform from [GitHub Releases](https://github.com/MogroWang/Plainstruct/releases):
 
 - **Windows x64** - NSIS installer, or the portable zip (`Plainstruct-x.y.z-Windows-x64-portable.zip`): unzip and run `plainstruct.exe`
-- **macOS (Apple Silicon)** - dmg disk image, drag into Applications. The app is ad-hoc signed and not notarized; if macOS says it is "damaged" or can't verify the developer, run `xattr -cr /Applications/Plainstruct.app` in a terminal, then open it normally
+- **macOS (Apple Silicon)** - dmg disk image, drag into Applications. The app is ad-hoc signed and not notarized; if macOS says it is "damaged", double-click **`损坏修复.command` (Repair Damaged)** inside the dmg and enter your password (only to remove the quarantine flag), or run `sudo xattr -r -d com.apple.quarantine /Applications/Plainstruct.app` in a terminal. Plainstruct is open source — this fix only clears Gatekeeper's quarantine flag on an un-notarized app and changes nothing inside it
 
 First run:
 

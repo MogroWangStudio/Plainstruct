@@ -1,0 +1,28 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <!-- 应用图标源文件:npm run icons(tauri icon src-tauri/icons/icon.svg)
+       图形原样取自「Plainstruct Logo only-graphic.svg」(viewBox 251x243),按 63% 居中:
+       642.56x622.08,偏移 (190.72, 200.96)。
+       白底全出血:macOS 26+ 由系统统一裁切圆角并加投影,Windows 直接使用方形图标 -->
+  <rect width="1024" height="1024" fill="#ffffff"/>
+  <g transform="translate(190.72 200.96) scale(2.56)">
+    <g transform="matrix(1,0,0,1,-592.339322,-2678.930414)">
+      <g transform="matrix(0,-1.380197,1.380197,0,-307.09037,3578.546338)">
+        <g transform="matrix(0.271124,0,0,0.983783,395.406838,428.141128)">
+          <rect x="298.6" y="227.211" width="184.417" height="184.417"/>
+        </g>
+        <g transform="matrix(0,0.271124,-0.866058,0,832.858584,570.710025)">
+          <path d="M483.017,353.896L483.017,411.629L298.6,411.629L298.6,227.211L483.017,227.211L483.017,284.944L390.808,284.944L390.808,353.896L483.017,353.896Z"/>
+        </g>
+        <g transform="matrix(0.382053,0.382053,-0.136228,0.136228,498.21693,582.030611)">
+          <rect x="298.6" y="227.211" width="184.417" height="184.417" style="fill-opacity:0.15;"/>
+        </g>
+        <g transform="matrix(0.518281,0,0,0.192655,401.463967,672.894134)">
+          <rect x="298.6" y="227.211" width="184.417" height="184.417"/>
+        </g>
+        <g transform="matrix(0.518281,0,0,0.192655,401.463967,753.791871)">
+          <rect x="298.6" y="227.211" width="184.417" height="184.417"/>
+        </g>
+      </g>
+    </g>
+  </g>
+</svg>

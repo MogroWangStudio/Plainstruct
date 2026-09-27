@@ -61,23 +61,39 @@ jobs:
         run: npm run windows:portable
         shell: powershell
 
-      # macOS arm64:同时构建 .app 与 dmg(--bundles dmg 单独使用时 .app 不落盘,无法签名)
-      - name: Build Tauri bundle (macOS arm64 app + dmg)
+      # macOS arm64:只构建 .app;dmg 由下一步自行打包,以注入「损坏修复」脚本
+      - name: Build Tauri bundle (macOS arm64 app)
         if: runner.os == 'macOS'
-        run: npm run tauri -- build --bundles app,dmg
+        run: npm run tauri -- build --bundles app
 
-      # ad-hoc 重签 .app 与 dmg:无 Apple 开发者证书无法公证,但有效的 ad-hoc 签名
+      # ad-hoc 重签 .app:无 Apple 开发者证书无法公证,但有效的 ad-hoc 签名
       # 可避免 Gatekeeper 把应用直接判定为「已损坏」(未签名会触发更严重的拦截)。
-      # 下载后的隔离属性仍需用户以 xattr 解除,见 Release 说明。
-      - name: Ad-hoc sign macOS bundle
+      # 下载后的隔离属性由 dmg 内的「损坏修复.command」解除。
+      - name: Ad-hoc sign macOS app
         if: runner.os == 'macOS'
         run: |
           for app in src-tauri/target/release/bundle/macos/*.app; do
             if [ -e "$app" ]; then codesign --force --deep --sign - "$app"; fi
           done
-          for f in src-tauri/target/release/bundle/dmg/*.dmg; do
-            if [ -e "$f" ]; then codesign --force --sign - "$f"; fi
-          done
+
+      # 自打 dmg:应用 + Applications 快捷方式 + 「损坏修复」脚本。
+      # tauri 的 dmg 不支持注入自定义文件,故先签名 .app 再用 hdiutil 重打,最后签 dmg。
+      - name: Pack macOS dmg with repair script
+        if: runner.os == 'macOS'
+        run: |
+          set -e
+          APP="src-tauri/target/release/bundle/macos/Plainstruct.app"
+          [ -d "$APP" ]
+          VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")
+          STAGING="$(mktemp -d)"
+          cp -R "$APP" "$STAGING/"
+          ln -s /Applications "$STAGING/Applications"
+          cp scripts/损坏修复.command "$STAGING/损坏修复.command"
+          chmod +x "$STAGING/损坏修复.command"
+          DMG="src-tauri/target/release/bundle/dmg/Plainstruct_${VERSION}_aarch64.dmg"
+          mkdir -p "$(dirname "$DMG")"
+          hdiutil create -volname "Plainstruct" -srcfolder "$STAGING" -ov -format UDZO "$DMG"
+          codesign --force --sign - "$DMG"
 
       - name: Upload Windows installer artifact
         if: runner.os == 'Windows'
@@ -126,8 +142,8 @@ jobs:
             自动构建的 Plainstruct ${{ github.ref_name }} 安装包。
 
             - Windows:NSIS 安装包与免安装版(zip);WebView2 采用 embedBootstrapper,安装时自动引导,无需预装运行库
-            - macOS:Apple Silicon (arm64) 磁盘镜像(dmg)。应用采用 ad-hoc 签名、未经 Apple 公证,首次打开若提示「已损坏」或「无法验证开发者」,请先安装到「应用程序」,再在终端执行以下命令解除隔离后正常打开:
-              `xattr -cr /Applications/Plainstruct.app`
+            - macOS:Apple Silicon (arm64) 磁盘镜像(dmg)。应用为开源软件,采用 ad-hoc 签名、未经 Apple 公证,首次打开若提示「已损坏」,双击镜像内的「损坏修复.command」并输入开机密码(仅用于移除隔离标记)即可正常安装打开;也可在终端手动执行(装到「应用程序」后):
+              `sudo xattr -r -d com.apple.quarantine /Applications/Plainstruct.app`
           files: |
             artifacts/**/*.exe
             artifacts/**/*.msi

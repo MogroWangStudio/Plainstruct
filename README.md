@@ -38,7 +38,7 @@
 从 [GitHub Releases](https://github.com/MogroWang/Plainstruct/releases) 下载对应平台的安装包:
 
 - **Windows x64**:NSIS 安装包,或免安装版 zip(`Plainstruct-x.y.z-Windows-x64-portable.zip`,解压后双击 `plainstruct.exe`)
-- **macOS(Apple Silicon)**:dmg 磁盘镜像,拖入「应用程序」。应用为 ad-hoc 签名、未经 Apple 公证,首次打开若提示「已损坏」或「无法验证开发者」,在终端执行 `xattr -cr /Applications/Plainstruct.app` 后即可打开
+- **macOS(Apple Silicon)**:dmg 磁盘镜像,拖入「应用程序」。应用为 ad-hoc 签名、未经 Apple 公证,首次打开若提示「已损坏」,双击 dmg 内的**「损坏修复.command」**并输入开机密码(仅用于移除隔离标记)即可;也可在终端手动执行 `sudo xattr -r -d com.apple.quarantine /Applications/Plainstruct.app`。本软件开源,该修复仅移除 Gatekeeper 对未公证应用的「隔离」标记,不改动应用内容
 
 首次使用:
 

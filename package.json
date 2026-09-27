@@ -10,7 +10,7 @@
     "check": "vue-tsc --noEmit",
     "preview": "vite preview",
     "tauri": "tauri",
-    "icons": "tauri icon src-tauri/icons/icon.png -o src-tauri/icons",
+    "icons": "tauri icon src-tauri/icons/icon.svg -o src-tauri/icons",
     "windows:portable": "powershell -ExecutionPolicy Bypass -File scripts/build-portable.ps1"
   },
   "dependencies": {

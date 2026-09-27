@@ -5,7 +5,10 @@ use std::time::Duration;
 
 pub struct AppState {
     pub site_root: Mutex<Option<PathBuf>>,
+    /// 数据目录(当前生效:自定义目录或默认目录)
     pub app_data_dir: Mutex<PathBuf>,
+    /// 默认数据目录(便携 data/ 或回退 AppData);自定义目录的引导指针存于其 app.json
+    pub default_data_dir: Mutex<PathBuf>,
     pub http: reqwest::Client,
 }
 
@@ -14,6 +17,7 @@ impl Default for AppState {
         Self {
             site_root: Mutex::new(None),
             app_data_dir: Mutex::new(PathBuf::new()),
+            default_data_dir: Mutex::new(PathBuf::new()),
             http: reqwest::Client::builder()
                 .user_agent("Plainstruct")
                 // 必须带超时:否则同步期间单个挂起的请求会让流程无限等待
@@ -46,5 +50,9 @@ impl AppState {
 
     pub fn app_data(&self) -> PathBuf {
         self.app_data_dir.lock().map(|p| p.clone()).unwrap_or_default()
+    }
+
+    pub fn default_data_dir(&self) -> PathBuf {
+        self.default_data_dir.lock().map(|p| p.clone()).unwrap_or_default()
     }
 }

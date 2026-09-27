@@ -1,0 +1,3 @@
+# shell 脚本一律 LF,跨平台 checkout 不被转换(损坏修复.command 在 macOS 上运行)
+*.command text eol=lf
+*.sh text eol=lf
