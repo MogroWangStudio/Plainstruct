@@ -90,9 +90,9 @@ jobs:
           codesign --force --sign - "$BUNDLE_DIR.dmg"
           ZIP_STAGE="$(mktemp -d)"
           cp -R "$APP" "$ZIP_STAGE/"
-          cp scripts/损坏修复.command "$ZIP_STAGE/"
+          cp scripts/损坏修复.command "$ZIP_STAGE/损坏修复.command"
           chmod +x "$ZIP_STAGE/损坏修复.command"
-          (cd "$ZIP_STAGE" && ditto -c -k --sequesterRint . "$GITHUB_WORKSPACE/$BUNDLE_DIR.zip")
+          (cd "$ZIP_STAGE" && ditto -c -k --sequesterRsrc . "$GITHUB_WORKSPACE/$BUNDLE_DIR.zip")
 
       - name: Upload Windows x64 portable artifact
         if: runner.os == 'Windows'
