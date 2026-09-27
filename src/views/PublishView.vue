@@ -3,7 +3,6 @@ import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { usePublishStore } from "@/stores/publish";
 import { useBuilderStore } from "@/stores/builder";
-import { ipc } from "@/ipc/ipc";
 import AppIcon from "@/components/AppIcon.vue";
 
 const { t } = useI18n();
@@ -19,7 +18,7 @@ const progressPct = computed(() =>
 );
 
 function openPages() {
-  if (publish.result) void ipc.openExternal(publish.result.pagesUrl);
+  void publish.openSite();
 }
 </script>
 
@@ -111,9 +110,9 @@ function openPages() {
             {{ t("publish.done") }}
           </p>
           <p class="mono text-[12px] text-ink-2">{{ t("publish.commit", { sha: publish.result.commitSha.slice(0, 7) }) }}</p>
-          <button class="btn btn-secondary !w-fit" @click="openPages">
-            <AppIcon name="external" :size="14" />
-            {{ t("publish.viewSite") }}
+          <button class="btn btn-secondary !w-fit" :disabled="publish.checkingDeploy" @click="openPages">
+            <AppIcon name="refresh" :size="14" :class="{ 'animate-spin': publish.checkingDeploy }" />
+            {{ publish.checkingDeploy ? t("publish.waitingDeploy") : t("publish.viewSite") }}
           </button>
         </div>
 

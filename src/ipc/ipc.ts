@@ -5,6 +5,7 @@ import type {
   CopyItem,
   GithubConfig,
   OutputFile,
+  PagesBuildStatus,
   PublishPreflight,
   SiteConfig,
   SyncProgress,
@@ -190,6 +191,10 @@ export const ipc = {
   /** 发布前预检:本地构建是否过期、云端是否被外部更新(仅提醒) */
   githubPreflight(cfg: GithubConfig): Promise<PublishPreflight> {
     return inTauri ? invoke<PublishPreflight>("github_preflight", { cfg }) : mock.githubPreflight(cfg);
+  },
+  /** 查询 Pages 最新构建是否已覆盖本次发布的提交 */
+  githubPagesStatus(cfg: GithubConfig, commit: string): Promise<PagesBuildStatus> {
+    return inTauri ? invoke<PagesBuildStatus>("github_pages_status", { cfg, commit }) : mock.githubPagesStatus(cfg, commit);
   },
   async githubSync(cfg: GithubConfig, onProgress: (p: SyncProgress) => void): Promise<SyncResult> {
     if (!inTauri) return mock.githubSync(cfg, onProgress);

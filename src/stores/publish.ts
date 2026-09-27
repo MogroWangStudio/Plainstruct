@@ -14,6 +14,8 @@ interface State {
   progress: SyncProgress | null;
   result: SyncResult | null;
   error: string | null;
+  /** 正在等待 GitHub Pages 部署本次发布 */
+  checkingDeploy: boolean;
 }
 
 export const usePublishStore = defineStore("publish", {
@@ -26,6 +28,7 @@ export const usePublishStore = defineStore("publish", {
     progress: null,
     result: null,
     error: null,
+    checkingDeploy: false,
   }),
 
   actions: {
@@ -102,6 +105,45 @@ export const usePublishStore = defineStore("publish", {
         this.error = ipc.errText(e);
       } finally {
         this.syncing = false;
+      }
+    },
+
+    /** 打开站点:先检测 Pages 是否已部署本次提交,未完成则轮询等待后自动打开 */
+    async openSite() {
+      const ui = useUiStore();
+      const t = i18n.global.t;
+      if (!this.result || this.checkingDeploy) return;
+      this.checkingDeploy = true;
+      try {
+        // 上限 3 分钟:Pages 部署通常 1-2 分钟内完成
+        const deadline = Date.now() + 180_000;
+        let ready = false;
+        let errored = false;
+        while (Date.now() < deadline) {
+          const st = await ipc.githubPagesStatus(this.config, this.result.commitSha);
+          if (st.ready) {
+            ready = true;
+            break;
+          }
+          if (st.errored) {
+            errored = true;
+            break;
+          }
+          await new Promise((r) => setTimeout(r, 5000));
+        }
+        if (ready) {
+          await ipc.openExternal(this.result.pagesUrl);
+          ui.toast(t("publish.deployReady"), "success");
+        } else if (errored) {
+          ui.toast(t("publish.deployErrored"), "error");
+        } else {
+          ui.toast(t("publish.deployTimeout"), "info");
+        }
+      } catch {
+        // 部署状态查询失败(网络等):降级为直接打开,行为与不检测时一致
+        await ipc.openExternal(this.result.pagesUrl);
+      } finally {
+        this.checkingDeploy = false;
       }
     },
   },

@@ -58,6 +58,18 @@ pub struct SyncResult {
     pub pages_url: String,
 }
 
+/// Pages 部署状态(针对本次发布提交)
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PagesStatus {
+    /// 本次发布的提交已在 Pages 上构建完成,可以打开站点
+    pub ready: bool,
+    /// 部署失败(构建出错)
+    pub errored: bool,
+    /// GitHub 返回的原始构建状态(built / building / errored / none / http-xxx)
+    pub status: String,
+}
+
 /// 发布前预检结果:提醒而非阻断,前端据此向用户确认
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -262,6 +274,44 @@ pub async fn github_preflight(
     }
 
     Ok(PreflightResult { build_stale, remote_dirty })
+}
+
+/// 查询 Pages 最新一次构建是否已覆盖本次发布的提交。
+/// GitHub Pages 在推送后需要一到数分钟完成部署,前端据此决定是否打开站点。
+#[tauri::command]
+pub async fn github_pages_status(
+    window: tauri::WebviewWindow,
+    state: State<'_, AppState>,
+    cfg: GithubConfig,
+    commit: String,
+) -> Result<PagesStatus, String> {
+    ensure_main(&window)?;
+    let http = state.http.clone();
+    let (status, body) = request(
+        &http,
+        reqwest::Method::GET,
+        &repo_api(&cfg, "/pages/builds/latest"),
+        &cfg.token,
+        None,
+    )
+    .await?;
+    if status != 200 {
+        // 404 = Pages 尚未产生过构建;其余按原始状态码透出
+        let kind = if status == 404 { "none".to_string() } else { format!("http-{status}") };
+        return Ok(PagesStatus { ready: false, errored: false, status: kind });
+    }
+    let build_status = body["status"].as_str().unwrap_or("").to_string();
+    let built_commit = body["commit"].as_str().unwrap_or("").to_string();
+    // 比较短 sha(7 位),对 API 返回完整/短格式均兼容
+    let short = |s: &str| s.chars().take(7).collect::<String>();
+    let ready = build_status == "built"
+        && !built_commit.is_empty()
+        && short(&built_commit) == short(&commit);
+    Ok(PagesStatus {
+        ready,
+        errored: build_status == "errored",
+        status: if build_status.is_empty() { "none".into() } else { build_status },
+    })
 }
 
 #[tauri::command]

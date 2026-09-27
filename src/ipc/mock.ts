@@ -5,6 +5,7 @@ import type {
   CopyItem,
   GithubConfig,
   OutputFile,
+  PagesBuildStatus,
   PublishPreflight,
   RecentSite,
   SiteConfig,
@@ -599,6 +600,11 @@ export const mock = {
   async githubPreflight(_cfg: GithubConfig): Promise<PublishPreflight> {
     await delay(200);
     return { buildStale: false, remoteDirty: false };
+  },
+
+  async githubPagesStatus(_cfg: GithubConfig, _commit: string): Promise<PagesBuildStatus> {
+    await delay(200);
+    return { ready: true, errored: false, status: "built" };
   },
 
   async githubSync(

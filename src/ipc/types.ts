@@ -149,6 +149,16 @@ export interface PublishPreflight {
   remoteDirty: boolean;
 }
 
+/** GitHub Pages 部署状态(针对本次发布提交) */
+export interface PagesBuildStatus {
+  /** 本次提交已构建完成,可以打开站点 */
+  ready: boolean;
+  /** 部署失败 */
+  errored: boolean;
+  /** 原始构建状态(built / building / errored / none / http-xxx) */
+  status: string;
+}
+
 export interface SyncProgress {
   done: number;
   total: number;
