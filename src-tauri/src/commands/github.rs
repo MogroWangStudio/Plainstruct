@@ -708,32 +708,22 @@ pub async fn update_download(
         return Err("already-latest".into());
     }
 
-    // 2. 选择当前平台的更新包:按发行形态以关键字符匹配(大小写不敏感),不依赖文件名里的
-    //    版本号与分隔符写法——Windows 便携版(marker 标记)的更新包是免安装 zip(解压覆盖更新),
-    //    安装版是 NSIS 安装器(静默安装);macOS 用 dmg。x64 字样用于区分架构,官方产物名均携带。
-    let portable = std::env::current_exe()
-        .ok()
-        .and_then(|exe| exe.parent().map(|p| p.join("portable.marker").exists()))
-        .unwrap_or(false);
+    // 2. 选择当前平台的更新包:按关键字符匹配(大小写不敏感),不依赖文件名里的版本号与
+    //    分隔符写法——Windows 一律为免安装 zip(解压覆盖更新),macOS 用 dmg;
+    //    x64 字样用于区分架构,官方产物名均携带。
     let want = |name: &str| -> bool {
         let n = name.to_ascii_lowercase();
         #[cfg(target_os = "windows")]
         {
-            let shape = if portable {
-                n.ends_with(".zip") && n.contains("portable")
-            } else {
-                n.ends_with(".exe") && n.contains("setup")
-            };
-            shape && n.contains("x64")
+            n.ends_with(".zip") && n.contains("portable") && n.contains("x64")
         }
         #[cfg(target_os = "macos")]
         {
-            let _ = portable;
             n.ends_with(".dmg")
         }
         #[cfg(not(any(target_os = "windows", target_os = "macos")))]
         {
-            let _ = (n, portable);
+            let _ = n;
             false
         }
     };
@@ -782,7 +772,7 @@ pub async fn update_download(
     let _ = file.flush();
 
     // 4. 生成平台对应的更新向导脚本,退出钩子据此拉起
-    write_update_helper(&asset_path, portable)?;
+    write_update_helper(&asset_path)?;
 
     Ok(UpdateDownloadResult {
         version: latest,
@@ -791,7 +781,7 @@ pub async fn update_download(
 }
 
 /// 生成更新向导脚本(路径全部在生成时嵌入,向导无需解析任务文件)
-fn write_update_helper(asset_path: &std::path::Path, portable: bool) -> Result<(), String> {
+fn write_update_helper(asset_path: &std::path::Path) -> Result<(), String> {
     let dir = update_dir();
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let asset = asset_path.to_string_lossy().replace('\'', "''");
@@ -806,7 +796,6 @@ fn write_update_helper(asset_path: &std::path::Path, portable: bool) -> Result<(
 $installer = '{asset}'
 $appExe    = '{app_exe}'
 $appDir    = '{app_dir}'
-$portable  = '{portable}'
 
 Add-Type -AssemblyName System.Windows.Forms
 $form = New-Object System.Windows.Forms.Form
@@ -833,18 +822,12 @@ Set-Stage '等待 Plainstruct 退出...'
 try {{ Wait-Process -Name 'plainstruct' -Timeout 30 -ErrorAction Stop }} catch {{}}
 Start-Sleep -Milliseconds 800
 
-if ($portable -eq 'true') {{
-  Set-Stage '正在解压并更新程序文件...'
-  $tmp = Join-Path $env:TEMP ('plainstruct-unzip-' + [guid]::NewGuid().ToString())
-  Expand-Archive -Path $installer -DestinationPath $tmp -Force
-  $src = (Get-ChildItem $tmp | Select-Object -First 1).FullName
-  Copy-Item -Path (Join-Path $src '*') -Destination $appDir -Recurse -Force
-  Remove-Item -LiteralPath $tmp -Recurse -Force
-}} else {{
-  Set-Stage '正在运行安装程序,请稍候...'
-  $nsisArgs = '/S /D=' + $appDir
-  Start-Process -FilePath $installer -ArgumentList $nsisArgs -Wait | Out-Null
-}}
+Set-Stage '正在解压并更新程序文件...'
+$tmp = Join-Path $env:TEMP ('plainstruct-unzip-' + [guid]::NewGuid().ToString())
+Expand-Archive -Path $installer -DestinationPath $tmp -Force
+$src = (Get-ChildItem $tmp | Select-Object -First 1).FullName
+Copy-Item -Path (Join-Path $src '*') -Destination $appDir -Recurse -Force
+Remove-Item -LiteralPath $tmp -Recurse -Force
 
 Set-Stage '启动新版本...'
 Start-Process -FilePath $appExe
@@ -853,14 +836,12 @@ $form.Close()
             asset = asset,
             app_exe = app_exe,
             app_dir = app_dir,
-            portable = if portable { "true" } else { "false" },
         );
         std::fs::write(dir.join("update-helper.ps1"), script).map_err(|e| e.to_string())?;
     }
 
     #[cfg(target_os = "macos")]
     {
-        let _ = portable;
         // 旧 .app 位置:当前 exe 位于 <App>.app/Contents/MacOS/<bin>,向上三级即 bundle;
         // 找不到时(开发模式)退回 /Applications 的标准位置
         let app_path = std::env::current_exe()

@@ -1,17 +1,17 @@
-# 素构 Plainstruct —— 推送后自动构建,产物作为 Artifact 上传。
+# 素构 Plainstruct —— 推送版本标签后自动构建,产物作为 GitHub Release 草稿发布。
 # 触发方式:
-#   - 推送 main 分支(不发布,仅构建留档)
-#   - 推送版本标签(自动创建 GitHub Release 草稿并附上安装包)
+#   - 推送版本标签(自动构建并创建 GitHub Release 草稿)——发布站点产物的唯一途径
 #     兼容 v1.2.3 与 1.2.3 两种标签写法
 #   - 手动触发(workflow_dispatch)
+# 平时推送到 main 不再触发构建,避免发布 Release 后的日常提交重复消耗构建时长。
 #
-# 矩阵:Windows(NSIS/MSI 安装包 + 免安装 zip)与 macOS arm64(dmg,Apple Silicon)。
+# 产物形态:Windows x64 免安装 zip(内含 exe,不再构建安装包)与 macOS arm64 dmg / zip,
+# 命名统一为 Plainstruct_版本号_平台架构。
 
 name: Build Plainstruct
 
 on:
   push:
-    branches: [main]
     tags: ["v*", "[0-9]*"]
   workflow_dispatch:
 
@@ -25,7 +25,7 @@ jobs:
           - os: macos-latest # Apple Silicon (arm64) runner
     runs-on: ${{ matrix.os }}
     env:
-      # 版本号取自已打的标签,未打标签时回退到 dev
+      # 版本号取自已打的标签(剥离可选的 v 前缀),未打标签时回退到 dev
       APP_VERSION: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'dev' }}
 
     steps:
@@ -50,25 +50,20 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      # Windows:NSIS 安装包与 MSI(WebView2 采用 embedBootstrapper,安装时自动引导)
-      - name: Build Tauri bundles (Windows)
-        if: runner.os == 'Windows'
-        run: npm run tauri -- build
-
-      # 基于上一步的 release 可执行文件打免安装版 zip(脚本内部 --no-bundle,增量极快)
-      - name: Build portable zip
+      # Windows x64:免安装 zip(内含 exe)。脚本内部以 --no-bundle 编译,不再产出 NSIS/MSI 安装包
+      - name: Build Windows x64 portable zip
         if: runner.os == 'Windows'
         run: npm run windows:portable
         shell: powershell
 
-      # macOS arm64:只构建 .app;dmg 由下一步自行打包,以注入「损坏修复」脚本
+      # macOS arm64:只构建 .app;dmg 与 zip 由后续步骤自行打包,以注入「损坏修复」脚本
       - name: Build Tauri bundle (macOS arm64 app)
         if: runner.os == 'macOS'
         run: npm run tauri -- build --bundles app
 
       # ad-hoc 重签 .app:无 Apple 开发者证书无法公证,但有效的 ad-hoc 签名
       # 可避免 Gatekeeper 把应用直接判定为「已损坏」(未签名会触发更严重的拦截)。
-      # 下载后的隔离属性由 dmg 内的「损坏修复.command」解除。
+      # 下载后的隔离属性由 dmg/zip 内的「损坏修复.command」解除。
       - name: Ad-hoc sign macOS app
         if: runner.os == 'macOS'
         run: |
@@ -76,50 +71,48 @@ jobs:
             if [ -e "$app" ]; then codesign --force --deep --sign - "$app"; fi
           done
 
-      # 自打 dmg:应用 + Applications 快捷方式 + 「损坏修复」脚本。
+      # 打包 macOS 产物:压缩包(zip,内含 .app 与「损坏修复.command」)与磁盘镜像(dmg)同名成对,
+      # 统一为 Plainstruct_版本号_macOS_arm64。
       # tauri 的 dmg 不支持注入自定义文件,故先签名 .app 再用 hdiutil 重打,最后签 dmg。
-      - name: Pack macOS dmg with repair script
+      - name: Pack macOS dmg and zip with repair script
         if: runner.os == 'macOS'
         run: |
           set -e
           APP="src-tauri/target/release/bundle/macos/Plainstruct.app"
           [ -d "$APP" ]
-          VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")
+          VERSION="${APP_VERSION#v}"
           STAGING="$(mktemp -d)"
           cp -R "$APP" "$STAGING/"
           ln -s /Applications "$STAGING/Applications"
           cp scripts/损坏修复.command "$STAGING/损坏修复.command"
           chmod +x "$STAGING/损坏修复.command"
-          DMG="src-tauri/target/release/bundle/dmg/Plainstruct_${VERSION}_aarch64.dmg"
-          mkdir -p "$(dirname "$DMG")"
-          hdiutil create -volname "Plainstruct" -srcfolder "$STAGING" -ov -format UDZO "$DMG"
-          codesign --force --sign - "$DMG"
+          BUNDLE_DIR="src-tauri/target/release/bundle/macos/Plainstruct_${VERSION}_macOS_arm64"
+          hdiutil create -volname "Plainstruct" -srcfolder "$STAGING" -ov -format UDZO \
+            "$BUNDLE_DIR.dmg"
+          codesign --force --sign - "$BUNDLE_DIR.dmg"
+          ZIP_STAGE="$(mktemp -d)"
+          cp -R "$APP" "$ZIP_STAGE/"
+          cp scripts/损坏修复.command "$ZIP_STAGE/"
+          chmod +x "$ZIP_STAGE/损坏修复.command"
+          (cd "$ZIP_STAGE" && ditto -c -k --sequesterRint . "$GITHUB_WORKSPACE/$BUNDLE_DIR.zip")
 
-      - name: Upload Windows installer artifact
+      - name: Upload Windows x64 portable artifact
         if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
         with:
-          name: plainstruct-windows-installer
-          path: |
-            src-tauri/target/release/bundle/nsis/*.exe
-            src-tauri/target/release/bundle/msi/*.msi
-          if-no-files-found: warn
+          name: plainstruct-windows-x64-portable
+          path: release/Plainstruct_*_Windows_x64_Portable.zip
+          if-no-files-found: error
 
-      - name: Upload Windows portable artifact
-        if: runner.os == 'Windows'
-        uses: actions/upload-artifact@v4
-        with:
-          name: plainstruct-x64-portable
-          path: release/Plainstruct-x64-portable.zip
-          if-no-files-found: warn
-
-      - name: Upload macOS arm64 artifact
+      - name: Upload macOS arm64 artifacts
         if: runner.os == 'macOS'
         uses: actions/upload-artifact@v4
         with:
-          name: plainstruct-macos-arm64-dmg
-          path: src-tauri/target/release/bundle/dmg/*.dmg
-          if-no-files-found: warn
+          name: plainstruct-macos-arm64
+          path: |
+            src-tauri/target/release/bundle/macos/Plainstruct_*_macOS_arm64.dmg
+            src-tauri/target/release/bundle/macos/Plainstruct_*_macOS_arm64.zip
+          if-no-files-found: error
 
   # 推送版本标签时,汇总两个平台的产物创建 Release 草稿
   release:
@@ -141,12 +134,10 @@ jobs:
           body: |
             自动构建的 Plainstruct ${{ github.ref_name }} 安装包。
 
-            - Windows:NSIS 安装包与免安装版(zip);WebView2 采用 embedBootstrapper,安装时自动引导,无需预装运行库
-            - macOS:Apple Silicon (arm64) 磁盘镜像(dmg)。应用为开源软件,采用 ad-hoc 签名、未经 Apple 公证,首次打开若提示「已损坏」,双击镜像内的「损坏修复.command」并输入开机密码(仅用于移除隔离标记)即可正常安装打开;也可在终端手动执行(装到「应用程序」后):
+            - Windows x64:免安装版 zip,解压后双击 `plainstruct.exe` 即用,自动更新也以此包覆盖升级(不再提供安装包)
+            - macOS(Apple Silicon):磁盘镜像(dmg)拖入「应用程序」,或压缩包(zip)解压后移入「应用程序」。应用为开源软件,采用 ad-hoc 签名、未经 Apple 公证,首次打开若提示「已损坏」,双击包内的**「损坏修复.command」**并输入开机密码(仅用于移除隔离标记)即可;也可在终端手动执行(装到「应用程序」后):
               `sudo xattr -r -d com.apple.quarantine /Applications/Plainstruct.app`
           files: |
-            artifacts/**/*.exe
-            artifacts/**/*.msi
             artifacts/**/*.zip
             artifacts/**/*.dmg
         env:

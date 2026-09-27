@@ -37,8 +37,8 @@
 
 从 [GitHub Releases](https://github.com/MogroWang/Plainstruct/releases) 下载对应平台的安装包:
 
-- **Windows x64**:NSIS 安装包,或免安装版 zip(`Plainstruct-x.y.z-Windows-x64-portable.zip`,解压后双击 `plainstruct.exe`)
-- **macOS(Apple Silicon)**:dmg 磁盘镜像,拖入「应用程序」。应用为 ad-hoc 签名、未经 Apple 公证,首次打开若提示「已损坏」,双击 dmg 内的**「损坏修复.command」**并输入开机密码(仅用于移除隔离标记)即可;也可在终端手动执行 `sudo xattr -r -d com.apple.quarantine /Applications/Plainstruct.app`。本软件开源,该修复仅移除 Gatekeeper 对未公证应用的「隔离」标记,不改动应用内容
+- **Windows x64**:免安装版 zip(`Plainstruct-版本号-Windows-x64-Portable.zip`,解压后双击 `plainstruct.exe`),自动更新也以此包覆盖升级
+- **macOS(Apple Silicon)**:dmg 磁盘镜像(拖入「应用程序」)或 zip 压缩包(解压后移入「应用程序」),两者均附「损坏修复.command」。应用为 ad-hoc 签名、未经 Apple 公证,首次打开若提示「已损坏」,双击包内的**「损坏修复.command」**并输入开机密码(仅用于移除隔离标记)即可;也可在终端手动执行 `sudo xattr -r -d com.apple.quarantine /Applications/Plainstruct.app`。本软件开源,该修复仅移除 Gatekeeper 对未公证应用的「隔离」标记,不改动应用内容
 
 首次使用:
 
@@ -144,8 +144,8 @@ npm run build        # 前端类型检查 + 生产构建
 cargo check          # 在 src-tauri/ 下,Rust 编译检查
 
 npm run icons                          # 由 icon.png 生成全套应用图标
-npm run windows:portable               # Windows x64 免安装构建 -> release/Plainstruct-x64-portable.zip
-npm run tauri -- build                 # 平台安装包(NSIS / dmg)
+npm run windows:portable               # Windows x64 免安装构建 -> release/Plainstruct_版本号_Windows_x64_Portable.zip
+npm run tauri -- build                 # 平台产物(dmg / app)
 ```
 
 ### 技术架构

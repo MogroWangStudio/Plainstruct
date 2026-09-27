@@ -11,8 +11,16 @@ if (-not (Test-Path $exe)) {
   throw "Release executable not found: $exe"
 }
 
-$outDir = Join-Path $root "release\plainstruct-portable"
-$zipPath = Join-Path $root "release\Plainstruct-x64-portable.zip"
+# 版本号取自 Cargo.toml(与应用版本同源),用于产物命名
+$cargo = Get-Content (Join-Path $root "src-tauri\Cargo.toml") -Raw
+$version = [regex]::Match($cargo, '(?m)^version\s*=\s*"([^"]+)"').Groups[1].Value
+if (-not $version) {
+  throw "Version not found in Cargo.toml"
+}
+
+$name = "Plainstruct_${version}_Windows_x64_Portable"
+$outDir = Join-Path $root "release\$name"
+$zipPath = Join-Path $root "release\$name.zip"
 
 if (Test-Path $outDir) {
   Remove-Item -LiteralPath $outDir -Recurse -Force
@@ -20,9 +28,6 @@ if (Test-Path $outDir) {
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 
 Copy-Item -LiteralPath $exe -Destination $outDir
-
-# 便携版标记:自动更新据此选择 zip 覆盖式更新(而非 NSIS 静默安装)
-New-Item -ItemType File -Force -Path (Join-Path $outDir "portable.marker") | Out-Null
 
 if (Test-Path $zipPath) {
   Remove-Item -LiteralPath $zipPath -Force

@@ -13,6 +13,8 @@
 
 ### 变更
 
+- **发布形态精简与产物命名统一**:不再构建 Windows 安装包(NSIS/MSI),Windows x64 只提供免安装 zip(内含 `plainstruct.exe`),命名统一为 `Plainstruct_版本号_Windows_x64_Portable.zip`;macOS arm64 产物同名成对 —— `Plainstruct_版本号_macOS_arm64.dmg` 与内含 .app 及「损坏修复.command」的 `Plainstruct_版本号_macOS_arm64.zip`;免安装包不再内含 `portable.marker` 标记文件,应用更新在 Windows 一律按免安装方式解压覆盖,更新包匹配以关键字符完成,不再依赖标记
+- **CI 只在发布时构建**:推送 main 分支不再触发构建,仅推送版本标签(或手动触发)时构建并创建 Release 草稿,产物命名由流水线统一保证,发布时无需再手动改名补传
 - 版本号升级至 2.2.0,内置主题版本同步升级
 
 ## [2.1.0] - 2026-09-27

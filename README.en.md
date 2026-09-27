@@ -35,8 +35,8 @@ Plain (素) structure (构): gray-white palette, a single ink accent, system fon
 
 Download an installer for your platform from [GitHub Releases](https://github.com/MogroWang/Plainstruct/releases):
 
-- **Windows x64** - NSIS installer, or the portable zip (`Plainstruct-x.y.z-Windows-x64-portable.zip`): unzip and run `plainstruct.exe`
-- **macOS (Apple Silicon)** - dmg disk image, drag into Applications. The app is ad-hoc signed and not notarized; if macOS says it is "damaged", double-click **`损坏修复.command` (Repair Damaged)** inside the dmg and enter your password (only to remove the quarantine flag), or run `sudo xattr -r -d com.apple.quarantine /Applications/Plainstruct.app` in a terminal. Plainstruct is open source — this fix only clears Gatekeeper's quarantine flag on an un-notarized app and changes nothing inside it
+- **Windows x64** - portable zip only (`Plainstruct-<version>-Windows-x64-Portable.zip`): unzip and run `plainstruct.exe`; auto-update overwrites the app folder with the same package
+- **macOS (Apple Silicon)** - dmg disk image (drag into Applications) or zip archive (unzip and move into Applications), both bundling the repair script. The app is ad-hoc signed and not notarized; if macOS says it is "damaged", double-click **`损坏修复.command` (Repair Damaged)** inside the package and enter your password (only to remove the quarantine flag), or run `sudo xattr -r -d com.apple.quarantine /Applications/Plainstruct.app` in a terminal. Plainstruct is open source — this fix only clears Gatekeeper's quarantine flag on an un-notarized app and changes nothing inside it
 
 First run:
 
@@ -142,8 +142,8 @@ npm run build        # type check + production frontend build
 cargo check          # Rust compile check (in src-tauri/)
 
 npm run icons                          # generate app icons from icon.png
-npm run windows:portable               # Windows x64 portable build -> release/Plainstruct-x64-portable.zip
-npm run tauri -- build                 # platform installers (NSIS / dmg)
+npm run windows:portable               # Windows x64 portable build -> release/Plainstruct_<version>_Windows_x64_Portable.zip
+npm run tauri -- build                 # platform artifacts (dmg / app)
 ```
 
 ### Architecture
