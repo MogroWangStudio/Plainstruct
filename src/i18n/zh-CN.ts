@@ -270,6 +270,10 @@ export default {
     remoteTitle: "云端将被覆盖",
     remoteBody: "云端发布分支的最新提交与本站点上次发布的不一致,可能在其他设备或网页上更新过。继续发布将以本地构建覆盖云端内容。",
     remoteConfirm: "覆盖云端",
+    logTitle: "运行日志",
+    logEmpty: "发布过程与状态将在此实时显示;出错时也会在此给出具体环节。",
+    logClear: "清空日志",
+    logStart: "开始发布到 {repo} …",
   },
   titlebar: {
     minimize: "最小化",

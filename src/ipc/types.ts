@@ -171,6 +171,14 @@ export interface SyncProgress {
   message: string;
 }
 
+/** 发布运行日志条目(后端发布流程逐阶段推送) */
+export interface SyncLogEntry {
+  level: "info" | "error" | "success";
+  message: string;
+  /** 毫秒时间戳 */
+  time: number;
+}
+
 export interface BuildWarning {
   source: string; // 源文档路径
   link: string; // 原始链接

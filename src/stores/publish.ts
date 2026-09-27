@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { ipc } from "@/ipc/ipc";
-import type { GithubConfig, SyncProgress, SyncResult, VerifyResult } from "@/ipc/types";
+import { Events, listen } from "@/ipc/events";
+import type { GithubConfig, SyncLogEntry, SyncProgress, SyncResult, VerifyResult } from "@/ipc/types";
 import { i18n } from "@/i18n";
 import { useBuilderStore } from "./builder";
 import { useUiStore } from "./ui";
@@ -16,6 +17,19 @@ interface State {
   error: string | null;
   /** 正在等待 GitHub Pages 部署本次发布 */
   checkingDeploy: boolean;
+  /** 发布运行日志(实时) */
+  logs: SyncLogEntry[];
+}
+
+/** 发布日志事件监听:模块级仅注册一次,浏览器环境为空操作 */
+let logListening = false;
+function ensureLogListener() {
+  if (logListening) return;
+  logListening = true;
+  void listen<{ level: string; message: string; time: number }>(Events.PublishLog, (p) => {
+    const level = p.level === "error" || p.level === "success" ? p.level : "info";
+    usePublishStore().appendLog(level, p.message, p.time);
+  });
 }
 
 export const usePublishStore = defineStore("publish", {
@@ -29,11 +43,22 @@ export const usePublishStore = defineStore("publish", {
     result: null,
     error: null,
     checkingDeploy: false,
+    logs: [],
   }),
 
   actions: {
     reset() {
       this.$reset();
+    },
+
+    appendLog(level: SyncLogEntry["level"], message: string, time?: number) {
+      this.logs.push({ level, message, time: time ?? Date.now() });
+      // 日志保留上限,避免长时间使用无限增长
+      if (this.logs.length > 300) this.logs.splice(0, this.logs.length - 300);
+    },
+
+    clearLogs() {
+      this.logs = [];
     },
 
     async load() {
@@ -69,6 +94,9 @@ export const usePublishStore = defineStore("publish", {
         ui.toast(t("publish.branchEmpty"), "error");
         return;
       }
+      ensureLogListener();
+      this.logs = [];
+      this.appendLog("info", t("publish.logStart", { repo: `${this.config.owner}/${this.config.repo}` }));
       // 预检提醒(网络异常时忽略,不阻断发布):
       // 本地构建过期 → 建议重新构建;云端被其他设备更新 → 提示将覆盖
       try {
@@ -103,6 +131,8 @@ export const usePublishStore = defineStore("publish", {
         });
       } catch (e) {
         this.error = ipc.errText(e);
+        // 错误同步落入运行日志,便于用户定位失败环节
+        this.appendLog("error", this.error);
       } finally {
         this.syncing = false;
       }

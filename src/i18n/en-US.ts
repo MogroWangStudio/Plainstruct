@@ -270,6 +270,10 @@ export default {
     remoteTitle: "Remote will be overwritten",
     remoteBody: "The remote branch's latest commit differs from what this site last published — it may have been updated elsewhere. Publishing will overwrite the remote content with the local build.",
     remoteConfirm: "Overwrite remote",
+    logTitle: "Run log",
+    logEmpty: "Publish progress and status will appear here in real time; errors are shown with the exact step that failed.",
+    logClear: "Clear log",
+    logStart: "Publishing to {repo} …",
   },
   titlebar: {
     minimize: "Minimize",

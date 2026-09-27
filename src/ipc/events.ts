@@ -3,6 +3,7 @@
 export const Events = {
   SyncProgress: "plainstruct://sync-progress",
   UpdateProgress: "plainstruct://update-progress",
+  PublishLog: "plainstruct://publish-log",
 } as const;
 
 export type SyncProgressEvent = typeof Events.SyncProgress;

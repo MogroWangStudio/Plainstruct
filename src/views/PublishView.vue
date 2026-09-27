@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, watch } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { usePublishStore } from "@/stores/publish";
 import { useBuilderStore } from "@/stores/builder";
@@ -14,6 +14,27 @@ watch(
   () => [publish.config.owner, publish.config.repo, publish.config.branch],
   () => {
     publish.verifyResult = null;
+  },
+);
+
+/* ---------- 运行日志 ---------- */
+
+const logBox = ref<HTMLElement | null>(null);
+
+function formatTime(ms: number): string {
+  const d = new Date(ms);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+
+// 新日志到达时滚动到底部(仅当用户未向上翻阅时贴合底部)
+watch(
+  () => publish.logs.length,
+  async () => {
+    await nextTick();
+    const box = logBox.value;
+    if (!box) return;
+    box.scrollTop = box.scrollHeight;
   },
 );
 
@@ -130,6 +151,73 @@ function openPages() {
 
         <p class="field-hint mt-5">{{ t("publish.security") }}</p>
       </section>
+
+      <!-- 运行日志:发布过程与状态实时反馈,报错可在此定位 -->
+      <section aria-label="log">
+        <div class="flex items-center justify-between">
+          <h2 class="text-title">{{ t("publish.logTitle") }}</h2>
+          <button
+            class="btn-icon"
+            :disabled="publish.logs.length === 0"
+            :title="t('publish.logClear')"
+            @click="publish.clearLogs()"
+          >
+            <AppIcon name="trash" :size="15" />
+          </button>
+        </div>
+        <div ref="logBox" class="log-box mt-2">
+          <p v-if="publish.logs.length === 0" class="px-4 py-3 text-[12px] text-ink-3">
+            {{ t("publish.logEmpty") }}
+          </p>
+          <p
+            v-for="(entry, i) in publish.logs"
+            :key="i"
+            class="log-line"
+            :class="`is-${entry.level}`"
+          >
+            <span class="log-time">{{ formatTime(entry.time) }}</span>
+            <span class="log-text">{{ entry.message }}</span>
+          </p>
+        </div>
+      </section>
     </div>
   </div>
 </template>
+
+<style scoped>
+/* 运行日志:控制台式面板,等宽排印,级别着色 */
+.log-box {
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  background: var(--color-surface-2);
+  padding: 8px 0;
+}
+.log-line {
+  display: flex;
+  gap: 10px;
+  padding: 2px 14px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.7;
+}
+.log-time {
+  flex-shrink: 0;
+  color: var(--color-ink-3);
+}
+.log-text {
+  word-break: break-all;
+  white-space: pre-wrap;
+}
+.log-line.is-info .log-text {
+  color: var(--color-ink-2);
+}
+.log-line.is-success .log-text {
+  color: var(--color-ink);
+  font-weight: 600;
+}
+.log-line.is-error .log-text {
+  color: var(--color-danger);
+}
+</style>

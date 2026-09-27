@@ -7,7 +7,7 @@ use tauri::{AppHandle, Emitter, State};
 
 use crate::commands::app::now_millis;
 use crate::commands::build::collect_build_files;
-use crate::events::SYNC_PROGRESS;
+use crate::events::{PUBLISH_LOG, SYNC_PROGRESS};
 use crate::state::{ensure_main, AppState};
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
@@ -316,6 +316,14 @@ pub async fn github_pages_status(
     })
 }
 
+/// 发布日志:实时反馈流程与状态,错误也经此落日志便于用户定位
+fn emit_log(app: &AppHandle, level: &str, message: impl Into<String>) {
+    let _ = app.emit(
+        PUBLISH_LOG,
+        json!({ "level": level, "message": message.into(), "time": now_millis() }),
+    );
+}
+
 #[tauri::command]
 pub async fn github_sync(
     window: tauri::WebviewWindow,
@@ -324,6 +332,18 @@ pub async fn github_sync(
     cfg: GithubConfig,
 ) -> Result<SyncResult, String> {
     ensure_main(&window)?;
+    let result = github_sync_inner(&app, &state, cfg).await;
+    match &result {
+        Ok(r) => {
+            let sha = r.commit_sha.get(..7).unwrap_or(&r.commit_sha).to_string();
+            emit_log(&app, "success", format!("发布完成:提交 {sha} 已推送,站点地址 {}", r.pages_url));
+        }
+        Err(e) => emit_log(&app, "error", format!("发布失败:{e}")),
+    }
+    result
+}
+
+async fn github_sync_inner(app: &AppHandle, state: &AppState, cfg: GithubConfig) -> Result<SyncResult, String> {
     if cfg.token.is_empty() || cfg.owner.is_empty() || cfg.repo.is_empty() {
         return Err("请先填写用户名、仓库名与访问令牌".into());
     }
@@ -334,19 +354,23 @@ pub async fn github_sync(
     }
     let http = state.http.clone();
     let total = files.len() as u32;
+    emit_log(app, "info", format!("准备发布:共 {total} 个文件"));
 
     // 1. 校验令牌
+    emit_log(app, "info", "校验访问令牌…");
     let (status, _) = request(&http, reqwest::Method::GET, &format!("{API}/user"), &cfg.token, None).await?;
     if status == 401 || status == 403 {
         return Err("invalid-token".into());
     }
 
     // 2. 确保仓库存在
+    emit_log(app, "info", format!("检查仓库 {}/{}…", cfg.owner, cfg.repo));
     let (repo_status, _) = request(&http, reqwest::Method::GET, &repo_api(&cfg, ""), &cfg.token, None).await?;
     if repo_status == 404 {
         if !cfg.auto_create {
             return Err(format!("仓库 {}/{} 不存在", cfg.owner, cfg.repo));
         }
+        emit_log(app, "info", "仓库不存在,正在自动创建…");
         let (create_status, create_body) = request(
             &http,
             reqwest::Method::POST,
@@ -361,6 +385,7 @@ pub async fn github_sync(
             let msg = create_body["message"].as_str().unwrap_or("");
             return Err(format!("创建仓库失败({create_status}): {msg}"));
         }
+        emit_log(app, "info", "仓库已创建");
     } else if repo_status != 200 {
         return Err(format!("访问仓库失败({repo_status})"));
     }
@@ -376,13 +401,16 @@ pub async fn github_sync(
     //    完全空仓库(无任何提交)的 ref 查询返回 409「Git Repository is empty」,
     //    且 Git API 无法在空仓库直接创建 ref:先用 Contents API 在发布分支放入
     //    种子文件生成初始提交,再以该提交为基准发布(站点提交随后全量替换种子文件)
+    emit_log(app, "info", format!("查询发布分支 {}…", cfg.branch));
     let (ref_status, ref_body) = request(&http, reqwest::Method::GET, &ref_url, &cfg.token, None).await?;
     let mut base_commit: Option<String> = None;
     let mut branch_exists = false;
     if ref_status == 200 {
         base_commit = ref_body["object"]["sha"].as_str().map(|s| s.to_string());
         branch_exists = true;
+        emit_log(app, "info", "发布分支已存在,将基于云端最新提交增量更新");
     } else if ref_status == 409 {
+        emit_log(app, "info", "仓库为空,正在初始化发布分支…");
         let (seed_status, seed_body) = request(
             &http,
             reqwest::Method::PUT,
@@ -405,12 +433,15 @@ pub async fn github_sync(
             base_commit = ref_body["object"]["sha"].as_str().map(|s| s.to_string());
             branch_exists = true;
         }
+    } else {
+        emit_log(app, "info", format!("发布分支不存在(ref 查询返回 {ref_status}),将创建分支并写入首个站点提交"));
     }
 
     // 4. 逐文件建 blob(全量替换,天然处理删除)。增量:先取云端现有 tree 的
     //    path -> blob sha 映射,内容未变化的文件直接复用云端 blob,不再重复上传
     let mut remote_shas: std::collections::HashMap<String, String> = std::collections::HashMap::new();
     if let Some(base) = &base_commit {
+        emit_log(app, "info", "对比云端内容,计算需要上传的变更…");
         let (t_status, t_body) = request(
             &http,
             reqwest::Method::GET,
@@ -433,9 +464,11 @@ pub async fn github_sync(
     }
 
     let mut tree_items = Vec::with_capacity(files.len());
+    let mut reused: usize = 0;
     for (i, (path, bytes)) in files.iter().enumerate() {
         let local_sha = git_blob_sha(bytes);
         let sha = if remote_shas.get(path).map(|s| s.as_str()) == Some(local_sha.as_str()) {
+            reused += 1;
             local_sha
         } else {
             let (blob_status, blob) = request(
@@ -465,6 +498,17 @@ pub async fn github_sync(
     }
 
     // 5. tree(不带 base_tree = 精确替换,自动清理已删除文件)-> commit -> 更新 ref
+    let changed = files.len() - reused;
+    emit_log(
+        app,
+        "info",
+        if reused > 0 {
+            format!("上传完成:{changed} 个文件有变更,复用 {reused} 个未变化文件;构建产物中已删除的文件将从站点移除")
+        } else {
+            format!("上传完成:{changed} 个文件")
+        },
+    );
+    emit_log(app, "info", "创建目录树与提交…");
     let tree_body = json!({ "tree": tree_items });
     let (tree_status, new_tree) = request(
         &http,
@@ -500,6 +544,8 @@ pub async fn github_sync(
         return Err(format!("创建提交失败({commit_status}): {msg}"));
     }
     let commit_sha = commit["sha"].as_str().ok_or("提交缺少 sha")?.to_string();
+    let short_sha = commit_sha.get(..7).unwrap_or(&commit_sha).to_string();
+    emit_log(app, "info", format!("提交 {short_sha} 已创建,正在更新发布分支…"));
 
     // 6. 更新发布分支引用(幂等收敛,杜绝引用状态冲突):
     //    每次发布都基于云端最新提交(parent = base)生成单线历史;更新失败
@@ -518,6 +564,7 @@ pub async fn github_sync(
         .await?;
         if ref_status == 200 {
             ref_updated = true;
+            emit_log(app, "info", "发布分支已更新");
         }
     }
     if !ref_updated {
@@ -548,12 +595,14 @@ pub async fn github_sync(
                 let msg = patch_body["message"].as_str().unwrap_or("");
                 return Err(format!("更新分支失败({patch_status}): {msg}"));
             }
+            emit_log(app, "info", "发布分支已更新(经创建兜底收敛)");
         }
     }
 
     // 7. 尽力开启 Pages(失败不影响发布结果)
     let (pages_status, _) = request(&http, reqwest::Method::GET, &repo_api(&cfg, "/pages"), &cfg.token, None).await?;
     if pages_status == 404 {
+        emit_log(app, "info", "首次发布:正在开启 GitHub Pages…");
         let _ = request(
             &http,
             reqwest::Method::POST,
@@ -562,6 +611,9 @@ pub async fn github_sync(
             Some(json!({ "source": { "branch": cfg.branch, "path": "/" } })),
         )
         .await?;
+        emit_log(app, "info", "GitHub Pages 已开启(指向发布分支)");
+    } else {
+        emit_log(app, "info", "GitHub Pages 已开启,跳过");
     }
 
     // 8. 记录本次发布的提交,供下次发布前检测云端是否被其他设备更新
