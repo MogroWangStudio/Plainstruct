@@ -132,6 +132,8 @@ export default {
       tableHeader: "表头",
       tableCell: "内容",
     },
+    imageImported: "已复制 {n} 张图片到站点 images 文件夹",
+    imageImportFailed: "图片导入失败:{msg}",
   },
   site: {
     title: "站点设置",

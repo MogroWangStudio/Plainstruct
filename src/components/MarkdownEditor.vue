@@ -3,7 +3,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { Decoration, DecorationSet, EditorView, keymap, KeyBinding, ViewPlugin, ViewUpdate, WidgetType } from "@codemirror/view";
-import { Compartment, EditorState, type Extension, RangeSetBuilder } from "@codemirror/state";
+import { Compartment, EditorState, type Extension, type Text, RangeSetBuilder } from "@codemirror/state";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { highlightSelectionMatches, searchKeymap } from "@codemirror/search";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
@@ -11,12 +11,18 @@ import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { tags as tg } from "@lezer/highlight";
 import { useEditorStore } from "@/stores/editor";
 import { useAppStore } from "@/stores/app";
+import { useSiteStore } from "@/stores/site";
+import { useUiStore } from "@/stores/ui";
+import { ipc } from "@/ipc/ipc";
+import { encodePath, stripExt } from "@/lib/paths";
 import { registerCmView, unregisterCmView } from "@/lib/contextMenu";
 import AppIcon from "@/components/AppIcon.vue";
 
 const { t } = useI18n();
 const editor = useEditorStore();
 const app = useAppStore();
+const site = useSiteStore();
+const ui = useUiStore();
 const host = ref<HTMLElement>();
 let view: EditorView | null = null;
 
@@ -301,12 +307,46 @@ function insertLink() {
   commit(range.from, range.to, insert, urlFrom, urlFrom + 8);
 }
 
-function insertImage() {
+/** 文档开头 --- 包围块(front-matter)的结束位置(闭合围栏行尾);不含 front-matter 的文档返回 null */
+function frontMatterEnd(doc: Text): number | null {
+  if (doc.line(1).text.trim() !== "---") return null;
+  for (let n = 2; n <= doc.lines; n++) {
+    if (/^(---|\.\.\.)\s*$/.test(doc.line(n).text)) return doc.line(n).to;
+  }
+  return null;
+}
+
+/**
+ * 插入图片:选取后统一复制进站点 images/ 文件夹(自动建目录、重名加序号),
+ * 在光标处插入按当前文档位置换算的相对路径(根级文档 images/…,子目录 ../images/…),
+ * 构建与预览都能正确显示;光标落在 front-matter 内时移到其后插入,避免破坏元数据块;
+ * 文件树同步刷新出 images 文件夹,并以提示说明图片去向。
+ */
+async function insertImage() {
   if (!view) return;
-  const range = view.state.selection.main;
-  const alt = t("editor.toolbar.imageAlt");
-  const insert = `![${alt}](https://)`;
-  commit(range.from, range.to, insert, range.from + 2, range.from + 2 + alt.length);
+  const files = await ipc.pickImages();
+  if (!files?.length) return;
+  try {
+    const names = await site.importSiteImages(files);
+    if (!names.length) return;
+    const depth = editor.activePath ? editor.activePath.split("/").length - 1 : 0;
+    const prefix = "../".repeat(depth) + "images/";
+    const markdown = names
+      .map((name) => `![${stripExt(name) || t("editor.toolbar.imageAlt")}](${encodePath(prefix + name)})`)
+      .join("\n");
+    const { state } = view;
+    const range = state.selection.main;
+    const fmEnd = frontMatterEnd(state.doc);
+    // 默认光标停在文档开头(front-matter 之前):图片改插到元数据块后的正文区,补空行分段
+    const inFm = fmEnd !== null && range.from < fmEnd;
+    const from = inFm ? fmEnd : range.from;
+    const to = inFm ? fmEnd : range.to;
+    const insert = (inFm ? "\n\n" : "") + markdown;
+    commit(from, to, insert, from + insert.length, from + insert.length);
+    ui.toast(t("editor.imageImported", { n: names.length }), "success");
+  } catch (e) {
+    ui.toast(t("editor.imageImportFailed", { msg: ipc.errText(e) }), "error");
+  }
 }
 
 function toggleCodeBlock() {

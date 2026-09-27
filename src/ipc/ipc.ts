@@ -133,6 +133,12 @@ export const ipc = {
       ? invoke<number>("import_files", { srcPaths, destDir })
       : mock.importFiles(srcPaths, destDir);
   },
+  /** 站点图片统一导入:复制进 content/images/(自动建目录、重名加序号),返回实际落盘文件名 */
+  importSiteImages(srcPaths: string[]): Promise<string[]> {
+    return inTauri
+      ? invoke<string[]>("import_site_images", { srcPaths })
+      : mock.importSiteImages(srcPaths);
+  },
 
   /* ---------- 构建 ---------- */
   clearBuild(): Promise<void> {
@@ -262,6 +268,16 @@ export const ipc = {
       filters: [{ name: "Images", extensions: ["png", "svg", "jpg", "jpeg", "webp", "ico"] }],
     });
     return typeof file === "string" ? file : null;
+  },
+  /** 编辑器插入图片:多选图片文件(mock 环境返回示例路径走通流程) */
+  async pickImages(): Promise<string[] | null> {
+    if (!inTauri) return ["C:/Users/me/Pictures/photo-1.png", "C:/Users/me/Pictures/photo-2.png"];
+    const { open } = await import("@tauri-apps/plugin-dialog");
+    const files = await open({
+      multiple: true,
+      filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "gif", "webp", "svg", "avif"] }],
+    });
+    return Array.isArray(files) ? files : files ? [files] : null;
   },
   async pickImportFiles(): Promise<string[] | null> {
     if (!inTauri) return ["C:/Docs/imported-note.md"];

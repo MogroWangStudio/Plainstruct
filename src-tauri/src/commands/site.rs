@@ -96,6 +96,8 @@ pub fn create_site(
     }
 
     std::fs::create_dir_all(root.join("content")).map_err(|e| e.to_string())?;
+    // 站点图片统一存放处:插入图片时自动复制到这里,构建后原样出现在站点根
+    std::fs::create_dir_all(root.join("content").join("images")).map_err(|e| e.to_string())?;
     std::fs::create_dir_all(plainstruct_dir(&root).join("themes")).map_err(|e| e.to_string())?;
     std::fs::create_dir_all(plainstruct_dir(&root).join("assets")).map_err(|e| e.to_string())?;
 

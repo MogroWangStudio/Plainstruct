@@ -254,8 +254,6 @@ function renderOnePage(
   /** 站点类型与博客文章流(extras.posts 为当前页应展示的切片,extras.pagination 仅首页系列传入) */
   extras?: { siteType?: SiteType; posts?: PostSummary[]; pagination?: { current: number; total: number } },
 ): PageContext & { html: string } {
-  const env: MdEnv = { currentMdPath: doc.path, docMap, dirSet, warnings, resolveAsset };
-  const content = renderMarkdown(doc.body, env);
   const htmlPath = mdToHtml(doc.path);
   const outDir = dirname(htmlPath);
   const prefix = relPrefix(htmlPath);
@@ -265,6 +263,17 @@ function renderOnePage(
   const next = idx >= 0 && idx < flat.length - 1 ? flat[idx + 1] : undefined;
   const isBlog = (extras?.siteType ?? "docs") === "blog";
   const pag = extras?.pagination;
+
+  // 图片等资源按当前文档目录解析;分页伪页(page/N)的公告正文来自根 index.md,按根目录解析。
+  // 构建时把资源统一改写为页面相对地址(预览由调用方传入 siteUrl 版本),深层页面与分页页同样正确。
+  const env: MdEnv = {
+    currentMdPath: pag ? "index.md" : doc.path,
+    docMap,
+    dirSet,
+    warnings,
+    resolveAsset: resolveAsset ?? ((resolved) => encodePath(relPosix(outDir, resolved))),
+  };
+  const content = renderMarkdown(doc.body, env);
 
   // 分页页码链接:统一指向目录内 index.html,由 relPosix 换算为当前页相对地址
   let pagination: PaginationInfo | undefined;

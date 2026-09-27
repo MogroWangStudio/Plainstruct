@@ -208,5 +208,12 @@ export const useSiteStore = defineStore("site", {
       await this.refreshTree();
       return n;
     },
+
+    /** 站点图片统一导入(落至 content/images/),树刷新后 images 文件夹即可见 */
+    async importSiteImages(srcPaths: string[]) {
+      const names = await ipc.importSiteImages(srcPaths);
+      if (names.length) await this.refreshTree();
+      return names;
+    },
   },
 });

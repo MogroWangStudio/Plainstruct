@@ -475,6 +475,29 @@ export const mock = {
     return srcPaths.length;
   },
 
+  /** 与 Rust 端行为一致:图片落进 content/images/,重名加序号,返回实际文件名 */
+  async importSiteImages(srcPaths: string[]): Promise<string[]> {
+    const taken = new Set(
+      [...files.keys()]
+        .filter((k) => k.startsWith(`${currentRoot}/content/images/`))
+        .map((k) => k.slice(`${currentRoot}/content/images/`.length)),
+    );
+    const names: string[] = [];
+    for (const src of srcPaths) {
+      const original = src.split(/[\\/]/).pop() ?? "";
+      const dot = original.lastIndexOf(".");
+      const stem = dot > 0 ? original.slice(0, dot) : original;
+      const ext = dot > 0 ? original.slice(dot) : "";
+      let name = original;
+      let i = 2;
+      while (taken.has(name)) name = `${stem}-${i++}${ext}`;
+      taken.add(name);
+      files.set(`${currentRoot}/content/images/${name}`, `(站点图片 ${name})`);
+      names.push(name);
+    }
+    return names;
+  },
+
   async clearBuild(): Promise<void> {
     buildFiles = new Map();
   },

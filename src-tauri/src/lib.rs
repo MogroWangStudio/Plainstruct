@@ -142,6 +142,7 @@ pub fn run() {
             commands::move_item,
             commands::delete_item,
             commands::import_files,
+            commands::import_site_images,
             // 构建
             commands::clear_build,
             commands::write_build_files,
