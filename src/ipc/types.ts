@@ -141,6 +141,14 @@ export interface SyncResult {
   pagesUrl: string;
 }
 
+/** 发布前预检:提醒而非阻断 */
+export interface PublishPreflight {
+  /** content 在最近构建后有修改,本地构建已过期(建议重新构建) */
+  buildStale: boolean;
+  /** 云端分支与本站点上次发布的记录不一致(发布将覆盖云端外部更改) */
+  remoteDirty: boolean;
+}
+
 export interface SyncProgress {
   done: number;
   total: number;

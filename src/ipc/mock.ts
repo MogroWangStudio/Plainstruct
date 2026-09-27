@@ -5,6 +5,7 @@ import type {
   CopyItem,
   GithubConfig,
   OutputFile,
+  PublishPreflight,
   RecentSite,
   SiteConfig,
   SyncProgress,
@@ -593,6 +594,11 @@ export const mock = {
       return { ok: false, message: "invalid-token" };
     }
     return { ok: true, user: cfg.owner || "you", repoExists: true, pagesEnabled: true };
+  },
+
+  async githubPreflight(_cfg: GithubConfig): Promise<PublishPreflight> {
+    await delay(200);
+    return { buildStale: false, remoteDirty: false };
   },
 
   async githubSync(

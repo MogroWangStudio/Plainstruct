@@ -104,11 +104,16 @@ pub fn collect_build_files(root: &PathBuf) -> Result<Vec<(String, Vec<u8>)>, Str
         return Err("build 目录不存在,请先构建".into());
     }
     let mut out = Vec::new();
+    // GitHub 的 tree API 拒绝重复 path:同名条目(软链/连接点意外等)提前检出并给出明确提示
+    let mut seen = std::collections::HashSet::new();
     for entry in walkdir::WalkDir::new(&build).into_iter().filter_map(|e| e.ok()) {
         if !entry.file_type().is_file() {
             continue;
         }
         let rel = rel_posix(&build, entry.path());
+        if !seen.insert(rel.clone()) {
+            return Err(format!("构建产物中存在重复路径 {rel},请清理 build 目录后重新构建"));
+        }
         let bytes = std::fs::read(entry.path()).map_err(|e| e.to_string())?;
         out.push((rel, bytes));
     }

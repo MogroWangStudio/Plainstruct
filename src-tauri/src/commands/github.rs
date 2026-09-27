@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tauri::{AppHandle, Emitter, State};
 
+use crate::commands::app::now_millis;
 use crate::commands::build::collect_build_files;
 use crate::events::SYNC_PROGRESS;
 use crate::state::{ensure_main, AppState};
@@ -57,7 +58,43 @@ pub struct SyncResult {
     pub pages_url: String,
 }
 
+/// 发布前预检结果:提醒而非阻断,前端据此向用户确认
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PreflightResult {
+    /// content 目录在最近一次构建后有修改(本地构建已过期,建议重新构建)
+    pub build_stale: bool,
+    /// 云端发布分支的最新提交与本站点上次发布的记录不一致(云端可能被其他设备更新,发布将覆盖)
+    pub remote_dirty: bool,
+}
+
 const API: &str = "https://api.github.com";
+
+/// 计算文件的 git blob sha(与 GitHub 对象库一致):sha1("blob <len>\0" + content)。
+/// 用于增量上传:本地 sha 与云端 tree 中相同,即内容未变化,无需重复上传。
+fn git_blob_sha(bytes: &[u8]) -> String {
+    use sha1::{Digest, Sha1};
+    let mut hasher = Sha1::new();
+    hasher.update(format!("blob {}\0", bytes.len()));
+    hasher.update(bytes);
+    hasher.finalize().iter().map(|b| format!("{b:02x}")).collect()
+}
+
+/// 递归取目录内文件的最大修改时间(目录不存在或无文件返回 None)
+fn newest_mtime(dir: &std::path::Path) -> Option<std::time::SystemTime> {
+    let mut newest: Option<std::time::SystemTime> = None;
+    for entry in walkdir::WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
+        if !entry.file_type().is_file() {
+            continue;
+        }
+        if let Some(t) = entry.metadata().ok().and_then(|md| md.modified().ok()) {
+            if newest.map_or(true, |n| t > n) {
+                newest = Some(t);
+            }
+        }
+    }
+    newest
+}
 
 /// 统一请求:返回 (状态码, 响应 JSON)
 async fn request(
@@ -182,6 +219,51 @@ fn pages_url(cfg: &GithubConfig) -> String {
     }
 }
 
+/// 发布前预检:检测本地构建是否过期、云端是否被本站点之外更新。
+/// 仅作提醒(网络异常时不阻断发布),前端据此向用户确认。
+#[tauri::command]
+pub async fn github_preflight(
+    window: tauri::WebviewWindow,
+    state: State<'_, AppState>,
+    cfg: GithubConfig,
+) -> Result<PreflightResult, String> {
+    ensure_main(&window)?;
+    let root = state.site_root()?;
+
+    // 本地构建过期:content 在 build 之后有过修改(改了文档还没重新构建)
+    let content_newest = newest_mtime(&root.join("content"));
+    let build_newest = newest_mtime(&root.join("build"));
+    let build_stale = match (content_newest, build_newest) {
+        (Some(c), Some(b)) => c > b,
+        // 从未构建过(build 不存在):视为需要构建
+        (Some(_), None) => true,
+        _ => false,
+    };
+
+    // 云端外部更新:分支存在且其最新提交与本站点上次发布的记录不一致
+    let mut remote_dirty = false;
+    if !cfg.owner.is_empty() && !cfg.repo.is_empty() && !cfg.branch.trim().is_empty() {
+        let http = state.http.clone();
+        let ref_url = repo_api(&cfg, &format!("/git/ref/refs/heads/{}", cfg.branch.replace('/', "%2F")));
+        let (ref_status, ref_body) = request(&http, reqwest::Method::GET, &ref_url, &cfg.token, None).await?;
+        if ref_status == 200 {
+            let cloud_commit = ref_body["object"]["sha"].as_str().unwrap_or("").to_string();
+            let record = root
+                .join(".plainstruct")
+                .join("last-publish.json");
+            let recorded = std::fs::read_to_string(record)
+                .ok()
+                .and_then(|s| serde_json::from_str::<Value>(&s).ok())
+                .and_then(|v| v["commit"].as_str().map(|s| s.to_string()));
+            if let Some(recorded) = recorded {
+                remote_dirty = recorded != cloud_commit;
+            }
+        }
+    }
+
+    Ok(PreflightResult { build_stale, remote_dirty })
+}
+
 #[tauri::command]
 pub async fn github_sync(
     window: tauri::WebviewWindow,
@@ -270,22 +352,51 @@ pub async fn github_sync(
         }
     }
 
-    // 4. 逐文件建 blob(全量替换,天然处理删除)
-    let mut tree_items = Vec::with_capacity(files.len());
-    for (i, (path, bytes)) in files.iter().enumerate() {
-        let (blob_status, blob) = request(
+    // 4. 逐文件建 blob(全量替换,天然处理删除)。增量:先取云端现有 tree 的
+    //    path -> blob sha 映射,内容未变化的文件直接复用云端 blob,不再重复上传
+    let mut remote_shas: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    if let Some(base) = &base_commit {
+        let (t_status, t_body) = request(
             &http,
-            reqwest::Method::POST,
-            &repo_api(&cfg, "/git/blobs"),
+            reqwest::Method::GET,
+            &repo_api(&cfg, &format!("/git/trees/{base}?recursive=1")),
             &cfg.token,
-            Some(json!({ "content": B64.encode(bytes), "encoding": "base64" })),
+            None,
         )
         .await?;
-        if blob_status != 201 {
-            let msg = blob["message"].as_str().unwrap_or("");
-            return Err(format!("上传 {path} 失败({blob_status}): {msg}"));
+        if t_status == 200 {
+            if let Some(items) = t_body["tree"].as_array() {
+                for it in items {
+                    if it["type"] == "blob" {
+                        if let (Some(p), Some(s)) = (it["path"].as_str(), it["sha"].as_str()) {
+                            remote_shas.insert(p.to_string(), s.to_string());
+                        }
+                    }
+                }
+            }
         }
-        let sha = blob["sha"].as_str().ok_or("blob 响应缺少 sha")?.to_string();
+    }
+
+    let mut tree_items = Vec::with_capacity(files.len());
+    for (i, (path, bytes)) in files.iter().enumerate() {
+        let local_sha = git_blob_sha(bytes);
+        let sha = if remote_shas.get(path).map(|s| s.as_str()) == Some(local_sha.as_str()) {
+            local_sha
+        } else {
+            let (blob_status, blob) = request(
+                &http,
+                reqwest::Method::POST,
+                &repo_api(&cfg, "/git/blobs"),
+                &cfg.token,
+                Some(json!({ "content": B64.encode(bytes), "encoding": "base64" })),
+            )
+            .await?;
+            if blob_status != 201 {
+                let msg = blob["message"].as_str().unwrap_or("");
+                return Err(format!("上传 {path} 失败({blob_status}): {msg}"));
+            }
+            blob["sha"].as_str().ok_or("blob 响应缺少 sha")?.to_string()
+        };
         tree_items.push(json!({ "path": path, "mode": "100644", "type": "blob", "sha": sha }));
 
         let _ = app.emit(
@@ -375,6 +486,16 @@ pub async fn github_sync(
             Some(json!({ "source": { "branch": cfg.branch, "path": "/" } })),
         )
         .await?;
+    }
+
+    // 8. 记录本次发布的提交,供下次发布前检测云端是否被其他设备更新
+    let record = json!({ "commit": commit_sha, "publishedAt": now_millis() });
+    let record_dir = root.join(".plainstruct");
+    if std::fs::create_dir_all(&record_dir).is_ok() {
+        let _ = std::fs::write(
+            record_dir.join("last-publish.json"),
+            serde_json::to_string_pretty(&record).unwrap_or_default(),
+        );
     }
 
     Ok(SyncResult {

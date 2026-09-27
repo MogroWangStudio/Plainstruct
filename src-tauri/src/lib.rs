@@ -157,6 +157,7 @@ pub fn run() {
             commands::github_read_config,
             commands::github_save_config,
             commands::github_verify,
+            commands::github_preflight,
             commands::github_sync,
             // 系统
             commands::open_path,

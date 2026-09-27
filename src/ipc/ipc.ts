@@ -5,6 +5,7 @@ import type {
   CopyItem,
   GithubConfig,
   OutputFile,
+  PublishPreflight,
   SiteConfig,
   SyncProgress,
   SyncResult,
@@ -185,6 +186,10 @@ export const ipc = {
   },
   githubVerify(cfg: GithubConfig): Promise<VerifyResult> {
     return inTauri ? invoke<VerifyResult>("github_verify", { cfg }) : mock.githubVerify(cfg);
+  },
+  /** 发布前预检:本地构建是否过期、云端是否被外部更新(仅提醒) */
+  githubPreflight(cfg: GithubConfig): Promise<PublishPreflight> {
+    return inTauri ? invoke<PublishPreflight>("github_preflight", { cfg }) : mock.githubPreflight(cfg);
   },
   async githubSync(cfg: GithubConfig, onProgress: (p: SyncProgress) => void): Promise<SyncResult> {
     if (!inTauri) return mock.githubSync(cfg, onProgress);
