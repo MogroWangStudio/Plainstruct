@@ -250,6 +250,10 @@ export default {
     resetDone: "主题配置已重置",
     navlistEmpty: "暂无可显示的文章或文件夹。",
     navlistMax: "已达最多显示 {n} 项",
+    navPickTitle: "选择右上角导航显示的项",
+    navPickedCount: "已选 {n} 项",
+    navPickEmpty: "未选择(将显示全部)",
+    navPickedHeading: "当前在导航中显示",
     fields: {
       color: "颜色",
       text: "文本",

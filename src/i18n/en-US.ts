@@ -250,6 +250,10 @@ export default {
     resetDone: "Theme settings reset",
     navlistEmpty: "No articles or folders to show yet.",
     navlistMax: "Up to {n} items",
+    navPickTitle: "Choose top-right nav items",
+    navPickedCount: "{n} selected",
+    navPickEmpty: "None picked (show all)",
+    navPickedHeading: "Shown in the nav",
     fields: {
       color: "Color",
       text: "Text",

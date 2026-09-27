@@ -1,11 +1,12 @@
 <script setup lang="ts">
 /** 主题可视化配置面板 -- 由 theme.json 的 config schema 自动生成表单 */
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import type { ThemeField } from "@/ipc/types";
 import { navMaxOf, topNavItems } from "@/lib/builder";
 import { useSiteStore } from "@/stores/site";
 import { useThemeStore } from "@/stores/theme";
+import Modal from "@/components/Modal.vue";
 
 const { t } = useI18n();
 const theme = useThemeStore();
@@ -41,24 +42,38 @@ function pickedOf(field: ThemeField): string[] {
 /** 数量上限与构建同源(navMaxItems 配置,缺省 6) */
 const maxNav = computed(() => navMaxOf(theme.configValues));
 
-function maxReached(field: ThemeField): boolean {
-  return pickedOf(field).length >= maxNav.value;
+/** 已选项的显示名(顺序与导航一致;文档已删除的项不再展示) */
+function pickedLabels(field: ThemeField): string[] {
+  const byKey = new Map(navOptions.value.map((o) => [o.key, o]));
+  return pickedOf(field)
+    .map((key) => byKey.get(key))
+    .filter((o) => o !== undefined)
+    .map((o) => (o.dir ? `${o.title} /` : o.title));
 }
 
-function isChecked(field: ThemeField, key: string): boolean {
-  return pickedOf(field).includes(key);
+/* 弹窗选择器:草稿集,点击确认才写入配置 */
+const pickerOpen = ref(false);
+const pickerField = ref<ThemeField | null>(null);
+const draft = ref(new Set<string>());
+
+function openPicker(field: ThemeField) {
+  pickerField.value = field;
+  draft.value = new Set(pickedOf(field));
+  pickerOpen.value = true;
 }
 
-/** 上限已满且该项未勾选时锁住,防止顶栏被挤满 */
-function isNavLocked(field: ThemeField, key: string): boolean {
-  return maxReached(field) && !isChecked(field, key);
+const draftFull = computed(() => draft.value.size >= maxNav.value);
+
+function toggleDraft(key: string, on: boolean) {
+  const next = new Set(draft.value);
+  if (on) next.add(key);
+  else next.delete(key);
+  draft.value = next;
 }
 
-function toggleNav(field: ThemeField, key: string, on: boolean) {
-  const picked = new Set(pickedOf(field));
-  if (on) picked.add(key);
-  else picked.delete(key);
-  onField(field, [...picked].join("\n"));
+function confirmPicker() {
+  if (pickerField.value) onField(pickerField.value, [...draft.value].join("\n"));
+  pickerOpen.value = false;
 }
 </script>
 
@@ -103,28 +118,26 @@ function toggleNav(field: ThemeField, key: string, on: boolean) {
         <option v-for="opt in field.options ?? []" :key="opt" :value="opt">{{ opt }}</option>
       </select>
 
-      <!-- 博客顶栏导航:勾选即显示(顺序随内容树),达到数量上限后其余项禁用 -->
-      <div v-else-if="field.type === 'navlist'" class="flex flex-col">
+      <!-- 博客顶栏导航:按钮弹出选择窗口,确认后面板列出当前在导航中显示的项 -->
+      <div v-else-if="field.type === 'navlist'" class="flex flex-col gap-2">
         <p v-if="!navOptions.length" class="text-[13px] text-ink-3">{{ t("theme.navlistEmpty") }}</p>
         <template v-else>
-          <label
-            v-for="opt in navOptions"
-            :key="opt.key"
-            class="navlist-row"
-            :class="{ off: isNavLocked(field, opt.key) }"
-          >
-            <input
-              type="checkbox"
-              class="checkbox-input"
-              :checked="isChecked(field, opt.key)"
-              :disabled="isNavLocked(field, opt.key)"
-              @change="toggleNav(field, opt.key, ($event.target as HTMLInputElement).checked)"
-            />
-            <span class="min-w-0 truncate text-[13px] text-ink-2">{{ opt.title }}{{ opt.dir ? " /" : "" }}</span>
-          </label>
-          <p v-if="maxReached(field)" class="mt-1 text-[12px] text-ink-3">
-            {{ t("theme.navlistMax", { n: maxNav }) }}
-          </p>
+          <button type="button" class="select !w-64 cursor-pointer text-left" @click="openPicker(field)">
+            {{ pickedOf(field).length ? t("theme.navPickedCount", { n: pickedOf(field).length }) : t("theme.navPickEmpty") }}
+          </button>
+          <template v-if="pickedLabels(field).length">
+            <p class="text-[12px] text-ink-3">{{ t("theme.navPickedHeading") }}</p>
+            <ul class="flex flex-col">
+              <li
+                v-for="(label, i) in pickedLabels(field)"
+                :key="i"
+                class="max-w-64 truncate py-0.5 text-[13px] text-ink-2"
+                :title="label"
+              >
+                {{ label }}
+              </li>
+            </ul>
+          </template>
         </template>
       </div>
 
@@ -152,6 +165,32 @@ function toggleNav(field: ThemeField, key: string, on: boolean) {
     <p v-if="!(theme.activeMeta?.config ?? []).length" class="text-[13px] text-ink-3">
       {{ t("common.empty") }}
     </p>
+
+    <!-- 顶栏导航选择弹窗:勾选数量上限内的项,确认后才写入配置 -->
+    <Modal v-if="pickerOpen" :title="t('theme.navPickTitle')" :width="360" @cancel="pickerOpen = false">
+      <div class="flex flex-col">
+        <label
+          v-for="opt in navOptions"
+          :key="opt.key"
+          class="navlist-row"
+          :class="{ off: draftFull && !draft.has(opt.key) }"
+        >
+          <input
+            type="checkbox"
+            class="checkbox-input"
+            :checked="draft.has(opt.key)"
+            :disabled="draftFull && !draft.has(opt.key)"
+            @change="toggleDraft(opt.key, ($event.target as HTMLInputElement).checked)"
+          />
+          <span class="min-w-0 truncate text-[13px] text-ink-2">{{ opt.title }}{{ opt.dir ? " /" : "" }}</span>
+        </label>
+      </div>
+      <p v-if="draftFull" class="mt-1 text-[12px] text-ink-3">{{ t("theme.navlistMax", { n: maxNav }) }}</p>
+      <template #footer>
+        <button class="btn btn-secondary" @click="pickerOpen = false">{{ t("common.cancel") }}</button>
+        <button class="btn btn-primary" @click="confirmPicker">{{ t("common.confirm") }}</button>
+      </template>
+    </Modal>
   </div>
 </template>
 
