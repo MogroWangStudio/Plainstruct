@@ -11,6 +11,11 @@
 
 - **修复 Windows 上检查更新后下载时报「Release 中没有当前平台的安装包」的问题**:更新包选择不再按「后缀 + 关键词」的组合硬套——此前免安装版(marker 标记)同样要求安装包以 `.exe` 结尾,而免安装版的更新包是 zip,永远匹配不上;现改为按发行形态以关键字符匹配(大小写不敏感):免安装版匹配 `*portable*.zip`(解压覆盖更新),安装版匹配 `*setup*.exe`(NSIS 静默安装),macOS 匹配 dmg,不再依赖文件名里的版本号与分隔符写法;另请注意,历史发布的 Release 未附 Windows NSIS 安装包,安装版的自动更新需发布时确保安装包一并上传
 
+### 新增
+
+- **资产页**:左侧新增「资产」入口,集中管理站点 images 文件夹中的图片 —— 缩略图网格、每张图片的引用计数、底部详情面板列出全部引用文档(点击直达);重命名图片时可同步改写引用文档中的路径(正在编辑且有未保存修改的文档自动跳过并提示),删除提供二级确认并在图片被引用时提示引用将失效
+- **配置头快速添加**:编辑器工具栏新增「快速添加配置头」—— 文档没有 front-matter 时一键生成完整配置头(title 取文档名、date 自动填当天,光标直接落在 title 上),已有 front-matter 时仅补齐缺失的识别字段(title/description/date/order),已有字段保持原样,字段齐全时给出提示;文档日期不显示通常就是因为 front-matter 里没有 date 字段(或文档主题的「显示文档日期」开关未开启),现在可以一键补上
+
 ### 变更
 
 - **发布形态精简与产物命名统一**:不再构建 Windows 安装包(NSIS/MSI),Windows x64 只提供免安装 zip(内含 `plainstruct.exe`),命名统一为 `Plainstruct_版本号_Windows_x64_Portable.zip`;macOS arm64 产物同名成对 —— `Plainstruct_版本号_macOS_arm64.dmg` 与内含 .app 及「损坏修复.command」的 `Plainstruct_版本号_macOS_arm64.zip`;免安装包不再内含 `portable.marker` 标记文件,应用更新在 Windows 一律按免安装方式解压覆盖,更新包匹配以关键字符完成,不再依赖标记

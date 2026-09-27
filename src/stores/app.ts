@@ -18,7 +18,7 @@ import { i18n, type Locale as I18nLocale } from "@/i18n";
 import { appThemeDef } from "@/lib/app-themes";
 import { useUiStore } from "./ui";
 
-export type AppView = "editor" | "site" | "build" | "theme" | "publish" | "settings" | "about";
+export type AppView = "editor" | "assets" | "site" | "build" | "theme" | "publish" | "settings" | "about";
 
 /** 自动更新阶段:idle=未开始 downloading=下载中 ready=已就绪待重启 error=失败 */
 export type UpdatePhase = "idle" | "downloading" | "ready" | "error";

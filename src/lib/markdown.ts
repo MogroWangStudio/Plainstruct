@@ -16,7 +16,7 @@ export interface MdEnv {
   resolveAsset?: (resolvedPath: string) => string;
 }
 
-function decodeHref(href: string): string {
+export function decodeHref(href: string): string {
   try {
     return decodeURIComponent(href);
   } catch {
@@ -24,7 +24,7 @@ function decodeHref(href: string): string {
   }
 }
 
-function splitHash(href: string): [target: string, hash: string] {
+export function splitHash(href: string): [target: string, hash: string] {
   const i = href.indexOf("#");
   if (i === -1) return [href, ""];
   return [href.slice(0, i), href.slice(i)];

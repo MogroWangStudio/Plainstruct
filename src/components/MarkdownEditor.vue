@@ -316,6 +316,51 @@ function frontMatterEnd(doc: Text): number | null {
   return null;
 }
 
+/** 素构识别的配置头字段与快速生成的默认值(日期为当天) */
+function fmDefaults(): { key: string; line: string }[] {
+  const today = new Date().toISOString().slice(0, 10);
+  return [
+    { key: "title", line: `title: ${editor.docTitle || t("editor.fmTitlePlaceholder")}` },
+    { key: "description", line: "description:" },
+    { key: "date", line: `date: ${today}` },
+    { key: "order", line: "order: 0" },
+  ];
+}
+
+/**
+ * 配置头快速添加:文档没有 front-matter 时在开头生成完整配置头(title/date 自动填充);
+ * 已有配置头时仅在闭合围栏前补齐缺失的识别字段,已有字段保持原样,不做重复添加。
+ */
+function insertFrontMatter() {
+  if (!view) return;
+  const { state } = view;
+  const doc = state.doc;
+  const fmEnd = frontMatterEnd(doc);
+  if (fmEnd === null) {
+    // 无配置头:生成完整模板,光标落到 title 值处便于直接修改
+    const lines = fmDefaults().map((f) => f.line);
+    const insert = `---\n${lines.join("\n")}\n---\n\n`;
+    const titleFrom = 4 + "title: ".length;
+    commit(0, 0, insert, titleFrom, titleFrom + (editor.docTitle || t("editor.fmTitlePlaceholder")).length);
+    return;
+  }
+  // 已有配置头:收集出现过的字段,缺失的补在闭合围栏之前
+  const endLine = doc.lineAt(fmEnd).number;
+  const present = new Set<string>();
+  for (let n = 2; n < endLine; n++) {
+    const m = doc.line(n).text.match(/^([A-Za-z_][\w-]*)\s*:/);
+    if (m) present.add(m[1].toLowerCase());
+  }
+  const missing = fmDefaults().filter((f) => !present.has(f.key));
+  if (!missing.length) {
+    ui.toast(t("editor.fmComplete"), "info");
+    return;
+  }
+  const closeLine = doc.line(endLine);
+  const insert = missing.map((f) => f.line).join("\n") + "\n";
+  commit(closeLine.from, closeLine.from, insert, closeLine.from, closeLine.from);
+}
+
 /**
  * 插入图片:选取后统一复制进站点 images/ 文件夹(自动建目录、重名加序号),
  * 在光标处插入按当前文档位置换算的相对路径(根级文档 images/…,子目录 ../images/…),
@@ -740,6 +785,10 @@ defineExpose({
       </button>
       <button class="tb-btn" :title="breakTitle" @click="insertBreak">
         <AppIcon name="wrapText" :size="15" />
+      </button>
+      <span class="tb-sep" />
+      <button class="tb-btn" :title="t('editor.toolbar.frontmatter')" @click="insertFrontMatter">
+        <AppIcon name="filePlus" :size="15" />
       </button>
     </div>
 

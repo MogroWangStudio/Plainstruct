@@ -9,6 +9,7 @@ import ContextMenu from "@/components/ContextMenu.vue";
 import FeedbackHost from "@/components/FeedbackHost.vue";
 import StartView from "@/views/StartView.vue";
 import EditorView from "@/views/EditorView.vue";
+import AssetsView from "@/views/AssetsView.vue";
 import SiteSettingsView from "@/views/SiteSettingsView.vue";
 import BuildView from "@/views/BuildView.vue";
 import ThemesView from "@/views/ThemesView.vue";
@@ -21,6 +22,7 @@ const site = useSiteStore();
 
 const viewMap = {
   editor: EditorView,
+  assets: AssetsView,
   site: SiteSettingsView,
   build: BuildView,
   theme: ThemesView,
