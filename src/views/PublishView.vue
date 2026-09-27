@@ -140,7 +140,12 @@ function openPages() {
           </p>
           <p class="mono text-[12px] text-ink-2">{{ t("publish.commit", { sha: publish.result.commitSha.slice(0, 7) }) }}</p>
           <div class="flex gap-2">
-            <button class="btn btn-secondary !w-fit" :disabled="publish.checkingDeploy" @click="openPages">
+            <button
+              class="btn btn-secondary !w-fit"
+              :class="{ 'btn-waiting': publish.checkingDeploy }"
+              :disabled="publish.checkingDeploy"
+              @click="openPages"
+            >
               <AppIcon name="refresh" :size="14" :class="{ 'animate-spin': publish.checkingDeploy }" />
               {{ publish.checkingDeploy ? t("publish.waitingDeploy") : t("publish.viewSite") }}
             </button>
@@ -191,6 +196,35 @@ function openPages() {
 </template>
 
 <style scoped>
+/* 等待 Pages 部署:按钮非线性呼吸闪烁 ——
+   两短一停的双闪节律(关键帧百分比不对称),每段经平滑缓动衔接,
+   叠加一圈强调色光环扩散,流动地表达「进行中」;reduce-motion 下由全局规则压停 */
+.btn-waiting {
+  animation: waiting-pulse 2s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+@keyframes waiting-pulse {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 var(--color-accent-soft);
+  }
+  10% {
+    opacity: 0.5;
+    box-shadow: 0 0 0 3px var(--color-accent-soft);
+  }
+  20% {
+    opacity: 0.9;
+    box-shadow: 0 0 0 0 var(--color-accent-soft);
+  }
+  30% {
+    opacity: 0.5;
+    box-shadow: 0 0 0 3px var(--color-accent-soft);
+  }
+  42% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 var(--color-accent-soft);
+  }
+}
+
 /* 运行日志:控制台式面板,等宽排印,级别着色 */
 .log-box {
   max-height: 240px;
