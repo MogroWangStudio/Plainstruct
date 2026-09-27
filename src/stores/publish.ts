@@ -85,10 +85,6 @@ export const usePublishStore = defineStore("publish", {
       const builder = useBuilderStore();
       const ui = useUiStore();
       const t = i18n.global.t;
-      if (!builder.report) {
-        ui.toast(t("publish.needBuild"), "error");
-        return;
-      }
       // 分支名不能为空:发布分支是站点内容在仓库中的落点
       if (!this.config.branch.trim()) {
         ui.toast(t("publish.branchEmpty"), "error");
@@ -97,18 +93,22 @@ export const usePublishStore = defineStore("publish", {
       ensureLogListener();
       this.logs = [];
       this.appendLog("info", t("publish.logStart", { repo: `${this.config.owner}/${this.config.repo}` }));
+
+      // 发布前自动构建:产物始终与站点内容一致(修改与删除一并生效)
+      this.appendLog("info", t("publish.autoBuild"));
+      await builder.build();
+      if (builder.error) {
+        this.error = builder.error;
+        this.appendLog("error", t("publish.autoBuildFailed", { msg: builder.error }));
+        ui.toast(t("publish.autoBuildFailed", { msg: builder.error }), "error");
+        return;
+      }
+      this.appendLog("success", t("publish.autoBuildDone"));
+
       // 预检提醒(网络异常时忽略,不阻断发布):
-      // 本地构建过期 → 建议重新构建;云端被其他设备更新 → 提示将覆盖
+      // 云端被其他设备更新 → 提示将覆盖
       try {
         const pre = await ipc.githubPreflight(this.config);
-        if (pre.buildStale) {
-          const go = await ui.confirmDialog({
-            title: t("publish.staleTitle"),
-            body: t("publish.staleBody"),
-            confirmText: t("publish.staleConfirm"),
-          });
-          if (!go) return;
-        }
         if (pre.remoteDirty) {
           const go = await ui.confirmDialog({
             title: t("publish.remoteTitle"),
@@ -138,8 +138,13 @@ export const usePublishStore = defineStore("publish", {
       }
     },
 
-    /** 打开站点:先检测 Pages 是否已部署本次提交,未完成则轮询等待后自动打开 */
-    async openSite() {
+    /** 前往目标仓库页面 */
+    openRepo() {
+      if (!this.config.owner || !this.config.repo) return;
+      void ipc.openExternal(`https://github.com/${this.config.owner}/${this.config.repo}`);
+    },
+
+    /** 打开站点:先检测 Pages 是否已部署本次提交,未完成则轮询等待后自动打开 */    async openSite() {
       const ui = useUiStore();
       const t = i18n.global.t;
       if (!this.result || this.checkingDeploy) return;

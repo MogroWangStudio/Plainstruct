@@ -139,10 +139,16 @@ function openPages() {
             {{ t("publish.done") }}
           </p>
           <p class="mono text-[12px] text-ink-2">{{ t("publish.commit", { sha: publish.result.commitSha.slice(0, 7) }) }}</p>
-          <button class="btn btn-secondary !w-fit" :disabled="publish.checkingDeploy" @click="openPages">
-            <AppIcon name="refresh" :size="14" :class="{ 'animate-spin': publish.checkingDeploy }" />
-            {{ publish.checkingDeploy ? t("publish.waitingDeploy") : t("publish.viewSite") }}
-          </button>
+          <div class="flex gap-2">
+            <button class="btn btn-secondary !w-fit" :disabled="publish.checkingDeploy" @click="openPages">
+              <AppIcon name="refresh" :size="14" :class="{ 'animate-spin': publish.checkingDeploy }" />
+              {{ publish.checkingDeploy ? t("publish.waitingDeploy") : t("publish.viewSite") }}
+            </button>
+            <button class="btn btn-secondary !w-fit" @click="publish.openRepo()">
+              <AppIcon name="external" :size="14" />
+              {{ t("publish.goRepo") }}
+            </button>
+          </div>
         </div>
 
         <p v-if="publish.error" class="mt-5 rounded-lg border border-line bg-danger-soft px-4 py-3 text-[12.5px] leading-relaxed text-danger">
