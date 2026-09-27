@@ -60,6 +60,12 @@ export interface UpdateInfo {
   publishedAt: string;
 }
 
+/** 自动更新包下载进度 */
+export interface UpdateProgress {
+  received: number;
+  total: number | null;
+}
+
 export interface SiteThemeRef {
   id: string;
   source: ThemeSource;

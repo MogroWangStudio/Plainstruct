@@ -21,6 +21,9 @@ New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 
 Copy-Item -LiteralPath $exe -Destination $outDir
 
+# 便携版标记:自动更新据此选择 zip 覆盖式更新(而非 NSIS 静默安装)
+New-Item -ItemType File -Force -Path (Join-Path $outDir "portable.marker") | Out-Null
+
 if (Test-Path $zipPath) {
   Remove-Item -LiteralPath $zipPath -Force
 }

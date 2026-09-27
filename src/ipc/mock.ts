@@ -641,6 +641,12 @@ export const mock = {
       publishedAt: "",
     };
   },
+
+  /** 浏览器预览无更新下载:模拟下载后进入就绪 */
+  async updateDownload(): Promise<{ version: string; assetName: string }> {
+    await delay(1200);
+    return { version: __APP_VERSION__, assetName: "mock-installer" };
+  },
 };
 
 /** mock 模式下的文件选择:返回虚拟路径 */

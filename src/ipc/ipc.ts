@@ -46,6 +46,10 @@ export const ipc = {
   checkUpdate(): Promise<UpdateInfo> {
     return inTauri ? invoke<UpdateInfo>("check_update") : mock.checkUpdate();
   },
+  /** 下载官方最新 Release 的当前平台安装包,并准备更新向导(完成后关闭应用即自动更新) */
+  updateDownload(): Promise<{ version: string; assetName: string }> {
+    return inTauri ? invoke<{ version: string; assetName: string }>("update_download") : mock.updateDownload();
+  },
   /** 更改数据存储位置(null = 恢复默认),数据迁移后立即生效 */
   setDataDir(path: string | null): Promise<void> {
     return inTauri ? invoke<void>("set_data_dir", { path }) : mock.setDataDir(path);

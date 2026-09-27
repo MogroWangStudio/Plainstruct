@@ -195,7 +195,7 @@ pub fn set_data_dir(
 
 /* ---------- 检查更新:对比 GitHub 最新 Release 与当前版本 ---------- */
 
-const RELEASES_API: &str = "https://api.github.com/repos/MogroWang/Plainstruct/releases/latest";
+pub(crate) const RELEASES_API: &str = "https://api.github.com/repos/MogroWang/Plainstruct/releases/latest";
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -216,7 +216,7 @@ fn parse_semver(s: &str) -> Option<(u64, u64, u64)> {
     Some((it.next()?.parse().ok()?, it.next()?.parse().ok()?, it.next()?.parse().ok()?))
 }
 
-fn is_newer(latest: &str, current: &str) -> bool {
+pub(crate) fn is_newer(latest: &str, current: &str) -> bool {
     match (parse_semver(latest), parse_semver(current)) {
         (Some(a), Some(b)) => a > b,
         // 任一侧无法按 semver 解析时退化为字符串比较

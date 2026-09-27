@@ -108,7 +108,7 @@ fn newest_mtime(dir: &std::path::Path) -> Option<std::time::SystemTime> {
     newest
 }
 
-/// 统一请求:返回 (状态码, 响应 JSON)
+/// 统一请求:返回 (状态码, 响应 JSON)。token 为空时不带 Authorization(公开接口)
 async fn request(
     http: &reqwest::Client,
     method: reqwest::Method,
@@ -118,9 +118,11 @@ async fn request(
 ) -> Result<(u16, Value), String> {
     let mut req = http
         .request(method, url)
-        .header("Authorization", format!("Bearer {token}"))
         .header("Accept", "application/vnd.github+json")
         .header("X-GitHub-Api-Version", "2022-11-28");
+    if !token.is_empty() {
+        req = req.header("Authorization", format!("Bearer {token}"));
+    }
     if let Some(b) = body {
         req = req.json(&b);
     }
@@ -552,4 +554,270 @@ pub async fn github_sync(
         commit_sha,
         pages_url: pages_url(&cfg),
     })
+}
+
+/* ---------------- 自动更新 ---------------- */
+
+/// 更新任务目录:安装包、向导脚本都放在这里。应用正常启动时会清空此目录,
+/// 因此「目录内存在向导脚本」即表示「用户已下载更新、等待退出后执行向导」。
+pub(crate) fn update_dir() -> std::path::PathBuf {
+    std::env::temp_dir().join("plainstruct-update")
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateDownloadResult {
+    pub version: String,
+    pub asset_name: String,
+}
+
+/// 从官方仓库最新 Release 下载当前平台对应的安装包,并生成更新向导脚本。
+/// 下载完成即万事俱备:用户关闭应用后由退出钩子拉起向导完成安装并重启。
+#[tauri::command]
+pub async fn update_download(
+    app: AppHandle,
+    window: tauri::WebviewWindow,
+    state: State<'_, AppState>,
+) -> Result<UpdateDownloadResult, String> {
+    use crate::events::UPDATE_PROGRESS;
+
+    ensure_main(&window)?;
+    let http = state.http.clone();
+    let current = env!("CARGO_PKG_VERSION").to_string();
+
+    // 1. 最新 Release 与版本比较
+    let (status, body) = request(&http, reqwest::Method::GET, crate::commands::app::RELEASES_API, "", None).await?;
+    if status != 200 {
+        return Err(format!("GitHub 返回 {status}"));
+    }
+    let tag = body["tag_name"].as_str().unwrap_or("").trim().to_string();
+    if tag.is_empty() {
+        return Err("Release 数据缺少版本号。".into());
+    }
+    let latest = tag.trim_start_matches(['v', 'V']).to_string();
+    if !crate::commands::app::is_newer(&latest, &current) {
+        return Err("already-latest".into());
+    }
+
+    // 2. 选择当前平台的安装包:便携版(marker 标记)用 zip 解压覆盖,安装版用 NSIS 静默安装
+    let portable = std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().map(|p| p.join("portable.marker").exists()))
+        .unwrap_or(false);
+    let want = |name: &str, suffix: &str| -> bool {
+        let n = name.to_ascii_lowercase();
+        #[cfg(target_os = "windows")]
+        {
+            n.ends_with(suffix) && n.contains("x64")
+                && if portable { n.contains("portable") } else { n.contains("setup") }
+        }
+        #[cfg(target_os = "macos")]
+        {
+            let _ = (name, suffix, portable);
+            n.ends_with(".dmg")
+        }
+        #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+        {
+            let _ = (n, suffix, portable);
+            false
+        }
+    };
+    let asset = body["assets"]
+        .as_array()
+        .and_then(|list| {
+            list.iter()
+                .find(|a| want(a["name"].as_str().unwrap_or(""), ".exe") || want(a["name"].as_str().unwrap_or(""), ".dmg"))
+        })
+        .ok_or("Release 中没有当前平台的安装包")?;
+    let asset_name = asset["name"].as_str().unwrap_or("").to_string();
+    let asset_url = asset["browser_download_url"].as_str().unwrap_or("").to_string();
+    if asset_url.is_empty() {
+        return Err("安装包下载地址缺失".into());
+    }
+
+    // 3. 流式下载,进度经事件广播
+    let dir = update_dir();
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let asset_path = dir.join(&asset_name);
+    let resp = http
+        .get(&asset_url)
+        .header("Accept", "application/octet-stream")
+        .timeout(std::time::Duration::from_secs(600))
+        .send()
+        .await
+        .map_err(|e| format!("下载失败: {e}"))?;
+    if !resp.status().is_success() {
+        return Err(format!("下载失败: GitHub 返回 {}", resp.status()));
+    }
+    let total = resp.content_length();
+    let mut file = std::fs::File::create(&asset_path).map_err(|e| e.to_string())?;
+    use std::io::Write;
+    let mut received: u64 = 0;
+    let mut last_emitted: u64 = 0;
+    let mut stream = resp;
+    while let Some(chunk) = stream.chunk().await.map_err(|e| format!("下载失败: {e}"))? {
+        file.write_all(&chunk).map_err(|e| e.to_string())?;
+        received += chunk.len() as u64;
+        // 每 256KB 或到达尾部时广播一次,避免事件风暴
+        if received - last_emitted >= 256 * 1024 || total.map_or(false, |t| received >= t) {
+            last_emitted = received;
+            let _ = app.emit(
+                UPDATE_PROGRESS,
+                json!({ "received": received, "total": total }),
+            );
+        }
+    }
+    let _ = file.flush();
+
+    // 4. 生成平台对应的更新向导脚本,退出钩子据此拉起
+    write_update_helper(&asset_path, portable)?;
+
+    Ok(UpdateDownloadResult {
+        version: latest,
+        asset_name,
+    })
+}
+
+/// 生成更新向导脚本(路径全部在生成时嵌入,向导无需解析任务文件)
+fn write_update_helper(asset_path: &std::path::Path, portable: bool) -> Result<(), String> {
+    let dir = update_dir();
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let asset = asset_path.to_string_lossy().replace('\'', "''");
+
+    #[cfg(target_os = "windows")]
+    {
+        let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+        let app_dir = exe.parent().ok_or("无法定位程序目录")?.to_string_lossy().replace('\'', "''");
+        let app_exe = exe.to_string_lossy().replace('\'', "''");
+        let script = format!(
+            r#"$ErrorActionPreference = 'Stop'
+$installer = '{asset}'
+$appExe    = '{app_exe}'
+$appDir    = '{app_dir}'
+$portable  = '{portable}'
+
+Add-Type -AssemblyName System.Windows.Forms
+$form = New-Object System.Windows.Forms.Form
+$form.Text = 'Plainstruct 更新'
+$form.Size = New-Object System.Drawing.Size(380,150)
+$form.StartPosition = 'CenterScreen'
+$form.FormBorderStyle = 'FixedDialog'
+$form.TopMost = $true
+$label = New-Object System.Windows.Forms.Label
+$label.Dock = 'Fill'
+$label.TextAlign = 'MiddleCenter'
+$label.Text = '准备更新...'
+$form.Controls.Add($label)
+$bar = New-Object System.Windows.Forms.ProgressBar
+$bar.Style = 'Marquee'
+$bar.MarqueeAnimationSpeed = 30
+$bar.Dock = 'Bottom'
+$bar.Height = 22
+$form.Controls.Add($bar)
+$form.Show()
+function Set-Stage($t) {{ $label.Text = $t; [System.Windows.Forms.Application]::DoEvents() }}
+
+Set-Stage '等待 Plainstruct 退出...'
+try {{ Wait-Process -Name 'plainstruct' -Timeout 30 -ErrorAction Stop }} catch {{}}
+Start-Sleep -Milliseconds 800
+
+if ($portable -eq 'true') {{
+  Set-Stage '正在解压并更新程序文件...'
+  $tmp = Join-Path $env:TEMP ('plainstruct-unzip-' + [guid]::NewGuid().ToString())
+  Expand-Archive -Path $installer -DestinationPath $tmp -Force
+  $src = (Get-ChildItem $tmp | Select-Object -First 1).FullName
+  Copy-Item -Path (Join-Path $src '*') -Destination $appDir -Recurse -Force
+  Remove-Item -LiteralPath $tmp -Recurse -Force
+}} else {{
+  Set-Stage '正在运行安装程序,请稍候...'
+  $nsisArgs = '/S /D=' + $appDir
+  Start-Process -FilePath $installer -ArgumentList $nsisArgs -Wait | Out-Null
+}}
+
+Set-Stage '启动新版本...'
+Start-Process -FilePath $appExe
+$form.Close()
+"#,
+            asset = asset,
+            app_exe = app_exe,
+            app_dir = app_dir,
+            portable = if portable { "true" } else { "false" },
+        );
+        std::fs::write(dir.join("update-helper.ps1"), script).map_err(|e| e.to_string())?;
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let _ = portable;
+        // 旧 .app 位置:当前 exe 位于 <App>.app/Contents/MacOS/<bin>,向上三级即 bundle;
+        // 找不到时(开发模式)退回 /Applications 的标准位置
+        let app_path = std::env::current_exe()
+            .ok()
+            .and_then(|exe| {
+                exe.parent() // MacOS
+                    .and_then(|p| p.parent()) // Contents
+                    .and_then(|p| p.parent()) // <App>.app
+                    .filter(|p| p.extension().map_or(false, |e| e == "app"))
+                    .map(|p| p.to_string_lossy().to_string())
+            })
+            .unwrap_or_else(|| "/Applications/Plainstruct.app".to_string());
+        let app_path = app_path.replace('\'', "'\\''");
+        let dmg = asset;
+        let script = format!(
+            r#"#!/bin/bash
+# Plainstruct 自动更新向导(终端窗口即向导,按阶段显示进度)
+APP_PATH='{app_path}'
+DMG='{dmg}'
+echo '── Plainstruct 更新 ──'
+echo '等待 Plainstruct 退出...'
+while pgrep -x plainstruct >/dev/null 2>&1; do sleep 1; done
+echo '挂载更新镜像...'
+MOUNT=$(hdiutil attach -nobrowse -readonly "$DMG" 2>/dev/null | awk -F'\t' '/Volumes/{{print $NF}}' | head -1)
+if [ -z "$MOUNT" ]; then
+  echo '无法挂载更新镜像,更新已取消。'
+  read -r -p '按回车键退出...'
+  exit 1
+fi
+echo '正在安装新版本到 '"$APP_PATH"' ...'
+rm -rf "$APP_PATH"
+if ! cp -R "$MOUNT/Plainstruct.app" "$APP_PATH"; then
+  echo '安装失败,请手动打开 dmg 拖入「应用程序」。'
+  hdiutil detach "$MOUNT" 2>/dev/null
+  read -r -p '按回车键退出...'
+  exit 1
+fi
+hdiutil detach "$MOUNT" 2>/dev/null
+echo '检查隔离标记(应用内下载通常没有,无需修复)...'
+if xattr -p com.apple.quarantine "$APP_PATH" >/dev/null 2>&1; then
+  echo '检测到隔离标记:正在移除,需要输入开机密码...'
+  if sudo xattr -r -d com.apple.quarantine "$APP_PATH"; then
+    echo '已移除隔离标记。'
+  else
+    echo '移除未完成:若打开时提示「已损坏」,请运行 dmg 内的「损坏修复.command」。'
+  fi
+else
+  echo '未检测到隔离标记,无需修复。'
+fi
+echo '启动新版本...'
+open "$APP_PATH"
+echo '更新完成,本窗口可以关闭。'
+read -r -p '按回车键退出...'
+"#,
+            app_path = app_path,
+            dmg = dmg,
+        );
+        let path = dir.join("update-helper.command");
+        std::fs::write(&path, script).map_err(|e| e.to_string())?;
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).map_err(|e| e.to_string())?;
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    {
+        let _ = (asset_path, portable);
+        Err("当前平台不支持自动更新".into())
+    }
+
+    #[cfg(any(target_os = "windows", target_os = "macos"))]
+    Ok(())
 }

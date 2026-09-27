@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { ipc } from "@/ipc/ipc";
+import { Events, listen } from "@/ipc/events";
 import type {
   AppSettings,
   AppTheme,
@@ -11,11 +12,16 @@ import type {
   Platform,
   RecentSite,
   UiFontMode,
+  UpdateProgress,
 } from "@/ipc/types";
 import { i18n, type Locale as I18nLocale } from "@/i18n";
 import { appThemeDef } from "@/lib/app-themes";
+import { useUiStore } from "./ui";
 
 export type AppView = "editor" | "site" | "build" | "theme" | "publish" | "settings" | "about";
+
+/** 自动更新阶段:idle=未开始 downloading=下载中 ready=已就绪待重启 error=失败 */
+export type UpdatePhase = "idle" | "downloading" | "ready" | "error";
 
 /** 个性化外观(主题与字体) */
 export interface AppearanceSettings {
@@ -46,6 +52,11 @@ interface State {
   view: AppView;
   /** 系统当前是否深色(跟随系统主题用) */
   systemDark: boolean;
+  /** 自动更新阶段与下载进度(0-100,无总大小时为 -1 表示不确定) */
+  updatePhase: UpdatePhase;
+  updateProgress: number;
+  updateError: string;
+  updateVersion: string;
 }
 
 export const useAppStore = defineStore("app", {
@@ -54,6 +65,10 @@ export const useAppStore = defineStore("app", {
     bootstrap: null,
     view: "editor",
     systemDark: false,
+    updatePhase: "idle",
+    updateProgress: 0,
+    updateError: "",
+    updateVersion: "",
   }),
 
   getters: {
@@ -95,7 +110,45 @@ export const useAppStore = defineStore("app", {
       i18n.global.locale.value = this.settings.locale as I18nLocale;
       this.applyAppearance();
       this.watchSystemTheme();
+      this.watchUpdateProgress();
       this.ready = true;
+    },
+
+    /** 监听更新包下载进度事件 */
+    async watchUpdateProgress() {
+      await listen<UpdateProgress>(Events.UpdateProgress, (p) => {
+        if (this.updatePhase !== "downloading") return;
+        this.updateProgress = p.total && p.total > 0 ? Math.round((p.received / p.total) * 100) : -1;
+      });
+    },
+
+    /** 下载官方最新版安装包;完成后提示用户关闭应用以运行更新向导 */
+    async updateDownload() {
+      const ui = useUiStore();
+      const t = i18n.global.t;
+      this.updatePhase = "downloading";
+      this.updateProgress = 0;
+      this.updateError = "";
+      try {
+        const r = await ipc.updateDownload();
+        this.updateVersion = r.version;
+        this.updatePhase = "ready";
+      } catch (e) {
+        this.updatePhase = "error";
+        this.updateError = ipc.errText(e);
+        ui.toast(t("settings.updateDownloadFailed", { msg: this.updateError }), "error");
+      }
+    },
+
+    /** 检测到新版本时询问用户是否立即下载更新 */
+    async confirmUpdate(version: string): Promise<boolean> {
+      const ui = useUiStore();
+      const t = i18n.global.t;
+      return ui.confirmDialog({
+        title: t("settings.updateAskTitle"),
+        body: t("settings.updateAskBody", { v: version }),
+        confirmText: t("settings.updateAskConfirm"),
+      });
     },
 
     async setLocale(locale: Locale) {

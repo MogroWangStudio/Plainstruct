@@ -205,13 +205,23 @@ const updateHint = computed(() => {
   }
 });
 
+/** 自动更新行:阶段与下载进度 */
+const updateBar = computed(() =>
+  app.updateProgress >= 0 ? `${app.updateProgress}%` : "100%",
+);
+
 async function checkUpdate() {
   update.value = { kind: "checking" };
   try {
     const info = await ipc.checkUpdate();
-    update.value = info.hasUpdate
-      ? { kind: "available", version: info.latestVersion, url: info.releaseUrl }
-      : { kind: "latest" };
+    if (!info.hasUpdate) {
+      update.value = { kind: "latest" };
+      return;
+    }
+    update.value = { kind: "available", version: info.latestVersion, url: info.releaseUrl };
+    // 检测到新版本:询问用户是否立即下载更新
+    const go = await app.confirmUpdate(info.latestVersion);
+    if (go) void app.updateDownload();
   } catch (e) {
     update.value = { kind: "error", message: ipc.errText(e) };
   }
@@ -483,7 +493,7 @@ function openRelease(url: string) {
                   </button>
                 </div>
 
-                <!-- 检查更新 -->
+                <!-- 检查更新与自动更新 -->
                 <div class="settings-row" style="--i: 1">
                   <div class="min-w-0">
                     <p class="text-[13.5px] font-medium">{{ t("settings.checkUpdate") }}</p>
@@ -493,17 +503,46 @@ function openRelease(url: string) {
                     >
                       {{ updateHint }}
                     </p>
+                    <p v-if="app.updatePhase === 'downloading'" class="mt-0.5 text-[12px] text-ink-2">
+                      {{ t("settings.updateDownloading") }}
+                    </p>
+                    <p v-else-if="app.updatePhase === 'ready'" class="mt-0.5 text-[12px] leading-relaxed text-accent">
+                      {{ t("settings.updateReady", { v: app.updateVersion }) }}
+                    </p>
+                    <div
+                      v-if="app.updatePhase === 'downloading'"
+                      class="mt-2 h-1 w-full max-w-[240px] overflow-hidden rounded-full bg-surface-3"
+                    >
+                      <div
+                        class="h-full rounded-full bg-accent transition-[width] duration-200 ease-(--ease-plain)"
+                        :class="{ 'animate-pulse': app.updateProgress < 0 }"
+                        :style="{ width: updateBar }"
+                      />
+                    </div>
                   </div>
                   <div class="flex shrink-0 items-center gap-2">
                     <button
-                      v-if="update.kind === 'available'"
+                      v-if="update.kind === 'available' && app.updatePhase !== 'ready'"
                       class="btn btn-primary"
+                      :disabled="app.updatePhase === 'downloading'"
+                      @click="app.updateDownload()"
+                    >
+                      <AppIcon name="download" :size="14" />
+                      {{ t("settings.updateDownload") }}
+                    </button>
+                    <button
+                      v-if="update.kind === 'available'"
+                      class="btn btn-secondary"
                       @click="openRelease(update.url)"
                     >
                       <AppIcon name="external" :size="14" />
                       {{ t("settings.viewRelease") }}
                     </button>
-                    <button class="btn btn-secondary" :disabled="update.kind === 'checking'" @click="checkUpdate">
+                    <button
+                      class="btn btn-secondary"
+                      :disabled="update.kind === 'checking' || app.updatePhase === 'downloading'"
+                      @click="checkUpdate"
+                    >
                       <AppIcon name="refresh" :size="14" :class="{ 'animate-spin': update.kind === 'checking' }" />
                       {{
                         update.kind === "checking"
