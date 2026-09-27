@@ -100,7 +100,7 @@ function openPages() {
             <span class="mono">{{ progressPct }}%</span>
           </div>
           <div class="h-1.5 overflow-hidden rounded-full bg-surface-3">
-            <div class="h-full rounded-full bg-accent transition-[width] duration-200 ease-[cubic-bezier(0.23,1,0.32,1)]" :style="{ width: progressPct + '%' }" />
+            <div class="h-full rounded-full bg-accent transition-[width] duration-200 ease-(--ease-plain)" :style="{ width: progressPct + '%' }" />
           </div>
         </div>
 

@@ -164,11 +164,19 @@ pub fn run() {
         ])
         .setup(|app| {
             let state = app.state::<AppState>();
-            if let Ok(dir) = app.path().app_data_dir() {
-                let _ = std::fs::create_dir_all(&dir);
-                if let Ok(mut guard) = state.app_data_dir.lock() {
-                    *guard = dir;
-                }
+            // 便携版策略:数据库目录固定为可执行文件所在根目录下的 data/,数据随程序
+            // 一起迁移;exe 所在目录不可写(如安装进 Program Files)时回退系统 AppData
+            let portable = std::env::current_exe().ok().and_then(|exe| {
+                let dir = exe.parent()?.join("data");
+                std::fs::create_dir_all(&dir).ok()?;
+                Some(dir)
+            });
+            let dir = match portable {
+                Some(dir) => dir,
+                None => app.path().app_data_dir().unwrap_or_default(),
+            };
+            if let Ok(mut guard) = state.app_data_dir.lock() {
+                *guard = dir;
             }
             // 平台窗口装饰:macOS 保留原生圆角与红绿灯(conf 里 titleBarStyle Overlay + hiddenTitle),
             // 其余平台维持无边框自绘标题栏;窗口初始隐藏,装饰调整完成后再显示,避免启动闪烁

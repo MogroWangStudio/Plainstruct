@@ -150,7 +150,7 @@ npm run tauri -- build                 # platform installers (NSIS / dmg)
 
 - **Frontend**: Vue 3 + TypeScript + Vite + Pinia + Tailwind CSS 4 (custom Plainstruct tokens); CodeMirror 6 editor; markdown-it + highlight.js rendering; Handlebars templates
 - **Desktop**: Tauri 2 (Rust). File IO, ZIP handling and the GitHub API live in Rust commands; a `site://` custom protocol serves the site folder directly so the build preview matches the published output exactly
-- **No backend**: app state lives in the system app-data directory; site data lives entirely in the site folder
+- **No backend**: app state lives in a `data/` folder next to the executable (portable — data travels with the app; falls back to the system app-data directory when that location is not writable); site data lives entirely in the site folder
 
 ## Credits
 

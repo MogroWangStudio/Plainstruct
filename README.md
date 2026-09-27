@@ -152,7 +152,7 @@ npm run tauri -- build                 # 平台安装包(NSIS / dmg)
 
 - **前端**:Vue 3 + TypeScript + Vite + Pinia + Tailwind CSS 4(自定义素构令牌);编辑器 CodeMirror 6;渲染 markdown-it + highlight.js;模板 Handlebars
 - **桌面**:Tauri 2(Rust)。文件 IO、ZIP、GitHub API 在 Rust 命令层;`site://` 自定义协议直读站点文件夹,构建预览与发布产物完全一致
-- **无后端**:应用状态存于系统应用数据目录,站点数据全部在站点文件夹内
+- **无后端**:应用状态存于程序根目录的 `data/` 文件夹(便携式,数据随程序走;该目录不可写时自动回退系统应用数据目录),站点数据全部在站点文件夹内
 
 ## 目录结构
 

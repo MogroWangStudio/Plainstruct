@@ -236,7 +236,7 @@ onBeforeUnmount(() => {
   transition: opacity 700ms var(--ease-plain);
 }
 .brand-logo.pressed {
-  animation: logo-press 340ms cubic-bezier(0.34, 1.4, 0.64, 1);
+  animation: logo-press 340ms var(--ease-pop);
 }
 
 /* 失焦后:整体变淡;转头张望以 logo 下部为轴小幅摆动 */
@@ -264,7 +264,7 @@ onBeforeUnmount(() => {
 }
 /* 点按反馈优先于眨眼:眯眼幅度略小,像开心地眯起来 */
 .brand-logo.pressed .eye-blink {
-  animation: eye-squint 340ms cubic-bezier(0.34, 1.4, 0.64, 1) both;
+  animation: eye-squint 340ms var(--ease-pop) both;
 }
 /* 睡着与苏醒中眼睛都保持闭合;进入 awake 后由过渡缓缓睁开 */
 .sleeping .eye-blink,
