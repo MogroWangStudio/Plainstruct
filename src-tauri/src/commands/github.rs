@@ -979,10 +979,19 @@ pub(crate) fn spawn_update_helper() -> Result<(), String> {
         } else {
             std::path::PathBuf::from("powershell")
         };
-        // -STA:显式单线程单元,WinForms 所需;不依赖宿主默认值
+        // -STA:显式单线程单元,WinForms 所需;不依赖宿主默认值。
+        // -NonInteractive:脚本意外触发交互请求时立即报错退出,而非隐形挂起。
+        // DETACHED_PROCESS 使 powershell 自创建起就没有控制台,全程只显示向导界面。
         let spawn_with = |flags: u32| {
             std::process::Command::new(&powershell)
-                .args(["-NoProfile", "-STA", "-ExecutionPolicy", "Bypass", "-File"])
+                .args([
+                    "-NoProfile",
+                    "-STA",
+                    "-NonInteractive",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                ])
                 .arg(&script)
                 .creation_flags(flags)
                 .spawn()
