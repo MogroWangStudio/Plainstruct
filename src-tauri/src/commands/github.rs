@@ -669,6 +669,8 @@ async fn github_sync_inner(app: &AppHandle, state: &AppState, cfg: GithubConfig)
 
 const UPDATE_TASK_FILE: &str = "update-task.json";
 const UPDATE_HELPER_FILE: &str = "update-helper";
+/// 向导运行日志(Windows):文件名与 WIN_WIZARD_SCRIPT 内写入处保持一致
+const UPDATE_LOG_FILE: &str = "update-wizard-log.txt";
 
 /// 更新任务目录。Windows 便携版直接使用 exe 所在根目录(更新包与向导脚本随程序
 /// 摆放,用户在程序目录可直接看到安装包);目录不可写时回退系统临时目录的专属
@@ -739,12 +741,13 @@ pub(crate) fn cleanup_update_task(current_version: &str) {
     remove_task_files(&dir, task.as_ref());
 }
 
-/// 清理任务文件、向导脚本与任务指名的更新包(exe 根目录场景)
+/// 清理任务文件、向导脚本、失败日志与任务指名的更新包(exe 根目录场景)
 fn remove_task_files(dir: &std::path::Path, task: Option<&UpdateTask>) {
     let _ = std::fs::remove_file(dir.join(UPDATE_TASK_FILE));
     for script in [".ps1", ".command"] {
         let _ = std::fs::remove_file(dir.join(format!("{UPDATE_HELPER_FILE}{script}")));
     }
+    let _ = std::fs::remove_file(dir.join(UPDATE_LOG_FILE));
     if let Some(t) = task {
         let _ = std::fs::remove_file(dir.join(&t.asset_name));
     }
@@ -966,17 +969,30 @@ pub(crate) fn spawn_update_helper() -> Result<(), String> {
             return Err("更新向导脚本不存在".into());
         }
         use std::os::windows::process::CommandExt;
-        std::process::Command::new("powershell")
-            .args([
-                "-NoProfile",
-                "-ExecutionPolicy",
-                "Bypass",
-                "-File",
-                &script.to_string_lossy(),
-            ])
-            // DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP:独立于已退出应用的作业
-            .creation_flags(0x0000_0008 | 0x0000_0200)
-            .spawn()
+        // 优先用绝对路径定位 Windows PowerShell(PATH 被裁剪时仍可用)
+        let system_root =
+            std::env::var_os("SystemRoot").unwrap_or_else(|| r"C:\Windows".into());
+        let powershell = std::path::Path::new(&system_root)
+            .join(r"System32\WindowsPowerShell\v1.0\powershell.exe");
+        let powershell = if powershell.exists() {
+            powershell
+        } else {
+            std::path::PathBuf::from("powershell")
+        };
+        // -STA:显式单线程单元,WinForms 所需;不依赖宿主默认值
+        let spawn_with = |flags: u32| {
+            std::process::Command::new(&powershell)
+                .args(["-NoProfile", "-STA", "-ExecutionPolicy", "Bypass", "-File"])
+                .arg(&script)
+                .creation_flags(flags)
+                .spawn()
+        };
+        const PLAIN: u32 = 0x0000_0008 | 0x0000_0200; // DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
+        const BREAKAWAY: u32 = 0x0100_0000; // CREATE_BREAKAWAY_FROM_JOB
+        // 先尝试脱离父进程的作业对象:若应用进程处在「退出即杀」的作业里,
+        // 向导可免于被连带终结;作业不允许脱离时创建失败,退回常规创建
+        spawn_with(PLAIN | BREAKAWAY)
+            .or_else(|_| spawn_with(PLAIN))
             .map_err(|e| format!("无法启动更新向导: {e}"))?;
         Ok(())
     }
@@ -1067,9 +1083,18 @@ fn write_update_helper(asset_path: &std::path::Path, latest_version: &str) -> Re
 /// Windows 更新向导(WinForms):阶段清单 + 逐条目解压的真实进度 + 失败可见,
 /// 中文经 UTF-8 BOM 正确显示。以 __TOKEN__ 占位替换,避免 format! 与
 /// PowerShell 花括号互相干扰。仅取文件条目,剥离公共顶层目录后按字节加权
-/// 展示进度,并防范压缩包内路径逃逸。
+/// 展示进度,并防范压缩包内路径逃逸。整个脚本包在 try/catch 内:窗体建成前
+/// 的失败回退为系统弹窗提示(此前这段出错会因无控制台而完全静默),
+/// 全程写运行日志 update-wizard-log.txt,成功结束自动删除。
 #[cfg(target_os = "windows")]
 const WIN_WIZARD_SCRIPT: &str = r#"$ErrorActionPreference = 'Stop'
+
+# 运行日志:与脚本同目录(即更新任务目录),成功结束自动删除。
+# 向导窗口若未出现,看这份日志即可判断脚本执行到了哪一步。
+$logPath = Join-Path (Split-Path -Parent $PSCommandPath) 'update-wizard-log.txt'
+function Write-Log([string]$msg) {
+  try { [System.IO.File]::AppendAllText($logPath, ("[{0}] {1}`r`n" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $msg)) } catch {}
+}
 
 $installer = '__ASSET__'
 $appExe    = '__APP_EXE__'
@@ -1078,110 +1103,120 @@ $taskFile  = '__TASK__'
 $verOld    = '__VER_OLD__'
 $verNew    = '__VER_NEW__'
 
-Add-Type -TypeDefinition 'using System.Runtime.InteropServices; public class DpiHelper { [DllImport("user32.dll")] public static extern bool SetProcessDPIAware(); }'
-[DpiHelper]::SetProcessDPIAware() | Out-Null
-Add-Type -AssemblyName System.Windows.Forms
-Add-Type -AssemblyName System.Drawing
-Add-Type -AssemblyName System.IO.Compression.FileSystem
-[System.Windows.Forms.Application]::EnableVisualStyles()
-
-$accent = [System.Drawing.Color]::FromArgb(15, 98, 254)
-$okC    = [System.Drawing.Color]::FromArgb(10, 122, 61)
-$badC   = [System.Drawing.Color]::FromArgb(192, 43, 43)
-$muted  = [System.Drawing.Color]::FromArgb(130, 130, 130)
-
-$form = New-Object System.Windows.Forms.Form
-$form.Text = 'Plainstruct 更新'
-$form.Font = New-Object System.Drawing.Font('Microsoft YaHei UI', 9)
-$form.ClientSize = New-Object System.Drawing.Size(412, 224)
-$form.StartPosition = 'CenterScreen'
-$form.FormBorderStyle = 'FixedDialog'
-$form.MaximizeBox = $false
-$form.TopMost = $true
-
-$verLabel = New-Object System.Windows.Forms.Label
-$verLabel.Text = "正在更新 Plainstruct:v$verOld → v$verNew"
-$verLabel.AutoSize = $true
-$verLabel.Location = New-Object System.Drawing.Point(20, 16)
-$form.Controls.Add($verLabel)
-
-$stages = @('等待 Plainstruct 退出', '校验更新包', '解压并安装新版本', '启动新版本')
-$script:states = @(0, 0, 0, 0)
-$stageLabels = @()
-for ($i = 0; $i -lt $stages.Count; $i++) {
-  $l = New-Object System.Windows.Forms.Label
-  $l.AutoSize = $true
-  $l.Location = New-Object System.Drawing.Point(22, (50 + $i * 26))
-  $form.Controls.Add($l)
-  $stageLabels += $l
-}
-$regular = New-Object System.Drawing.Font('Microsoft YaHei UI', 9)
-$bold    = New-Object System.Drawing.Font('Microsoft YaHei UI', 9, [System.Drawing.FontStyle]::Bold)
-
-function Update-Stages {
-  for ($i = 0; $i -lt $stages.Count; $i++) {
-    $icon = [char]0x25CB
-    $color = $muted
-    $font = $regular
-    switch ($script:states[$i]) {
-      1 { $icon = [char]0x25CF; $color = $accent; $font = $bold }
-      2 { $icon = [char]0x2713; $color = $okC }
-      3 { $icon = [char]0x2715; $color = $badC; $font = $bold }
-    }
-    $stageLabels[$i].Text = "$icon  $($stages[$i])"
-    $stageLabels[$i].ForeColor = $color
-    $stageLabels[$i].Font = $font
-  }
-  [System.Windows.Forms.Application]::DoEvents()
-}
-
-$bar = New-Object System.Windows.Forms.ProgressBar
-$bar.Location = New-Object System.Drawing.Point(20, 160)
-$bar.Size = New-Object System.Drawing.Size(372, 10)
-$form.Controls.Add($bar)
-
-$pctLabel = New-Object System.Windows.Forms.Label
-$pctLabel.AutoSize = $true
-$pctLabel.Location = New-Object System.Drawing.Point(20, 178)
-$pctLabel.ForeColor = $muted
-$pctLabel.Text = ''
-$form.Controls.Add($pctLabel)
-
-$closeBtn = New-Object System.Windows.Forms.Button
-$closeBtn.Text = '关闭'
-$closeBtn.Size = New-Object System.Drawing.Size(88, 26)
-$closeBtn.Location = New-Object System.Drawing.Point(304, 178)
-$closeBtn.Visible = $false
-$closeBtn.Add_Click({ $form.Close() })
-$form.Controls.Add($closeBtn)
-
-function Set-Stage([int]$idx) {
-  if ($idx -gt 0) { $script:states[$idx - 1] = 2 }
-  $script:states[$idx] = 1
-  Update-Stages
-}
-
-function Show-Fail([string]$msg) {
-  $cur = [Array]::IndexOf($script:states, 1)
-  if ($cur -ge 0) { $script:states[$cur] = 3 }
-  $verLabel.Text = "更新失败:$msg"
-  $verLabel.ForeColor = $badC
-  $bar.Visible = $false
-  $pctLabel.Visible = $false
-  $closeBtn.Visible = $true
-  Update-Stages
-  while (-not $form.IsDisposed) {
-    [System.Windows.Forms.Application]::DoEvents()
-    Start-Sleep -Milliseconds 60
-  }
-  exit 1
-}
-
-$form.Show()
-Update-Stages
-
 $zip = $null
 try {
+  Write-Log ("向导启动,PowerShell " + $PSVersionTable.PSVersion.ToString())
+
+  Add-Type -TypeDefinition 'using System.Runtime.InteropServices; public class DpiHelper { [DllImport("user32.dll")] public static extern bool SetProcessDPIAware(); }'
+  [DpiHelper]::SetProcessDPIAware() | Out-Null
+  Add-Type -AssemblyName System.Windows.Forms
+  Add-Type -AssemblyName System.Drawing
+  Add-Type -AssemblyName System.IO.Compression.FileSystem
+  [System.Windows.Forms.Application]::EnableVisualStyles()
+
+  $accent = [System.Drawing.Color]::FromArgb(15, 98, 254)
+  $okC    = [System.Drawing.Color]::FromArgb(10, 122, 61)
+  $badC   = [System.Drawing.Color]::FromArgb(192, 43, 43)
+  $muted  = [System.Drawing.Color]::FromArgb(130, 130, 130)
+
+  $form = New-Object System.Windows.Forms.Form
+  $form.Text = 'Plainstruct 更新'
+  $form.Font = New-Object System.Drawing.Font('Microsoft YaHei UI', 9)
+  $form.ClientSize = New-Object System.Drawing.Size(412, 224)
+  $form.StartPosition = 'CenterScreen'
+  $form.FormBorderStyle = 'FixedDialog'
+  $form.MaximizeBox = $false
+  $form.TopMost = $true
+
+  $verLabel = New-Object System.Windows.Forms.Label
+  $verLabel.Text = "正在更新 Plainstruct:v$verOld → v$verNew"
+  $verLabel.AutoSize = $true
+  $verLabel.Location = New-Object System.Drawing.Point(20, 16)
+  $form.Controls.Add($verLabel)
+
+  $stages = @('等待 Plainstruct 退出', '校验更新包', '解压并安装新版本', '启动新版本')
+  $script:states = @(0, 0, 0, 0)
+  $stageLabels = @()
+  for ($i = 0; $i -lt $stages.Count; $i++) {
+    $l = New-Object System.Windows.Forms.Label
+    $l.AutoSize = $true
+    $l.Location = New-Object System.Drawing.Point(22, (50 + $i * 26))
+    $form.Controls.Add($l)
+    $stageLabels += $l
+  }
+  $regular = New-Object System.Drawing.Font('Microsoft YaHei UI', 9)
+  $bold    = New-Object System.Drawing.Font('Microsoft YaHei UI', 9, [System.Drawing.FontStyle]::Bold)
+
+  function Update-Stages {
+    for ($i = 0; $i -lt $stages.Count; $i++) {
+      $icon = [char]0x25CB
+      $color = $muted
+      $font = $regular
+      switch ($script:states[$i]) {
+        1 { $icon = [char]0x25CF; $color = $accent; $font = $bold }
+        2 { $icon = [char]0x2713; $color = $okC }
+        3 { $icon = [char]0x2715; $color = $badC; $font = $bold }
+      }
+      $stageLabels[$i].Text = "$icon  $($stages[$i])"
+      $stageLabels[$i].ForeColor = $color
+      $stageLabels[$i].Font = $font
+    }
+    [System.Windows.Forms.Application]::DoEvents()
+  }
+
+  $bar = New-Object System.Windows.Forms.ProgressBar
+  $bar.Location = New-Object System.Drawing.Point(20, 160)
+  $bar.Size = New-Object System.Drawing.Size(372, 10)
+  $form.Controls.Add($bar)
+
+  $pctLabel = New-Object System.Windows.Forms.Label
+  $pctLabel.AutoSize = $true
+  $pctLabel.Location = New-Object System.Drawing.Point(20, 178)
+  $pctLabel.ForeColor = $muted
+  $pctLabel.Text = ''
+  $form.Controls.Add($pctLabel)
+
+  $closeBtn = New-Object System.Windows.Forms.Button
+  $closeBtn.Text = '关闭'
+  $closeBtn.Size = New-Object System.Drawing.Size(88, 26)
+  $closeBtn.Location = New-Object System.Drawing.Point(304, 178)
+  $closeBtn.Visible = $false
+  $closeBtn.Add_Click({ $form.Close() })
+  $form.Controls.Add($closeBtn)
+
+  function Set-Stage([int]$idx) {
+    Write-Log ("阶段: " + $stages[$idx])
+    if ($idx -gt 0) { $script:states[$idx - 1] = 2 }
+    $script:states[$idx] = 1
+    Update-Stages
+  }
+
+  function Show-Fail([string]$msg) {
+    Write-Log ("更新失败: " + $msg)
+    try {
+      $cur = [Array]::IndexOf($script:states, 1)
+      if ($cur -ge 0) { $script:states[$cur] = 3 }
+      $verLabel.Text = "更新失败:$msg"
+      $verLabel.ForeColor = $badC
+      $bar.Visible = $false
+      $pctLabel.Visible = $false
+      $closeBtn.Visible = $true
+      Update-Stages
+      while (-not $form.IsDisposed) {
+        [System.Windows.Forms.Application]::DoEvents()
+        Start-Sleep -Milliseconds 60
+      }
+    } catch {}
+    # 窗体尚未建成或不可用:退回系统弹窗,失败必须可见
+    try {
+      (New-Object -ComObject WScript.Shell).Popup(("更新失败:$msg`r`n详情见日志:$logPath"), 0, 'Plainstruct 更新', 16) | Out-Null
+    } catch {}
+    exit 1
+  }
+
+  $form.Show()
+  Update-Stages
+
   # 阶段 1:等待应用退出(显式更新流程下应用随即退出;兜底最多等 60 秒)
   Set-Stage 0
   for ($i = 0; $i -lt 120; $i++) {
@@ -1196,6 +1231,7 @@ try {
   if (-not (Test-Path -LiteralPath $installer)) { throw '找不到更新包,请回到应用重新下载。' }
   $zip = [System.IO.Compression.ZipFile]::OpenRead($installer)
   $entries = @($zip.Entries | Where-Object { $_.FullName -and -not $_.FullName.EndsWith('/') })
+  Write-Log ("更新包条目 " + $entries.Count + " 个")
 
   # 官方包内含一层文件夹:全部条目共享同一顶层目录时剥离
   $prefix = ''
@@ -1241,7 +1277,8 @@ try {
   # 阶段 4:清理任务文件与更新包,启动新版本
   Set-Stage 3
   $bar.Value = 100
-  foreach ($f in @($taskFile, $installer, $PSCommandPath)) {
+  Write-Log "更新完成"
+  foreach ($f in @($taskFile, $installer, $PSCommandPath, $logPath)) {
     Remove-Item -LiteralPath $f -Force -ErrorAction SilentlyContinue
   }
   Start-Process -FilePath $appExe -WorkingDirectory $appDir
