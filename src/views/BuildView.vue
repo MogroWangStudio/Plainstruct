@@ -25,7 +25,7 @@ function openOutput() {
       </div>
       <div class="ml-auto flex items-center gap-3">
         <label class="flex cursor-pointer items-center gap-2 text-[12.5px] text-ink-2">
-          <input v-model="builder.autoRebuild" type="checkbox" class="h-[14px] w-[14px] accent-[var(--color-accent)]" @change="builder.setAutoRebuild(builder.autoRebuild)" />
+          <input v-model="builder.autoRebuild" type="checkbox" class="checkbox-input" @change="builder.setAutoRebuild(builder.autoRebuild)" />
           {{ t("build.autoRebuild") }}
         </label>
         <button

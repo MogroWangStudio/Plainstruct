@@ -222,12 +222,6 @@ function confirmPicker() {
   border-radius: 5px;
 }
 
-.checkbox-input {
-  width: 15px;
-  height: 15px;
-  accent-color: var(--color-accent);
-}
-
 .navlist-row {
   display: flex;
   align-items: center;

@@ -3,6 +3,7 @@ import { computed, nextTick, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { usePublishStore } from "@/stores/publish";
 import { useBuilderStore } from "@/stores/builder";
+import { fireConfetti } from "@/lib/confetti";
 import AppIcon from "@/components/AppIcon.vue";
 
 const { t } = useI18n();
@@ -14,6 +15,14 @@ watch(
   () => [publish.config.owner, publish.config.repo, publish.config.branch],
   () => {
     publish.verifyResult = null;
+  },
+);
+
+// 发布成功的一刻撒一次纸屑(仅 result 从无到有时,回看结果不重播)
+watch(
+  () => publish.result,
+  (val, old) => {
+    if (val && !old) fireConfetti();
   },
 );
 
@@ -84,7 +93,7 @@ function openPages() {
           </div>
 
           <label class="flex cursor-pointer items-center gap-2 text-[13px] text-ink-2">
-            <input v-model="publish.config.autoCreate" type="checkbox" class="h-[14px] w-[14px] accent-[var(--color-accent)]" />
+            <input v-model="publish.config.autoCreate" type="checkbox" class="checkbox-input" />
             {{ t("publish.autoCreate") }}
           </label>
 

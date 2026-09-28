@@ -304,6 +304,66 @@ body {
   }
 }
 
+/* ---------- 勾选框(自绘) ---------- */
+/* 勾选标记经 input::before 绘制(WebKit/Chromium 支持,Tauri 运行时即此二者) */
+.checkbox-input {
+  -webkit-appearance: none;
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 4px;
+  background: var(--color-surface);
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) ease-out,
+    border-color var(--duration-base) var(--ease-plain),
+    box-shadow var(--duration-base) var(--ease-plain),
+    transform var(--duration-fast) ease-out;
+}
+.checkbox-input::before {
+  content: "";
+  width: 3.5px;
+  height: 7.5px;
+  border: solid var(--color-on-accent);
+  border-width: 0 1.5px 1.5px 0;
+  margin-top: -1px;
+  transform: scale(0);
+  transition: transform var(--duration-base) var(--ease-pop);
+}
+.checkbox-input:hover {
+  border-color: var(--color-ink-3);
+}
+/* 按下即缩小反馈,不必等状态切换 */
+.checkbox-input:active {
+  transform: scale(0.9);
+}
+.checkbox-input:checked {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+}
+.checkbox-input:checked::before {
+  transform: rotate(45deg) scale(1);
+}
+.checkbox-input:checked:hover {
+  border-color: var(--color-accent-strong);
+  background: var(--color-accent-strong);
+}
+.checkbox-input:focus-visible {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-soft);
+}
+.checkbox-input:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 /* ---------- 面板 ---------- */
 .panel {
   background: var(--color-surface);
