@@ -28,7 +28,7 @@ A local-first static site creator for both documentation and blogs. Write Markdo
 
 ## Design
 
-Plain (素) structure (构): gray-white palette, a single ink accent, system font stack, 4px base grid, 8px radius, one easing curve `cubic-bezier(0.23, 1, 0.32, 1)`. No gradients, no glows, no decoration for its own sake - hierarchy comes from type size, weight and whitespace.
+Plain (素) structure (构): gray-white palette, a single ink accent, system font stack, 4px base grid, 8px radius, one easing curve `cubic-bezier(0.23, 1, 0.32, 1)`. No gradients, no glows, no decoration for its own sake - hierarchy comes from type size, weight and whitespace. Form controls are custom-drawn: sliders use a 4px track with an ink progress fill, the thumb scales up with a soft ring on press, and the keyboard focus ring lands on the thumb.
 
 ## Getting Started
 

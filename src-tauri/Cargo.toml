@@ -1,6 +1,6 @@
 [package]
 name = "plainstruct"
-version = "2.4.0"
+version = "2.5.0"
 description = "素构 Plainstruct - 本地静态文档（wiki）网站创建器"
 authors = ["MogroWang Studio"]
 edition = "2021"

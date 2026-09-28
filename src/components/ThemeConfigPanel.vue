@@ -29,6 +29,15 @@ function isVisible(field: ThemeField): boolean {
   return String(fieldValue(dep)) === String(cond.equals);
 }
 
+/** 数值滑块的进度填充比例(0–100%),驱动自绘轨道的已填充段 */
+function rangeFill(field: ThemeField): string {
+  const min = field.min ?? 0;
+  const max = field.max ?? 100;
+  if (max <= min) return "100%";
+  const pct = ((Number(fieldValue(field)) - min) / (max - min)) * 100;
+  return `${Math.min(100, Math.max(0, pct))}%`;
+}
+
 /* navlist(博客顶栏导航):可选项与构建同源 -- 内容树顶层的文章/文件夹 */
 const navOptions = computed(() => topNavItems(site.tree, site.docsCache));
 
@@ -98,11 +107,12 @@ function confirmPicker() {
       <div v-else-if="field.type === 'number'" class="flex items-center gap-3">
         <input
           type="range"
-          class="range-input"
+          class="range-input min-w-0 flex-1"
           :min="field.min ?? 0"
           :max="field.max ?? 100"
           :step="field.step ?? 1"
           :value="Number(fieldValue(field))"
+          :style="{ '--range-fill': rangeFill(field) }"
           @input="onField(field, Number(($event.target as HTMLInputElement).value))"
         />
         <span class="mono w-12 text-right text-[12px] text-ink-2">{{ fieldValue(field) }}</span>
@@ -210,11 +220,6 @@ function confirmPicker() {
 .color-input::-webkit-color-swatch {
   border: none;
   border-radius: 5px;
-}
-
-.range-input {
-  width: 192px;
-  accent-color: var(--color-accent);
 }
 
 .checkbox-input {
