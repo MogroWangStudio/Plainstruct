@@ -98,6 +98,9 @@ export default {
     homeCreateHint: "根目录还没有 index.md,点击创建",
     homeCreated: "主页文档已创建",
     homeDocTitle: "首页",
+    fmEdit: "编辑配置头",
+    fmSaved: "配置头已保存",
+    importImages: "导入图片",
   },
   editor: {
     emptyTitle: "开始写作",

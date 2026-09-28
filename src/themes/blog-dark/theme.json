@@ -1,34 +1,34 @@
 {
   "id": "blog-dark",
-  "name": "\u624b\u8bb0 \u00b7 \u6df1\u8272",
-  "version": "2.2.0",
+  "name": "手记 · 深色",
+  "version": "2.3.0",
   "author": "MogroWang Studio",
   "type": "blog",
-  "description": "\u535a\u5ba2\u00b7\u6df1\u8272:\u6696\u70ad\u591c\u7eb8,\u6587\u7ae0\u4e3a\u6d41,\u65e5\u671f\u4e3a\u8bb0\u3002",
+  "description": "博客·深色:暖炭夜纸,文章为流,日期为记。",
   "config": [
     {
       "key": "navMode",
-      "label": "\u53f3\u4e0a\u89d2\u5bfc\u822a",
+      "label": "右上角导航",
       "type": "select",
-      "default": "\u5168\u90e8",
+      "default": "全部",
       "options": [
-        "\u5168\u90e8",
-        "\u81ea\u5b9a\u4e49"
+        "全部",
+        "自定义"
       ]
     },
     {
       "key": "navPicked",
-      "label": "\u9009\u62e9\u8981\u663e\u793a\u7684\u6587\u7ae0\u6216\u6587\u4ef6\u5939",
+      "label": "选择要显示的文章或文件夹",
       "type": "navlist",
       "default": "",
       "visibleIf": {
         "key": "navMode",
-        "equals": "\u81ea\u5b9a\u4e49"
+        "equals": "自定义"
       }
     },
     {
       "key": "navMaxItems",
-      "label": "\u53f3\u4e0a\u89d2\u5bfc\u822a\u6700\u591a\u663e\u793a(\u9879)",
+      "label": "右上角导航最多显示(项)",
       "type": "number",
       "default": 6,
       "min": 1,
@@ -37,13 +37,13 @@
     },
     {
       "key": "accentColor",
-      "label": "\u5f3a\u8c03\u8272",
+      "label": "强调色",
       "type": "color",
       "default": "#8ea8cc"
     },
     {
       "key": "contentWidth",
-      "label": "\u6b63\u6587\u5bbd\u5ea6(px)",
+      "label": "正文宽度(px)",
       "type": "number",
       "default": 680,
       "min": 560,
@@ -52,7 +52,7 @@
     },
     {
       "key": "navColumns",
-      "label": "\u6587\u7ae0\u5361\u7247\u5e76\u6392(\u4e2a)",
+      "label": "文章卡片并排(个)",
       "type": "number",
       "default": 1,
       "min": 1,
@@ -61,7 +61,7 @@
     },
     {
       "key": "coverHeight",
-      "label": "\u5c01\u9762\u56fe\u9ad8\u5ea6(px)",
+      "label": "封面图高度(px)",
       "type": "number",
       "default": 220,
       "min": 120,
@@ -70,7 +70,7 @@
     },
     {
       "key": "topbarWidth",
-      "label": "\u9876\u680f\u5bbd\u5ea6(px)",
+      "label": "顶栏宽度(px)",
       "type": "number",
       "default": 920,
       "min": 600,
@@ -79,7 +79,7 @@
     },
     {
       "key": "postsPerPage",
-      "label": "\u6bcf\u9875\u6587\u7ae0\u6570",
+      "label": "每页文章数",
       "type": "number",
       "default": 10,
       "min": 3,
@@ -88,7 +88,7 @@
     },
     {
       "key": "bodyFont",
-      "label": "\u6b63\u6587\u5b57\u4f53",
+      "label": "正文字体",
       "type": "select",
       "default": "system",
       "options": [
@@ -100,7 +100,7 @@
     },
     {
       "key": "customFont",
-      "label": "\u81ea\u5b9a\u4e49\u5b57\u4f53(font-family)",
+      "label": "自定义字体(font-family)",
       "type": "text",
       "default": "",
       "visibleIf": {
@@ -110,30 +110,30 @@
     },
     {
       "key": "showDate",
-      "label": "\u663e\u793a\u6587\u7ae0\u65e5\u671f",
+      "label": "显示文章日期",
       "type": "boolean",
       "default": true
     },
     {
       "key": "pageTransition",
-      "label": "\u9875\u9762\u8fc7\u6e21\u52a8\u753b",
+      "label": "页面过渡动画",
       "type": "select",
-      "default": "\u6de1\u5165\u4e0a\u6d6e",
+      "default": "淡入上浮",
       "options": [
-        "\u5173\u95ed",
-        "\u6de1\u5165",
-        "\u6de1\u5165\u4e0a\u6d6e",
-        "\u7f29\u653e\u6d6e\u73b0",
-        "\u6ed1\u5165",
-        "\u5f39\u6027\u6d6e\u73b0",
-        "\u6a21\u7cca\u805a\u7126",
-        "\u7ffb\u9875",
-        "\u63ed\u5f00"
+        "关闭",
+        "淡入",
+        "淡入上浮",
+        "缩放浮现",
+        "滑入",
+        "弹性浮现",
+        "模糊聚焦",
+        "翻页",
+        "揭开"
       ]
     },
     {
       "key": "showFooterCredit",
-      "label": "\u5728\u5e95\u90e8\u663e\u793a\u7531 Plainstruct \u521b\u5efa",
+      "label": "在底部显示由 Plainstruct 创建",
       "type": "boolean",
       "default": true
     }

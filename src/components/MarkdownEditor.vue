@@ -18,7 +18,7 @@ import { applyFrontMatter, parseFrontMatter } from "@/lib/frontmatter";
 import { encodePath, stripExt } from "@/lib/paths";
 import { registerCmView, unregisterCmView } from "@/lib/contextMenu";
 import AppIcon from "@/components/AppIcon.vue";
-import Modal from "@/components/Modal.vue";
+import FrontMatterModal, { type FrontMatterForm } from "@/components/FrontMatterModal.vue";
 
 const { t } = useI18n();
 const editor = useEditorStore();
@@ -318,10 +318,10 @@ function frontMatterEnd(doc: Text): number | null {
   return null;
 }
 
-/* ---------- 配置头可视化编辑:表单弹窗,确认后就地写回 ---------- */
+/* ---------- 配置头可视化编辑:表单弹窗(FrontMatterModal),确认后就地写回 ---------- */
 
 const fmOpen = ref(false);
-const fmForm = reactive({ title: "", description: "", date: "", cover: "" });
+const fmInitial: FrontMatterForm = reactive({ title: "", description: "", date: "", cover: "" });
 
 /** 当前文档位置引用 images/ 的路径前缀(根级 images/…,子目录 ../images/…) */
 function coverPrefix(): string {
@@ -329,55 +329,30 @@ function coverPrefix(): string {
   return "../".repeat(depth) + "images/";
 }
 
-/** 站点 images 文件夹里的图(按当前文档位置换算为可直接使用的路径建议) */
-const coverSuggestions = computed(() => {
-  const dir = site.tree.find((n) => n.type === "dir" && n.name.toLowerCase() === "images");
-  return (dir?.children ?? [])
-    .filter((n) => n.type === "file")
-    .map((n) => coverPrefix() + n.name);
-});
-
 /** 今天的本地日期(YYYY-MM-DD;toISOString 按 UTC 会在东八区晚间差一天) */
 function todayLocal(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-/** 打开表单:预填当前配置头的字段值(没有配置头时 title/date 给出默认;新建文档 date 一律填当天) */
-function openFmEditor(fromCreate = false) {
+/** 打开表单:预填当前配置头的字段值(没有配置头时 title/date 给出默认) */
+function openFmEditor() {
   if (!view) return;
   const parsed = parseFrontMatter(view.state.sliceDoc(0, view.state.doc.length));
   const isNew = frontMatterEnd(view.state.doc) === null;
-  fmForm.title = parsed.data.title ?? (isNew ? editor.docTitle : "");
-  fmForm.description = parsed.data.description ?? "";
-  fmForm.date = parsed.data.date ?? (isNew || fromCreate ? todayLocal() : "");
-  fmForm.cover = parsed.data.cover ?? "";
+  fmInitial.title = parsed.data.title ?? (isNew ? editor.docTitle : "");
+  fmInitial.description = parsed.data.description ?? "";
+  fmInitial.date = parsed.data.date ?? (isNew ? todayLocal() : "");
+  fmInitial.cover = parsed.data.cover ?? "";
   fmOpen.value = true;
 }
 
 /** 把表单值写回 front-matter:识别字段以表单为准,用户手写的其它字段原样保留 */
-function writeFrontMatter() {
+function writeFrontMatter(form: FrontMatterForm) {
   if (!view) return;
-  const next = applyFrontMatter(view.state.doc.toString(), {
-    title: fmForm.title,
-    description: fmForm.description,
-    date: fmForm.date,
-    cover: fmForm.cover,
-  });
+  const next = applyFrontMatter(view.state.doc.toString(), form);
   commit(0, view.state.doc.length, next, next.length, next.length);
   fmOpen.value = false;
-}
-
-/** 直接选取本地图片导入 images,作为表单里的封面图 */
-async function importCover() {
-  try {
-    const files = await ipc.pickImages();
-    if (!files?.length) return;
-    const names = await site.importSiteImages(files);
-    if (names.length) fmForm.cover = coverPrefix() + names[0];
-  } catch (e) {
-    ui.toast(t("editor.imageImportFailed", { msg: ipc.errText(e) }), "error");
-  }
 }
 
 /**
@@ -823,40 +798,13 @@ defineExpose({
     <div ref="host" class="min-h-0 flex-1 overflow-hidden" />
 
     <!-- 配置头可视化编辑:表单控件替代手写字段,确认后就地写回 front-matter -->
-    <Modal v-if="fmOpen" :title="t('editor.fmEditorTitle')" :width="400" @cancel="fmOpen = false">
-      <div class="flex flex-col gap-3">
-        <label class="flex flex-col gap-1">
-          <span class="field-label">{{ t("editor.fmTitle") }}</span>
-          <input v-model="fmForm.title" class="input" type="text" :placeholder="t('editor.fmTitlePlaceholder')" />
-        </label>
-        <label class="flex flex-col gap-1">
-          <span class="field-label">{{ t("editor.fmDescription") }}</span>
-          <input v-model="fmForm.description" class="input" type="text" />
-        </label>
-        <label class="flex flex-col gap-1">
-          <span class="field-label">{{ t("editor.fmDate") }}</span>
-          <input v-model="fmForm.date" class="input" type="date" />
-        </label>
-        <label class="flex flex-col gap-1">
-          <span class="field-label">{{ t("editor.fmCover") }}</span>
-          <div class="flex gap-2">
-            <input v-model="fmForm.cover" class="input min-w-0 flex-1" type="text" list="fmCoverOptions" :placeholder="t('editor.fmCoverHint')" />
-            <button type="button" class="btn btn-secondary shrink-0" @click="importCover">
-              <AppIcon name="download" :size="14" />
-              {{ t("editor.fmCoverImport") }}
-            </button>
-          </div>
-          <datalist id="fmCoverOptions">
-            <option v-for="s in coverSuggestions" :key="s" :value="s" />
-          </datalist>
-        </label>
-        <p class="text-[12px] leading-relaxed text-ink-3">{{ t("editor.fmHint") }}</p>
-      </div>
-      <template #footer>
-        <button class="btn btn-secondary" @click="fmOpen = false">{{ t("common.cancel") }}</button>
-        <button class="btn btn-primary" @click="writeFrontMatter">{{ t("common.save") }}</button>
-      </template>
-    </Modal>
+    <FrontMatterModal
+      :open="fmOpen"
+      :doc-path="editor.activePath ?? ''"
+      :initial="fmInitial"
+      @confirm="writeFrontMatter"
+      @cancel="fmOpen = false"
+    />
   </div>
 </template>
 

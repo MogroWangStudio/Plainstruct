@@ -98,6 +98,9 @@ export default {
     homeCreateHint: "No index.md in the root yet — click to create it",
     homeCreated: "Homepage document created",
     homeDocTitle: "Home",
+    fmEdit: "Edit front matter",
+    fmSaved: "Front matter saved",
+    importImages: "Import images",
   },
   editor: {
     emptyTitle: "Start writing",

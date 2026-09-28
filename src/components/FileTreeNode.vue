@@ -24,6 +24,8 @@ const props = defineProps<{
   depth: number;
   selectedPaths: Set<string>;
   selectMode: boolean;
+  /** 固定资源区(images)子项:不参与拖拽移动与排序 */
+  locked?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -47,6 +49,7 @@ const dropPos = ref<"before" | "after" | "into">("into");
 let expandTimer: number | undefined;
 
 const isDir = computed(() => props.node.type === "dir");
+const isImage = computed(() => !isDir.value && isImageFile(props.node.path));
 const label = computed(() => (isDir.value ? props.node.name : props.node.name.replace(/\.md$/i, "")));
 const isActive = computed(
   () => !isDir.value && (editor.activePath === props.node.path || editor.activeImage === props.node.path),
@@ -81,6 +84,10 @@ function onRowClick(e: MouseEvent) {
 }
 
 function onDragStart(e: DragEvent) {
+  if (props.locked) {
+    e.preventDefault();
+    return;
+  }
   e.dataTransfer?.setData("text/plain", props.node.path);
   if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
   setDragging(props.node.path);
@@ -170,7 +177,7 @@ function onDrop(e: DragEvent) {
         'opacity-40': isDragging,
       }"
       :style="{ paddingLeft: depth * 14 + 4 + 'px' }"
-      :draggable="true"
+      :draggable="!locked"
       :data-path="node.path"
       :title="node.name"
       @click="onRowClick"
@@ -206,7 +213,12 @@ function onDrop(e: DragEvent) {
       </button>
       <span v-else class="w-5" />
 
-      <AppIcon :name="isDir ? 'folder' : 'doc'" :size="15" class="shrink-0 text-ink-3" :class="{ 'text-ink-2': isDir }" />
+      <AppIcon
+        :name="isDir ? 'folder' : isImage ? 'image' : 'doc'"
+        :size="15"
+        class="shrink-0 text-ink-3"
+        :class="{ 'text-ink-2': isDir }"
+      />
       <span class="min-w-0 flex-1 truncate text-[13px]" :class="isActive ? 'font-medium' : ''">
         {{ label }}
       </span>

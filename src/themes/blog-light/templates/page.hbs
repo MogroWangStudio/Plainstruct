@@ -5,7 +5,7 @@
     <div class="blog-stream">
       {{#each posts}}
         <article class="blog-entry">
-          {{#if this.cover}}<a class="blog-entry-cover" href="{{this.url}}"><img src="{{this.cover}}" alt="{{this.title}}" loading="lazy"></a>{{/if}}
+          {{#if this.cover}}<a class="blog-entry-cover" href="{{this.url}}"><img src="{{this.cover}}" alt="{{this.title}}" loading="lazy"></a>{{else}}<a class="blog-entry-cover blog-entry-cover-empty" href="{{this.url}}" aria-hidden="true"><svg class="blog-entry-cover-icon" viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6"/><path d="M9 17h6"/></svg></a>{{/if}}
           {{#if this.date}}<time class="blog-entry-date">{{this.date}}</time>{{/if}}
           <h2 class="blog-entry-title"><a href="{{this.url}}">{{this.title}}</a></h2>
           {{#if this.description}}<p class="blog-entry-desc">{{this.description}}</p>{{/if}}

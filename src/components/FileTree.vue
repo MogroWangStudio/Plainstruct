@@ -1,15 +1,17 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, provide, ref, type Ref } from "vue";
+import { computed, onMounted, onUnmounted, provide, reactive, ref, type Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import type { TreeNode } from "@/ipc/types";
 import { useSiteStore } from "@/stores/site";
 import { useEditorStore } from "@/stores/editor";
 import { useUiStore } from "@/stores/ui";
+import { useBuilderStore } from "@/stores/builder";
 import { useContextMenuStore, type MenuItem } from "@/stores/contextMenu";
 import { ipc } from "@/ipc/ipc";
-import { applyFrontMatter } from "@/lib/frontmatter";
+import { applyFrontMatter, parseFrontMatter } from "@/lib/frontmatter";
 import NewDocModal from "@/components/NewDocModal.vue";
-import { basename, dirname, safeName, stripExt } from "@/lib/paths";
+import FrontMatterModal, { type FrontMatterForm } from "@/components/FrontMatterModal.vue";
+import { basename, dirname, isImageFile, safeName, stripExt } from "@/lib/paths";
 import AppIcon from "./AppIcon.vue";
 import FileTreeNode, { type DropMark, type SelectClick } from "./FileTreeNode.vue";
 import PromptModal from "./PromptModal.vue";
@@ -27,10 +29,30 @@ provide("treeCollapsed", collapsed);
 const dropMark = ref<DropMark>(null);
 provide("treeDropMark", dropMark);
 
-/** 过滤掉根级 index.md(作为独立首页),其余保持不变 */
-const displayTree = computed(() =>
-  site.tree.filter((n) => !(n.type === "file" && n.name.toLowerCase() === "index.md")),
+/** 站点图片目录(资源区,固定入口展示,不参与站点输出) */
+const imagesDir = computed(
+  () => site.tree.find((n) => n.type === "dir" && n.name.toLowerCase() === "images") ?? null,
 );
+
+/** 过滤掉根级 index.md(独立首页入口)与根级 images 文件夹(下方固定入口),其余保持不变 */
+const displayTree = computed(() =>
+  site.tree.filter(
+    (n) =>
+      !(n.type === "file" && n.name.toLowerCase() === "index.md") &&
+      !(n.type === "dir" && n === imagesDir.value),
+  ),
+);
+
+const imagesCollapsed = computed(() => !!imagesDir.value && collapsed.value.has(imagesDir.value.path));
+
+function toggleImages() {
+  const dir = imagesDir.value;
+  if (!dir) return;
+  const next = new Set(collapsed.value);
+  if (next.has(dir.path)) next.delete(dir.path);
+  else next.add(dir.path);
+  collapsed.value = next;
+}
 
 /** 拖拽中实际移动的路径集合(多选拖拽 = 全部选中项),供各行整体淡化 */
 const draggingPaths = ref<Set<string> | null>(null);
@@ -188,7 +210,7 @@ function collectDirs(): TreeNode[] {
   const dirs: TreeNode[] = [];
   const walk = (nodes: TreeNode[]) => {
     for (const n of nodes) {
-      if (n.type === "dir") {
+      if (n.type === "dir" && n !== imagesDir.value) {
         dirs.push(n);
         if (n.children) walk(n.children);
       }
@@ -319,9 +341,77 @@ function findNodeByPath(path: string): TreeNode | null {
   return walk(site.tree);
 }
 
+/* ---------- 配置头可视化编辑(文件树右键入口) ---------- */
+
+const fmOpen = ref(false);
+const fmTarget = ref("");
+const fmInitial = reactive<FrontMatterForm>({ title: "", description: "", date: "", cover: "" });
+
+/** 打开配置头表单:当前打开的文档取编辑器内容(含未保存修改),其余读磁盘版本 */
+async function openFmEditor(node: TreeNode) {
+  const base =
+    editor.activePath === node.path
+      ? editor.content
+      : ((await ipc.readDocs([node.path]))[0] ?? "");
+  const parsed = parseFrontMatter(base);
+  fmTarget.value = node.path;
+  fmInitial.title = parsed.data.title ?? stripExt(node.name);
+  fmInitial.description = parsed.data.description ?? "";
+  fmInitial.date = parsed.data.date ?? "";
+  fmInitial.cover = parsed.data.cover ?? "";
+  fmOpen.value = true;
+}
+
+/** 确认后写回文档:当前打开的文档经编辑器统一保存路径,其余直接落盘 */
+async function onFmConfirm(form: FrontMatterForm) {
+  fmOpen.value = false;
+  const path = fmTarget.value;
+  try {
+    const base =
+      editor.activePath === path
+        ? editor.content
+        : ((await ipc.readDocs([path]))[0] ?? "");
+    const next = applyFrontMatter(base, form);
+    if (next === base) return;
+    if (editor.activePath === path) {
+      editor.externalReplace = true;
+      editor.content = next;
+      await editor.save();
+    } else {
+      await ipc.saveDoc(path, next);
+      site.updateDocCache(path, next);
+    }
+    useBuilderStore().onSiteChanged();
+    ui.toast(t("tree.fmSaved"), "success");
+  } catch (e) {
+    ui.toast(t("ui.operationFailed", { msg: ipc.errText(e) }), "error");
+  }
+}
+
+/** 选取本地图片导入站点 images 文件夹(images 固定入口与右键共用) */
+async function importImages() {
+  const files = await ipc.pickImages();
+  if (!files?.length) return;
+  try {
+    const names = await site.importSiteImages(files);
+    if (names.length) ui.toast(t("tree.importDone", { n: names.length }), "success");
+  } catch (e) {
+    ui.toast(t("ui.operationFailed", { msg: ipc.errText(e) }), "error");
+  }
+}
+
 /** 树内右键:命中行弹出该节点的文件操作,空白处弹出根目录操作 */
 function openTreeMenu(e: MouseEvent) {
   const target = e.target as HTMLElement | null;
+  // images 固定入口:仅提供图片导入(内容操作在「资产」页)
+  if (target?.closest<HTMLElement>("[data-images-row]")) {
+    e.preventDefault();
+    e.stopPropagation();
+    ctxMenu.show(e.clientX, e.clientY, [
+      { id: "importImages", label: t("tree.importImages"), icon: "download", run: () => void importImages() },
+    ]);
+    return;
+  }
   const row = target?.closest<HTMLElement>(".tree-row") ?? null;
   const node = row?.dataset.path ? findNodeByPath(row.dataset.path) : null;
   const dir = node ? (node.type === "dir" ? node.path : dirname(node.path)) : "";
@@ -375,6 +465,15 @@ function openTreeMenu(e: MouseEvent) {
         run: () => void onRemove(node),
       },
     );
+    // Markdown 文档可从文件树直接打开配置头表单(图片没有配置头)
+    if (node.type === "file" && !isImageFile(node.path)) {
+      items.splice(2, 0, {
+        id: "frontmatter",
+        label: t("tree.fmEdit"),
+        icon: "filePlus",
+        run: () => void openFmEditor(node),
+      });
+    }
   }
 
   e.preventDefault();
@@ -582,6 +681,37 @@ async function onTreeDrop(e: DragEvent) {
           {{ t("tree.homeMissing") }}
         </span>
       </div>
+
+      <!-- 固定 images 入口:站点图片资源区,置顶不可移动,不进入站点输出 -->
+      <div v-if="imagesDir" class="pb-0.5 pt-1.5">
+        <div
+          class="home-row flex h-[30px] cursor-default items-center gap-1 rounded-md px-1 select-none"
+          data-images-row
+          :title="'images'"
+          @click="toggleImages"
+        >
+          <button class="btn-icon !h-5 !w-5 !text-ink-3" :title="imagesCollapsed ? '展开' : '折叠'" tabindex="-1" @click.stop="toggleImages">
+            <AppIcon :name="imagesCollapsed ? 'chevronRight' : 'chevronDown'" :size="13" />
+          </button>
+          <AppIcon name="folder" :size="15" class="shrink-0 text-ink-2" />
+          <span class="min-w-0 flex-1 truncate text-[13px]">{{ imagesDir.name }}</span>
+          <span class="shrink-0 pr-1 text-[10.5px] text-ink-3">{{ imagesDir.children?.length ?? 0 }}</span>
+        </div>
+        <div v-if="!imagesCollapsed">
+          <FileTreeNode
+            v-for="child in imagesDir.children"
+            :key="child.path"
+            :node="child"
+            :depth="0"
+            locked
+            :selected-paths="selectedPaths"
+            :select-mode="selectMode"
+            @rename="(n: TreeNode) => (prompt = { mode: 'rename', node: n })"
+            @remove="onRemove"
+            @select-click="handleSelectClick"
+          />
+        </div>
+      </div>
     </div>
 
     <div
@@ -656,6 +786,15 @@ async function onTreeDrop(e: DragEvent) {
 
     <!-- 新建文档:名称与配置头(标题/描述/日期/封面)一次填好 -->
     <NewDocModal :open="newDocOpen" :dir="newDocDir" @confirm="onNewDocConfirm" @cancel="newDocOpen = false" />
+
+    <!-- 配置头可视化编辑(文件树右键入口) -->
+    <FrontMatterModal
+      :open="fmOpen"
+      :doc-path="fmTarget"
+      :initial="fmInitial"
+      @confirm="onFmConfirm"
+      @cancel="fmOpen = false"
+    />
 
     <!-- 移动目标文件夹选择对话框 -->
     <Teleport to="body">

@@ -74,6 +74,11 @@ function buildMetas(paths: string[], cache: DocsCache): Map<string, DocMeta> {
   return metas;
 }
 
+/** 站点图片的统一存放目录(任何层级),只作为资源,不进入导航与目录页 */
+export function isImagesDir(path: string): boolean {
+  return basename(path).toLowerCase() === "images";
+}
+
 /** 封面图统一为 content/ 相对路径(外链 URL 原样保留),供文章流与预览换算页面地址 */
 function coverOf(meta: DocMeta): string | undefined {
   const raw = meta.cover?.trim();
@@ -106,6 +111,8 @@ function buildNav(nodes: TreeNode[], metas: Map<string, DocMeta>): RawNav[] {
   const result: RawNav[] = [];
   for (const node of nodes) {
     if (node.type === "dir") {
+      // images 是图片资源目录,不进入站点导航,也不生成目录页
+      if (isImagesDir(node.path)) continue;
       const indexChild = (node.children ?? []).find(
         (c) => c.type === "file" && c.name.toLowerCase() === "index.md",
       );
@@ -531,10 +538,10 @@ export async function buildSite(site: SiteConfig, theme: ThemeBundle): Promise<B
     outputs.push({ path: `page/${n}/index.html`, content: html });
   }
 
-  // 文件夹页:每个没有 index.md 的目录生成一个目录列表页(dir/index.html)
+  // 文件夹页:每个没有 index.md 的目录生成一个目录列表页(dir/index.html);images 目录除外
   const folderPages: DocMeta[] = [];
   walkTree(tree, (node) => {
-    if (node.type !== "dir") return;
+    if (node.type !== "dir" || isImagesDir(node.path)) return;
     const children = node.children ?? [];
     if (children.some((c) => c.type === "file" && c.name.toLowerCase() === "index.md")) return;
     folderPages.push({

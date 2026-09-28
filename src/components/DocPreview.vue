@@ -66,6 +66,8 @@ watch(
     () => theme.activeBundle,
     () => site.config,
     () => site.tree,
+    // 文档内容的外部写回(文件树配置头保存、资产页重命名同步等)也刷新文章流
+    () => site.docsCache,
   ],
   schedule,
   { immediate: true },

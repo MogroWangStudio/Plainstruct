@@ -798,6 +798,18 @@ a.blog-page-step:active {
   object-fit: cover;
 }
 
+/* 未设置封面的文章:文档图标占位(正文色低透明度,深浅主题自适应) */
+.blog-entry-cover-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--ps-cover-h, 220px);
+  background: color-mix(in srgb, currentColor 5%, transparent);
+}
+.blog-entry-cover-empty .blog-entry-cover-icon {
+  opacity: 0.26;
+}
+
 /* 文章卡片流多列(主题配置「文章卡片并排」) */
 .blog-stream {
   display: grid;
