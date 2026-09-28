@@ -13,9 +13,11 @@ import type {
   SyncResult,
   ThemeMeta,
   TreeNode,
+  UpdateDownloadResult,
   UpdateInfo,
   VerifyResult,
 } from "./types";
+import { Events, mockEmit } from "./events";
 import { getBuiltinTheme } from "@/themes/manifest";
 
 const LS_SETTINGS = "plainstruct.settings";
@@ -282,6 +284,7 @@ export const mock = {
       customDataDir: null,
       settings,
       recentSites: recent,
+      pendingUpdate: null,
     };
   },
 
@@ -657,20 +660,64 @@ export const mock = {
     await delay(400);
     return {
       currentVersion: __APP_VERSION__,
-      latestVersion: __APP_VERSION__,
-      hasUpdate: false,
+      latestVersion: MOCK_LATEST_VERSION,
+      hasUpdate: true,
       releaseUrl: "https://github.com/MogroWang/Plainstruct/releases/latest",
       releaseNotes: "",
       publishedAt: "",
     };
   },
 
-  /** 浏览器预览无更新下载:模拟下载后进入就绪 */
-  async updateDownload(): Promise<{ version: string; assetName: string }> {
-    await delay(1200);
-    return { version: __APP_VERSION__, assetName: "mock-installer" };
+  /** 浏览器 mock:模拟分块下载(事件驱动进度/速度),支持暂停、取消与续传 */
+  async updateDownload(): Promise<UpdateDownloadResult> {
+    const version = MOCK_LATEST_VERSION;
+    const assetName = `Plainstruct_${version}_Windows_x64_Portable.zip`;
+    const total = 24_117_248;
+    mockDownload.paused = false;
+    mockDownload.cancelled = false;
+    if (mockDownload.received >= total) return { version, assetName, paused: false };
+    mockDownload.running = true;
+    try {
+      while (mockDownload.received < total) {
+        if (mockDownload.cancelled) {
+          mockDownload.received = 0;
+          throw "update-cancelled";
+        }
+        if (mockDownload.paused) return { version, assetName, paused: true };
+        await delay(120);
+        mockDownload.received = Math.min(total, mockDownload.received + 640 * 1024 + Math.floor(Math.random() * 180_000));
+        mockEmit(Events.UpdateProgress, { received: mockDownload.received, total, name: assetName, version });
+      }
+    } finally {
+      mockDownload.running = false;
+    }
+    return { version, assetName, paused: false };
+  },
+
+  async updatePause(): Promise<void> {
+    mockDownload.paused = true;
+    while (mockDownload.running) await delay(30);
+  },
+
+  async updateCancel(): Promise<void> {
+    mockDownload.cancelled = true;
+    mockDownload.received = 0;
+    while (mockDownload.running) await delay(30);
+  },
+
+  async updateRestartInstall(): Promise<void> {
+    mockDownload.received = 0;
   },
 };
+
+/** mock 下载模拟器的共享状态(断点/暂停/取消) */
+const mockDownload = { paused: false, cancelled: false, received: 0, running: false };
+
+/** mock 模拟的「最新版本」:始终比当前应用版本新一个补丁位,版本升级后无需手动同步 */
+const MOCK_LATEST_VERSION = (() => {
+  const [maj, min, pat] = __APP_VERSION__.split(".").map(Number);
+  return `${maj}.${min}.${(pat ?? 0) + 1}`;
+})();
 
 /** mock 模式下的文件选择:返回虚拟路径 */
 export function mockPickDirectory(): string {

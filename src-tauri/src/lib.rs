@@ -127,6 +127,9 @@ pub fn run() {
             commands::check_update,
             commands::set_data_dir,
             commands::update_download,
+            commands::update_pause,
+            commands::update_cancel,
+            commands::update_restart_and_install,
             // 站点
             commands::create_site,
             commands::open_site,
@@ -175,9 +178,10 @@ pub fn run() {
         ])
         .setup(|app| {
             let state = app.state::<AppState>();
-            // 应用正常启动即说明没有更新待执行:清掉上次更新残留的任务目录,
-            // 「目录内存在向导脚本」仅表示「已下载更新、等待退出后执行」
-            let _ = std::fs::remove_dir_all(commands::github::update_dir());
+            // 清理更新任务残留:任务版本已不新于当前(装上了/过期)或包缺失时清空;
+            // 仍有待安装任务则保留,前端在设置页显示「重启并更新」。
+            // 更新向导改由用户点击按钮显式拉起,退出应用不再自动执行更新。
+            commands::github::cleanup_update_task(env!("CARGO_PKG_VERSION"));
             // 便携版策略:默认数据目录为可执行文件所在根目录下的 data/,数据随程序
             // 一起迁移;exe 所在目录不可写(如安装进 Program Files)时回退系统 AppData
             let portable = std::env::current_exe().ok().and_then(|exe| {
@@ -214,45 +218,4 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running plainstruct");
-
-    // 应用退出后:若用户已下载好更新,拉起平台对应的更新向导
-    // (Windows:PowerShell 更新窗体;macOS:终端脚本,含按需的隔离修复)
-    spawn_update_helper_if_pending();
-}
-
-/// 存在已下载的更新任务时,以独立进程拉起更新向导(与应用退出解耦)
-fn spawn_update_helper_if_pending() {
-    let dir = commands::github::update_dir();
-    if !dir.exists() {
-        return;
-    }
-    #[cfg(target_os = "windows")]
-    {
-        let script = dir.join("update-helper.ps1");
-        if script.exists() {
-            use std::os::windows::process::CommandExt;
-            let _ = std::process::Command::new("powershell")
-                .args([
-                    "-NoProfile",
-                    "-ExecutionPolicy",
-                    "Bypass",
-                    "-File",
-                    &script.to_string_lossy(),
-                ])
-                // DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP:独立于已退出应用的作业
-                .creation_flags(0x0000_0008 | 0x0000_0200)
-                .spawn();
-        }
-    }
-    #[cfg(target_os = "macos")]
-    {
-        let script = dir.join("update-helper.command");
-        if script.exists() {
-            let _ = std::process::Command::new("open")
-                .args(["-a", "Terminal", &script.to_string_lossy()])
-                .spawn();
-        }
-    }
-    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
-    let _ = dir;
 }

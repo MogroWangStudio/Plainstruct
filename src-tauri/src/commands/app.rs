@@ -31,6 +31,13 @@ pub(crate) struct AppData {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct PendingUpdate {
+    pub version: String,
+    pub asset_name: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Bootstrap {
     version: String,
     platform: String,
@@ -39,6 +46,8 @@ pub struct Bootstrap {
     custom_data_dir: Option<String>,
     settings: Value,
     recent_sites: Vec<RecentSite>,
+    /// 已下载待安装的更新(存在时前端显示「重启并更新」)
+    pending_update: Option<PendingUpdate>,
 }
 
 pub(crate) fn now_millis() -> u64 {
@@ -98,8 +107,14 @@ pub fn get_bootstrap(state: State<'_, AppState>, window: tauri::WebviewWindow) -
     } else {
         "unknown"
     };
+    let current = env!("CARGO_PKG_VERSION").to_string();
+    // 已下载且版本更新的待安装任务(安装包须仍在,否则视为残留)
+    let pending_update = crate::commands::github::read_update_task()
+        .filter(|t| is_newer(&t.version, &current))
+        .filter(|t| crate::commands::github::update_dir().join(&t.asset_name).exists())
+        .map(|t| PendingUpdate { version: t.version, asset_name: t.asset_name });
     Ok(Bootstrap {
-        version: env!("CARGO_PKG_VERSION").to_string(),
+        version: current,
         platform: platform.to_string(),
         app_data_dir: state.app_data().to_string_lossy().to_string(),
         custom_data_dir: read_app_data_at(&state.default_data_dir()).custom_data_dir,
@@ -109,6 +124,7 @@ pub fn get_bootstrap(state: State<'_, AppState>, window: tauri::WebviewWindow) -
             data.settings
         },
         recent_sites: data.recent_sites,
+        pending_update,
     })
 }
 

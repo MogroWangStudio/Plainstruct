@@ -667,10 +667,107 @@ async fn github_sync_inner(app: &AppHandle, state: &AppState, cfg: GithubConfig)
 
 /* ---------------- 自动更新 ---------------- */
 
-/// 更新任务目录:安装包、向导脚本都放在这里。应用正常启动时会清空此目录,
-/// 因此「目录内存在向导脚本」即表示「用户已下载更新、等待退出后执行向导」。
+const UPDATE_TASK_FILE: &str = "update-task.json";
+const UPDATE_HELPER_FILE: &str = "update-helper";
+
+/// 更新任务目录。Windows 便携版直接使用 exe 所在根目录(更新包与向导脚本随程序
+/// 摆放,用户在程序目录可直接看到安装包);目录不可写时回退系统临时目录的专属
+/// 子目录。macOS 使用系统临时目录的专属子目录。
 pub(crate) fn update_dir() -> std::path::PathBuf {
+    #[cfg(target_os = "windows")]
+    {
+        if let Some(dir) = std::env::current_exe()
+            .ok()
+            .and_then(|exe| exe.parent().map(|p| p.to_path_buf()))
+        {
+            // 可写探测:实际写入并删除一个探测文件
+            let probe = dir.join(".plainstruct-update-probe");
+            if std::fs::write(&probe, b"ok").is_ok() {
+                let _ = std::fs::remove_file(&probe);
+                return dir;
+            }
+        }
+    }
     std::env::temp_dir().join("plainstruct-update")
+}
+
+/// 已下载待安装的更新任务(任务目录内的持久化标记,重启后仍可「重启并更新」)
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct UpdateTask {
+    pub version: String,
+    pub asset_name: String,
+}
+
+pub(crate) fn read_update_task() -> Option<UpdateTask> {
+    let file = update_dir().join(UPDATE_TASK_FILE);
+    std::fs::read_to_string(file)
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+}
+
+fn write_update_task(task: &UpdateTask) -> Result<(), String> {
+    let dir = update_dir();
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let json = serde_json::to_string_pretty(task).map_err(|e| e.to_string())?;
+    std::fs::write(dir.join(UPDATE_TASK_FILE), json).map_err(|e| e.to_string())
+}
+
+/// 应用启动时清理更新残留:任务不存在或版本不新于当前(已装上/已过期)时清理;
+/// 有有效的待安装任务则保留,bootstrap 会暴露给前端显示「重启并更新」。
+/// 注意:任务目录可能是 exe 根目录,绝不能整目录删除;exe 根目录里只清理任务
+/// 文件、向导脚本与任务指名的更新包,其余 zip 可能是用户手动存放的发行包或
+/// 可续传的半成品,一律不动。
+pub(crate) fn cleanup_update_task(current_version: &str) {
+    let dir = update_dir();
+    let task = read_update_task();
+    let keep = task
+        .as_ref()
+        .filter(|t| {
+            crate::commands::app::is_newer(&t.version, current_version)
+                && dir.join(&t.asset_name).exists()
+        })
+        .is_some();
+    if keep {
+        return;
+    }
+    if dir.file_name().map_or(false, |n| n == "plainstruct-update") {
+        // 专属子目录:整目录删除
+        let _ = std::fs::remove_dir_all(&dir);
+        return;
+    }
+    remove_task_files(&dir, task.as_ref());
+}
+
+/// 清理任务文件、向导脚本与任务指名的更新包(exe 根目录场景)
+fn remove_task_files(dir: &std::path::Path, task: Option<&UpdateTask>) {
+    let _ = std::fs::remove_file(dir.join(UPDATE_TASK_FILE));
+    for script in [".ps1", ".command"] {
+        let _ = std::fs::remove_file(dir.join(format!("{UPDATE_HELPER_FILE}{script}")));
+    }
+    if let Some(t) = task {
+        let _ = std::fs::remove_file(dir.join(&t.asset_name));
+    }
+}
+
+/// 选择当前平台的更新包:按关键字符匹配(大小写不敏感),不依赖文件名里的版本号
+/// 与分隔符写法——Windows 一律为免安装 zip(解压覆盖更新),macOS 用 dmg;
+/// x64 字样用于区分架构,官方产物名均携带。
+fn asset_matches(name: &str) -> bool {
+    let n = name.to_ascii_lowercase();
+    #[cfg(target_os = "windows")]
+    {
+        n.ends_with(".zip") && n.contains("portable") && n.contains("x64")
+    }
+    #[cfg(target_os = "macos")]
+    {
+        n.ends_with(".dmg")
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    {
+        let _ = n;
+        false
+    }
 }
 
 #[derive(Serialize)]
@@ -678,10 +775,12 @@ pub(crate) fn update_dir() -> std::path::PathBuf {
 pub struct UpdateDownloadResult {
     pub version: String,
     pub asset_name: String,
+    /// true = 因用户暂停而中途返回(断点已保留,再次调用自动续传)
+    pub paused: bool,
 }
 
-/// 从官方仓库最新 Release 下载当前平台对应的安装包,并生成更新向导脚本。
-/// 下载完成即万事俱备:用户关闭应用后由退出钩子拉起向导完成安装并重启。
+/// 下载官方最新 Release 的当前平台更新包。支持暂停(保留断点,再次调用自动续传)
+/// 与取消(清理残留);完成后生成更新向导脚本与任务文件,由「重启并更新」拉起向导。
 #[tauri::command]
 pub async fn update_download(
     app: AppHandle,
@@ -689,10 +788,14 @@ pub async fn update_download(
     state: State<'_, AppState>,
 ) -> Result<UpdateDownloadResult, String> {
     use crate::events::UPDATE_PROGRESS;
+    use std::io::Write;
+    use std::sync::atomic::Ordering;
 
     ensure_main(&window)?;
     let http = state.http.clone();
     let current = env!("CARGO_PKG_VERSION").to_string();
+    state.update_pause.store(false, Ordering::SeqCst);
+    state.update_cancel.store(false, Ordering::SeqCst);
 
     // 1. 最新 Release 与版本比较
     let (status, body) = request(&http, reqwest::Method::GET, crate::commands::app::RELEASES_API, "", None).await?;
@@ -708,136 +811,223 @@ pub async fn update_download(
         return Err("already-latest".into());
     }
 
-    // 2. 选择当前平台的更新包:按关键字符匹配(大小写不敏感),不依赖文件名里的版本号与
-    //    分隔符写法——Windows 一律为免安装 zip(解压覆盖更新),macOS 用 dmg;
-    //    x64 字样用于区分架构,官方产物名均携带。
-    let want = |name: &str| -> bool {
-        let n = name.to_ascii_lowercase();
-        #[cfg(target_os = "windows")]
-        {
-            n.ends_with(".zip") && n.contains("portable") && n.contains("x64")
-        }
-        #[cfg(target_os = "macos")]
-        {
-            n.ends_with(".dmg")
-        }
-        #[cfg(not(any(target_os = "windows", target_os = "macos")))]
-        {
-            let _ = n;
-            false
-        }
-    };
+    // 2. 选择当前平台的更新包
     let asset = body["assets"]
         .as_array()
-        .and_then(|list| list.iter().find(|a| want(a["name"].as_str().unwrap_or(""))))
+        .and_then(|list| list.iter().find(|a| asset_matches(a["name"].as_str().unwrap_or(""))))
         .ok_or("Release 中没有当前平台的安装包")?;
     let asset_name = asset["name"].as_str().unwrap_or("").to_string();
     let asset_url = asset["browser_download_url"].as_str().unwrap_or("").to_string();
     if asset_url.is_empty() {
         return Err("安装包下载地址缺失".into());
     }
+    // 记录进行中的包名:取消时(含暂停后取消,此时任务文件尚未落盘)据此删除半成品
+    if let Ok(mut guard) = state.update_asset.lock() {
+        *guard = Some(asset_name.clone());
+    }
 
-    // 3. 流式下载,进度经事件广播
+    // 3. 流式下载,进度经事件广播:存在未完成的同名包时尝试断点续传,
+    //    服务器不支持 Range(返回 200)则从头下载
     let dir = update_dir();
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let asset_path = dir.join(&asset_name);
-    let resp = http
-        .get(&asset_url)
-        .header("Accept", "application/octet-stream")
+    let resume_from = std::fs::metadata(&asset_path).map(|m| m.len()).unwrap_or(0);
+    let mut req = http.get(&asset_url).header("Accept", "application/octet-stream");
+    if resume_from > 0 {
+        req = req.header("Range", format!("bytes={resume_from}-"));
+    }
+    let resp = req
         .timeout(std::time::Duration::from_secs(600))
         .send()
         .await
         .map_err(|e| format!("下载失败: {e}"))?;
-    if !resp.status().is_success() {
+
+    let mut received: u64 = 0;
+    let mut append = false;
+    if resume_from > 0 && resp.status() == reqwest::StatusCode::PARTIAL_CONTENT {
+        received = resume_from;
+        append = true;
+    } else if !resp.status().is_success() {
         return Err(format!("下载失败: GitHub 返回 {}", resp.status()));
     }
-    let total = resp.content_length();
-    let mut file = std::fs::File::create(&asset_path).map_err(|e| e.to_string())?;
-    use std::io::Write;
-    let mut received: u64 = 0;
+    let total = resp.content_length().map(|n| n + received);
+    let mut file = if append {
+        std::fs::OpenOptions::new()
+            .append(true)
+            .open(&asset_path)
+            .map_err(|e| e.to_string())?
+    } else {
+        std::fs::File::create(&asset_path).map_err(|e| e.to_string())?
+    };
+
     let mut last_emitted: u64 = 0;
+    let mut last_tick = std::time::Instant::now();
+    let emit = |received: u64, total: Option<u64>| {
+        let _ = app.emit(
+            UPDATE_PROGRESS,
+            json!({ "received": received, "total": total, "name": asset_name, "version": latest }),
+        );
+    };
+    emit(received, total);
     let mut stream = resp;
     while let Some(chunk) = stream.chunk().await.map_err(|e| format!("下载失败: {e}"))? {
+        // 暂停:保留断点返回;取消:清理残留后中止(前端识别 update-cancelled 静默回到初始态)
+        if state.update_cancel.load(Ordering::SeqCst) {
+            drop(file);
+            let _ = std::fs::remove_file(&asset_path);
+            return Err("update-cancelled".into());
+        }
+        if state.update_pause.load(Ordering::SeqCst) {
+            let _ = file.flush();
+            drop(file);
+            emit(received, total);
+            return Ok(UpdateDownloadResult { version: latest, asset_name, paused: true });
+        }
         file.write_all(&chunk).map_err(|e| e.to_string())?;
         received += chunk.len() as u64;
-        // 每 256KB 或到达尾部时广播一次,避免事件风暴
-        if received - last_emitted >= 256 * 1024 || total.map_or(false, |t| received >= t) {
+        // 每 256KB 或每 250ms 广播一次,兼顾事件风暴与低速连接下的进度刷新
+        if received - last_emitted >= 256 * 1024 || last_tick.elapsed() >= std::time::Duration::from_millis(250) {
             last_emitted = received;
-            let _ = app.emit(
-                UPDATE_PROGRESS,
-                json!({ "received": received, "total": total }),
-            );
+            last_tick = std::time::Instant::now();
+            emit(received, total);
         }
     }
-    let _ = file.flush();
 
-    // 4. 生成平台对应的更新向导脚本,退出钩子据此拉起
-    write_update_helper(&asset_path)?;
+    // 4. 完整性校验:已知总大小时长度不符即删除半包重来(避免越续越坏)
+    if let Some(t) = total {
+        if received != t {
+            drop(file);
+            let _ = std::fs::remove_file(&asset_path);
+            return Err("下载不完整,请重试".into());
+        }
+    }
+    emit(received, total);
 
-    Ok(UpdateDownloadResult {
-        version: latest,
-        asset_name,
-    })
+    // 5. 生成更新向导脚本与任务文件,等待「重启并更新」拉起
+    write_update_helper(&asset_path, &latest)?;
+    write_update_task(&UpdateTask { version: latest.clone(), asset_name: asset_name.clone() })?;
+
+    Ok(UpdateDownloadResult { version: latest, asset_name, paused: false })
 }
 
-/// 生成更新向导脚本(路径全部在生成时嵌入,向导无需解析任务文件)
-fn write_update_helper(asset_path: &std::path::Path) -> Result<(), String> {
+/// 暂停当前下载:下载循环看到标志后收尾返回(断点保留)
+#[tauri::command]
+pub fn update_pause(state: State<'_, AppState>, window: tauri::WebviewWindow) -> Result<(), String> {
+    ensure_main(&window)?;
+    use std::sync::atomic::Ordering;
+    state.update_pause.store(true, Ordering::SeqCst);
+    Ok(())
+}
+
+/// 取消下载/放弃已就绪的更新:通知下载循环中止(进行中时由循环删除半成品),
+/// 并清理任务文件、向导脚本与任务指名的更新包
+#[tauri::command]
+pub fn update_cancel(state: State<'_, AppState>, window: tauri::WebviewWindow) -> Result<(), String> {
+    ensure_main(&window)?;
+    use std::sync::atomic::Ordering;
+    state.update_cancel.store(true, Ordering::SeqCst);
+    let dir = update_dir();
+    let task = read_update_task();
+    remove_task_files(&dir, task.as_ref());
+    // 进行中的半成品(任务文件尚未落盘时是唯一的删除线索)
+    if let Ok(mut guard) = state.update_asset.lock() {
+        if let Some(name) = guard.take() {
+            let _ = std::fs::remove_file(dir.join(&name));
+        }
+    }
+    Ok(())
+}
+
+/// 用户点击「重启并更新」:复核任务与安装包、生成向导脚本,以独立进程拉起向导,
+/// 然后退出应用;向导等进程退出后完成安装并启动新版本。
+#[tauri::command]
+pub fn update_restart_and_install(app: AppHandle, window: tauri::WebviewWindow) -> Result<(), String> {
+    ensure_main(&window)?;
+    let dir = update_dir();
+    let task = read_update_task().ok_or("没有待执行的更新任务")?;
+    let asset_path = dir.join(&task.asset_name);
+    if !asset_path.exists() {
+        return Err("更新包不存在,请重新下载".into());
+    }
+    write_update_helper(&asset_path, &task.version)?;
+    spawn_update_helper()?;
+    // 向导独立于应用进程组,应用退出不影响其运行(其内部会等待应用退出)
+    app.exit(0);
+    Ok(())
+}
+
+/// 以独立进程拉起平台对应的更新向导
+pub(crate) fn spawn_update_helper() -> Result<(), String> {
+    let dir = update_dir();
+    #[cfg(target_os = "windows")]
+    {
+        let script = dir.join(format!("{UPDATE_HELPER_FILE}.ps1"));
+        if !script.exists() {
+            return Err("更新向导脚本不存在".into());
+        }
+        use std::os::windows::process::CommandExt;
+        std::process::Command::new("powershell")
+            .args([
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                &script.to_string_lossy(),
+            ])
+            // DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP:独立于已退出应用的作业
+            .creation_flags(0x0000_0008 | 0x0000_0200)
+            .spawn()
+            .map_err(|e| format!("无法启动更新向导: {e}"))?;
+        Ok(())
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let script = dir.join(format!("{UPDATE_HELPER_FILE}.command"));
+        if !script.exists() {
+            return Err("更新向导脚本不存在".into());
+        }
+        std::process::Command::new("open")
+            .args(["-a", "Terminal", &script.to_string_lossy()])
+            .spawn()
+            .map_err(|e| format!("无法启动更新向导: {e}"))?;
+        Ok(())
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    {
+        Err("当前平台不支持自动更新".into())
+    }
+}
+
+/// 生成更新向导脚本(路径与版本在生成时嵌入,向导无需解析任务文件)。
+/// Windows 脚本以 UTF-8 BOM 落盘:PowerShell 5.1 按系统 ANSI 编码读取无 BOM
+/// 的脚本,中文界面会变乱码。
+fn write_update_helper(asset_path: &std::path::Path, latest_version: &str) -> Result<(), String> {
     let dir = update_dir();
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    let asset = asset_path.to_string_lossy().replace('\'', "''");
 
     #[cfg(target_os = "windows")]
     {
+        let current_version = env!("CARGO_PKG_VERSION");
         let exe = std::env::current_exe().map_err(|e| e.to_string())?;
-        let app_dir = exe.parent().ok_or("无法定位程序目录")?.to_string_lossy().replace('\'', "''");
-        let app_exe = exe.to_string_lossy().replace('\'', "''");
-        let script = format!(
-            r#"$ErrorActionPreference = 'Stop'
-$installer = '{asset}'
-$appExe    = '{app_exe}'
-$appDir    = '{app_dir}'
-
-Add-Type -AssemblyName System.Windows.Forms
-$form = New-Object System.Windows.Forms.Form
-$form.Text = 'Plainstruct 更新'
-$form.Size = New-Object System.Drawing.Size(380,150)
-$form.StartPosition = 'CenterScreen'
-$form.FormBorderStyle = 'FixedDialog'
-$form.TopMost = $true
-$label = New-Object System.Windows.Forms.Label
-$label.Dock = 'Fill'
-$label.TextAlign = 'MiddleCenter'
-$label.Text = '准备更新...'
-$form.Controls.Add($label)
-$bar = New-Object System.Windows.Forms.ProgressBar
-$bar.Style = 'Marquee'
-$bar.MarqueeAnimationSpeed = 30
-$bar.Dock = 'Bottom'
-$bar.Height = 22
-$form.Controls.Add($bar)
-$form.Show()
-function Set-Stage($t) {{ $label.Text = $t; [System.Windows.Forms.Application]::DoEvents() }}
-
-Set-Stage '等待 Plainstruct 退出...'
-try {{ Wait-Process -Name 'plainstruct' -Timeout 30 -ErrorAction Stop }} catch {{}}
-Start-Sleep -Milliseconds 800
-
-Set-Stage '正在解压并更新程序文件...'
-$tmp = Join-Path $env:TEMP ('plainstruct-unzip-' + [guid]::NewGuid().ToString())
-Expand-Archive -Path $installer -DestinationPath $tmp -Force
-$src = (Get-ChildItem $tmp | Select-Object -First 1).FullName
-Copy-Item -Path (Join-Path $src '*') -Destination $appDir -Recurse -Force
-Remove-Item -LiteralPath $tmp -Recurse -Force
-
-Set-Stage '启动新版本...'
-Start-Process -FilePath $appExe
-$form.Close()
-"#,
-            asset = asset,
-            app_exe = app_exe,
-            app_dir = app_dir,
-        );
-        std::fs::write(dir.join("update-helper.ps1"), script).map_err(|e| e.to_string())?;
+        let app_dir = exe.parent().ok_or("无法定位程序目录")?.to_string_lossy().to_string();
+        let app_exe = exe.to_string_lossy().to_string();
+        let proc_name = exe
+            .file_stem()
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or_else(|| "plainstruct".into());
+        let q = |s: &str| s.replace('\'', "''");
+        let script = WIN_WIZARD_SCRIPT
+            .replace("__ASSET__", &q(&asset_path.to_string_lossy()))
+            .replace("__APP_EXE__", &q(&app_exe))
+            .replace("__APP_DIR__", &q(&app_dir))
+            .replace("__TASK__", &q(&dir.join(UPDATE_TASK_FILE).to_string_lossy()))
+            .replace("__VER_OLD__", current_version)
+            .replace("__VER_NEW__", latest_version)
+            .replace("__PROC__", &q(&proc_name));
+        // UTF-8 BOM:Windows PowerShell 5.1 据此正确解码中文
+        let mut bytes = vec![0xEF, 0xBB, 0xBF];
+        bytes.extend_from_slice(script.as_bytes());
+        std::fs::write(dir.join(format!("{UPDATE_HELPER_FILE}.ps1")), bytes).map_err(|e| e.to_string())?;
     }
 
     #[cfg(target_os = "macos")]
@@ -854,18 +1044,230 @@ $form.Close()
                     .map(|p| p.to_string_lossy().to_string())
             })
             .unwrap_or_else(|| "/Applications/Plainstruct.app".to_string());
-        let app_path = app_path.replace('\'', "'\\''");
-        let dmg = asset;
-        let script = format!(
-            r#"#!/bin/bash
+        let script = MAC_WIZARD_SCRIPT
+            .replace("__APP_PATH__", &app_path.replace('\'', "'\\''"))
+            .replace("__DMG__", &asset_path.to_string_lossy().replace('\'', "'\\''"))
+            .replace("__VER_NEW__", latest_version);
+        let path = dir.join(format!("{UPDATE_HELPER_FILE}.command"));
+        std::fs::write(&path, script).map_err(|e| e.to_string())?;
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).map_err(|e| e.to_string())?;
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    {
+        let _ = (asset_path, latest_version);
+        Err("当前平台不支持自动更新".into())
+    }
+
+    #[cfg(any(target_os = "windows", target_os = "macos"))]
+    Ok(())
+}
+
+/// Windows 更新向导(WinForms):阶段清单 + 逐条目解压的真实进度 + 失败可见,
+/// 中文经 UTF-8 BOM 正确显示。以 __TOKEN__ 占位替换,避免 format! 与
+/// PowerShell 花括号互相干扰。仅取文件条目,剥离公共顶层目录后按字节加权
+/// 展示进度,并防范压缩包内路径逃逸。
+#[cfg(target_os = "windows")]
+const WIN_WIZARD_SCRIPT: &str = r#"$ErrorActionPreference = 'Stop'
+
+$installer = '__ASSET__'
+$appExe    = '__APP_EXE__'
+$appDir    = '__APP_DIR__'
+$taskFile  = '__TASK__'
+$verOld    = '__VER_OLD__'
+$verNew    = '__VER_NEW__'
+
+Add-Type -TypeDefinition 'using System.Runtime.InteropServices; public class DpiHelper { [DllImport("user32.dll")] public static extern bool SetProcessDPIAware(); }'
+[DpiHelper]::SetProcessDPIAware() | Out-Null
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+[System.Windows.Forms.Application]::EnableVisualStyles()
+
+$accent = [System.Drawing.Color]::FromArgb(15, 98, 254)
+$okC    = [System.Drawing.Color]::FromArgb(10, 122, 61)
+$badC   = [System.Drawing.Color]::FromArgb(192, 43, 43)
+$muted  = [System.Drawing.Color]::FromArgb(130, 130, 130)
+
+$form = New-Object System.Windows.Forms.Form
+$form.Text = 'Plainstruct 更新'
+$form.Font = New-Object System.Drawing.Font('Microsoft YaHei UI', 9)
+$form.ClientSize = New-Object System.Drawing.Size(412, 224)
+$form.StartPosition = 'CenterScreen'
+$form.FormBorderStyle = 'FixedDialog'
+$form.MaximizeBox = $false
+$form.TopMost = $true
+
+$verLabel = New-Object System.Windows.Forms.Label
+$verLabel.Text = "正在更新 Plainstruct:v$verOld → v$verNew"
+$verLabel.AutoSize = $true
+$verLabel.Location = New-Object System.Drawing.Point(20, 16)
+$form.Controls.Add($verLabel)
+
+$stages = @('等待 Plainstruct 退出', '校验更新包', '解压并安装新版本', '启动新版本')
+$script:states = @(0, 0, 0, 0)
+$stageLabels = @()
+for ($i = 0; $i -lt $stages.Count; $i++) {
+  $l = New-Object System.Windows.Forms.Label
+  $l.AutoSize = $true
+  $l.Location = New-Object System.Drawing.Point(22, (50 + $i * 26))
+  $form.Controls.Add($l)
+  $stageLabels += $l
+}
+$regular = New-Object System.Drawing.Font('Microsoft YaHei UI', 9)
+$bold    = New-Object System.Drawing.Font('Microsoft YaHei UI', 9, [System.Drawing.FontStyle]::Bold)
+
+function Update-Stages {
+  for ($i = 0; $i -lt $stages.Count; $i++) {
+    $icon = [char]0x25CB
+    $color = $muted
+    $font = $regular
+    switch ($script:states[$i]) {
+      1 { $icon = [char]0x25CF; $color = $accent; $font = $bold }
+      2 { $icon = [char]0x2713; $color = $okC }
+      3 { $icon = [char]0x2715; $color = $badC; $font = $bold }
+    }
+    $stageLabels[$i].Text = "$icon  $($stages[$i])"
+    $stageLabels[$i].ForeColor = $color
+    $stageLabels[$i].Font = $font
+  }
+  [System.Windows.Forms.Application]::DoEvents()
+}
+
+$bar = New-Object System.Windows.Forms.ProgressBar
+$bar.Location = New-Object System.Drawing.Point(20, 160)
+$bar.Size = New-Object System.Drawing.Size(372, 10)
+$form.Controls.Add($bar)
+
+$pctLabel = New-Object System.Windows.Forms.Label
+$pctLabel.AutoSize = $true
+$pctLabel.Location = New-Object System.Drawing.Point(20, 178)
+$pctLabel.ForeColor = $muted
+$pctLabel.Text = ''
+$form.Controls.Add($pctLabel)
+
+$closeBtn = New-Object System.Windows.Forms.Button
+$closeBtn.Text = '关闭'
+$closeBtn.Size = New-Object System.Drawing.Size(88, 26)
+$closeBtn.Location = New-Object System.Drawing.Point(304, 178)
+$closeBtn.Visible = $false
+$closeBtn.Add_Click({ $form.Close() })
+$form.Controls.Add($closeBtn)
+
+function Set-Stage([int]$idx) {
+  if ($idx -gt 0) { $script:states[$idx - 1] = 2 }
+  $script:states[$idx] = 1
+  Update-Stages
+}
+
+function Show-Fail([string]$msg) {
+  $cur = [Array]::IndexOf($script:states, 1)
+  if ($cur -ge 0) { $script:states[$cur] = 3 }
+  $verLabel.Text = "更新失败:$msg"
+  $verLabel.ForeColor = $badC
+  $bar.Visible = $false
+  $pctLabel.Visible = $false
+  $closeBtn.Visible = $true
+  Update-Stages
+  while (-not $form.IsDisposed) {
+    [System.Windows.Forms.Application]::DoEvents()
+    Start-Sleep -Milliseconds 60
+  }
+  exit 1
+}
+
+$form.Show()
+Update-Stages
+
+$zip = $null
+try {
+  # 阶段 1:等待应用退出(显式更新流程下应用随即退出;兜底最多等 60 秒)
+  Set-Stage 0
+  for ($i = 0; $i -lt 120; $i++) {
+    if (-not (Get-Process -Name '__PROC__' -ErrorAction SilentlyContinue)) { break }
+    Start-Sleep -Milliseconds 500
+    [System.Windows.Forms.Application]::DoEvents()
+  }
+  Start-Sleep -Milliseconds 600
+
+  # 阶段 2:校验更新包
+  Set-Stage 1
+  if (-not (Test-Path -LiteralPath $installer)) { throw '找不到更新包,请回到应用重新下载。' }
+  $zip = [System.IO.Compression.ZipFile]::OpenRead($installer)
+  $entries = @($zip.Entries | Where-Object { $_.FullName -and -not $_.FullName.EndsWith('/') })
+
+  # 官方包内含一层文件夹:全部条目共享同一顶层目录时剥离
+  $prefix = ''
+  if ($entries.Count -gt 0) {
+    $first = $entries[0].FullName.Replace('\', '/')
+    $slash = $first.IndexOf('/')
+    if ($slash -ge 0) {
+      $cand = $first.Substring(0, $slash + 1)
+      $same = $true
+      foreach ($e in $entries) {
+        if (-not $e.FullName.Replace('\', '/').StartsWith($cand)) { $same = $false; break }
+      }
+      if ($same) { $prefix = $cand }
+    }
+  }
+  $totalBytes = [long]0
+  foreach ($e in $entries) { $totalBytes += $e.Length }
+  if ($totalBytes -le 0) { $totalBytes = 1 }
+  $appDirBase = [System.IO.Path]::GetFullPath($appDir).TrimEnd('\') + '\'
+
+  # 阶段 3:逐条目解压并覆盖安装,按字节加权展示真实进度
+  Set-Stage 2
+  $done = [long]0
+  foreach ($e in $entries) {
+    $rel = $e.FullName.Replace('\', '/').Substring($prefix.Length).Replace('/', '\')
+    if ($rel -eq '') { continue }
+    $dest = [System.IO.Path]::GetFullPath((Join-Path $appDir $rel))
+    if (-not $dest.StartsWith($appDirBase, [System.StringComparison]::OrdinalIgnoreCase)) { throw "压缩包含非法路径:$rel" }
+    $parent = Split-Path -Parent $dest
+    if (-not (Test-Path -LiteralPath $parent)) { New-Item -ItemType Directory -Force -Path $parent | Out-Null }
+    $in = $e.Open()
+    $out = [System.IO.File]::Create($dest)
+    try { $in.CopyTo($out) } finally { $out.Dispose(); $in.Dispose() }
+    $done += $e.Length
+    $pct = [Math]::Min(100, [int]($done * 100 / $totalBytes))
+    $bar.Value = $pct
+    $pctLabel.Text = "正在安装 $pct%"
+    [System.Windows.Forms.Application]::DoEvents()
+  }
+  $zip.Dispose()
+  $zip = $null
+
+  # 阶段 4:清理任务文件与更新包,启动新版本
+  Set-Stage 3
+  $bar.Value = 100
+  foreach ($f in @($taskFile, $installer, $PSCommandPath)) {
+    Remove-Item -LiteralPath $f -Force -ErrorAction SilentlyContinue
+  }
+  Start-Process -FilePath $appExe -WorkingDirectory $appDir
+  $pctLabel.Text = "更新完成,正在启动 v$verNew …"
+  for ($i = 0; $i -lt 15; $i++) {
+    [System.Windows.Forms.Application]::DoEvents()
+    Start-Sleep -Milliseconds 100
+  }
+  $form.Close()
+} catch {
+  if ($zip) { try { $zip.Dispose() } catch {} }
+  Show-Fail $_.Exception.Message
+}
+"#;
+
+/// macOS 更新向导(终端窗口即向导,按阶段显示进度,含按需的隔离修复)
+#[cfg(target_os = "macos")]
+const MAC_WIZARD_SCRIPT: &str = r#"#!/bin/bash
 # Plainstruct 自动更新向导(终端窗口即向导,按阶段显示进度)
-APP_PATH='{app_path}'
-DMG='{dmg}'
-echo '── Plainstruct 更新 ──'
+APP_PATH='__APP_PATH__'
+DMG='__DMG__'
+echo '── Plainstruct 更新 → v__VER_NEW__ ──'
 echo '等待 Plainstruct 退出...'
 while pgrep -x plainstruct >/dev/null 2>&1; do sleep 1; done
 echo '挂载更新镜像...'
-MOUNT=$(hdiutil attach -nobrowse -readonly "$DMG" 2>/dev/null | awk -F'\t' '/Volumes/{{print $NF}}' | head -1)
+MOUNT=$(hdiutil attach -nobrowse -readonly "$DMG" 2>/dev/null | awk -F'\t' '/Volumes/{print $NF}' | head -1)
 if [ -z "$MOUNT" ]; then
   echo '无法挂载更新镜像,更新已取消。'
   read -r -p '按回车键退出...'
@@ -895,22 +1297,4 @@ echo '启动新版本...'
 open "$APP_PATH"
 echo '更新完成,本窗口可以关闭。'
 read -r -p '按回车键退出...'
-"#,
-            app_path = app_path,
-            dmg = dmg,
-        );
-        let path = dir.join("update-helper.command");
-        std::fs::write(&path, script).map_err(|e| e.to_string())?;
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).map_err(|e| e.to_string())?;
-    }
-
-    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
-    {
-        let _ = (asset_path, portable);
-        Err("当前平台不支持自动更新".into())
-    }
-
-    #[cfg(any(target_os = "windows", target_os = "macos"))]
-    Ok(())
-}
+"#;

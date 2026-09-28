@@ -20,8 +20,14 @@ import { useUiStore } from "./ui";
 
 export type AppView = "editor" | "assets" | "site" | "build" | "theme" | "publish" | "settings" | "about";
 
-/** 自动更新阶段:idle=未开始 downloading=下载中 ready=已就绪待重启 error=失败 */
-export type UpdatePhase = "idle" | "downloading" | "ready" | "error";
+/**
+ * 自动更新阶段:idle=未开始 downloading=下载中 paused=已暂停(可续传)
+ * ready=已就绪待「重启并更新」 error=失败
+ */
+export type UpdatePhase = "idle" | "downloading" | "paused" | "ready" | "error";
+
+/** 速度平滑采样的上一次进度事件 */
+let lastSpeedSample: { received: number; ts: number } | null = null;
 
 /** 个性化外观(主题与字体) */
 export interface AppearanceSettings {
@@ -55,8 +61,14 @@ interface State {
   /** 自动更新阶段与下载进度(0-100,无总大小时为 -1 表示不确定) */
   updatePhase: UpdatePhase;
   updateProgress: number;
-  updateError: string;
+  /** 下载速度(bytes/s)与已接收/总大小(用于展示) */
+  updateSpeed: number;
+  updateReceived: number;
+  updateTotal: number | null;
+  /** 更新包文件名与目标版本 */
+  updateName: string;
   updateVersion: string;
+  updateError: string;
 }
 
 export const useAppStore = defineStore("app", {
@@ -67,8 +79,12 @@ export const useAppStore = defineStore("app", {
     systemDark: false,
     updatePhase: "idle",
     updateProgress: 0,
-    updateError: "",
+    updateSpeed: 0,
+    updateReceived: 0,
+    updateTotal: null,
+    updateName: "",
     updateVersion: "",
+    updateError: "",
   }),
 
   getters: {
@@ -111,32 +127,104 @@ export const useAppStore = defineStore("app", {
       this.applyAppearance();
       this.watchSystemTheme();
       this.watchUpdateProgress();
+      // 恢复已下载待安装的更新(「重启并更新」跨重启保持可用)
+      const pending = this.bootstrap.pendingUpdate;
+      if (pending) {
+        this.updatePhase = "ready";
+        this.updateVersion = pending.version;
+        this.updateName = pending.assetName;
+      }
       this.ready = true;
     },
 
-    /** 监听更新包下载进度事件 */
+    /** 监听更新包下载进度事件:驱动进度、速度与包名展示 */
     async watchUpdateProgress() {
       await listen<UpdateProgress>(Events.UpdateProgress, (p) => {
         if (this.updatePhase !== "downloading") return;
+        const now = performance.now();
+        const prev = lastSpeedSample;
+        if (prev && p.received > prev.received) {
+          const dt = (now - prev.ts) / 1000;
+          if (dt >= 0.08) {
+            const inst = (p.received - prev.received) / dt;
+            this.updateSpeed = this.updateSpeed > 0 ? this.updateSpeed * 0.55 + inst * 0.45 : inst;
+          }
+        } else if (p.received < (prev?.received ?? 0)) {
+          this.updateSpeed = 0; // 服务器不支持续传,从头下载
+        }
+        lastSpeedSample = { received: p.received, ts: now };
+        if (p.name) this.updateName = p.name;
+        if (p.version) this.updateVersion = p.version;
+        this.updateReceived = p.received;
+        this.updateTotal = p.total;
         this.updateProgress = p.total && p.total > 0 ? Math.round((p.received / p.total) * 100) : -1;
       });
     },
 
-    /** 下载官方最新版安装包;完成后提示用户关闭应用以运行更新向导 */
+    /** 重置下载展示状态(取消/失败时回到初始) */
+    resetDownloadState() {
+      this.updatePhase = "idle";
+      this.updateProgress = 0;
+      this.updateSpeed = 0;
+      this.updateReceived = 0;
+      this.updateTotal = null;
+      this.updateName = "";
+      this.updateVersion = "";
+      this.updateError = "";
+      lastSpeedSample = null;
+    },
+
+    /** 下载(或从断点续传)更新包;完成后进入「重启并更新」 */
     async updateDownload() {
       const ui = useUiStore();
       const t = i18n.global.t;
+      const fresh = this.updatePhase === "idle" || this.updatePhase === "error";
       this.updatePhase = "downloading";
-      this.updateProgress = 0;
       this.updateError = "";
+      if (fresh) {
+        this.updateProgress = 0;
+        this.updateSpeed = 0;
+        this.updateReceived = 0;
+        this.updateTotal = null;
+        lastSpeedSample = null;
+      }
       try {
         const r = await ipc.updateDownload();
         this.updateVersion = r.version;
-        this.updatePhase = "ready";
+        this.updateName = r.assetName;
+        this.updatePhase = r.paused ? "paused" : "ready";
+        this.updateSpeed = 0;
       } catch (e) {
-        this.updatePhase = "error";
         this.updateError = ipc.errText(e);
+        if (this.updateError === "update-cancelled") {
+          this.resetDownloadState();
+          return;
+        }
+        this.updatePhase = "error";
         ui.toast(t("settings.updateDownloadFailed", { msg: this.updateError }), "error");
+      }
+    },
+
+    /** 暂停下载:保留断点,可继续 */
+    async pauseDownload() {
+      if (this.updatePhase !== "downloading") return;
+      this.updatePhase = "paused";
+      this.updateSpeed = 0;
+      await ipc.updatePause();
+    },
+
+    /** 继续下载(从断点续传) */
+    async resumeDownload() {
+      if (this.updatePhase !== "paused") return;
+      await this.updateDownload();
+    },
+
+    /** 取消下载/放弃已就绪的更新:清理任务文件与更新包 */
+    async cancelDownload() {
+      try {
+        await ipc.updateCancel();
+      } finally {
+        this.resetDownloadState();
       }
     },
 
@@ -149,6 +237,28 @@ export const useAppStore = defineStore("app", {
         body: t("settings.updateAskBody", { v: version }),
         confirmText: t("settings.updateAskConfirm"),
       });
+    },
+
+    /** 重启并更新:拉起更新向导后关闭应用,由向导完成安装并启动新版本 */
+    async confirmRestart(version: string): Promise<boolean> {
+      const ui = useUiStore();
+      const t = i18n.global.t;
+      return ui.confirmDialog({
+        title: t("settings.updateRestartAskTitle"),
+        body: t("settings.updateRestartAskBody", { v: version }),
+        confirmText: t("settings.updateRestartAskConfirm"),
+      });
+    },
+
+    async restartToUpdate() {
+      const ui = useUiStore();
+      const t = i18n.global.t;
+      try {
+        await ipc.updateRestartInstall();
+        // 应用将退出(浏览器 mock 为空操作),无需进一步处理
+      } catch (e) {
+        ui.toast(t("settings.updateRestartFailed", { msg: ipc.errText(e) }), "error");
+      }
     },
 
     async setLocale(locale: Locale) {

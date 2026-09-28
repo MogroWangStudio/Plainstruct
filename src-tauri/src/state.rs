@@ -1,5 +1,6 @@
 /** 全局状态:当前站点根目录、应用数据目录、共享 HTTP 客户端 */
 use std::path::PathBuf;
+use std::sync::atomic::AtomicBool;
 use std::sync::Mutex;
 use std::time::Duration;
 
@@ -10,6 +11,11 @@ pub struct AppState {
     /// 默认数据目录(便携 data/ 或回退 AppData);自定义目录的引导指针存于其 app.json
     pub default_data_dir: Mutex<PathBuf>,
     pub http: reqwest::Client,
+    /// 更新下载控制标志:暂停(下载循环看到后收尾返回)与取消(清理残留后中止)
+    pub update_pause: AtomicBool,
+    pub update_cancel: AtomicBool,
+    /// 进行中的更新包文件名(取消时据此删除半成品,任务文件在完成后才落盘)
+    pub update_asset: Mutex<Option<String>>,
 }
 
 impl Default for AppState {
@@ -25,6 +31,9 @@ impl Default for AppState {
                 .timeout(Duration::from_secs(120))
                 .build()
                 .expect("failed to build http client"),
+            update_pause: AtomicBool::new(false),
+            update_cancel: AtomicBool::new(false),
+            update_asset: Mutex::new(None),
         }
     }
 }

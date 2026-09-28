@@ -49,6 +49,14 @@ export interface Bootstrap {
   customDataDir: string | null;
   settings: AppSettings;
   recentSites: RecentSite[];
+  /** 已下载待安装的更新(存在时设置页显示「重启并更新」) */
+  pendingUpdate: PendingUpdate | null;
+}
+
+/** 已下载待安装的更新任务 */
+export interface PendingUpdate {
+  version: string;
+  assetName: string;
 }
 
 export interface UpdateInfo {
@@ -60,10 +68,19 @@ export interface UpdateInfo {
   publishedAt: string;
 }
 
-/** 自动更新包下载进度 */
+/** 自动更新包下载进度(name/version 用于下载中展示包名与目标版本) */
 export interface UpdateProgress {
   received: number;
   total: number | null;
+  name?: string;
+  version?: string;
+}
+
+/** 更新包下载结果:paused=true 表示因暂停而中途返回(断点已保留) */
+export interface UpdateDownloadResult {
+  version: string;
+  assetName: string;
+  paused: boolean;
 }
 
 export interface SiteThemeRef {

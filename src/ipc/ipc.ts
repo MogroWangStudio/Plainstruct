@@ -12,6 +12,7 @@ import type {
   SyncResult,
   ThemeMeta,
   TreeNode,
+  UpdateDownloadResult,
   UpdateInfo,
   VerifyResult,
 } from "./types";
@@ -46,9 +47,21 @@ export const ipc = {
   checkUpdate(): Promise<UpdateInfo> {
     return inTauri ? invoke<UpdateInfo>("check_update") : mock.checkUpdate();
   },
-  /** 下载官方最新 Release 的当前平台安装包,并准备更新向导(完成后关闭应用即自动更新) */
-  updateDownload(): Promise<{ version: string; assetName: string }> {
-    return inTauri ? invoke<{ version: string; assetName: string }>("update_download") : mock.updateDownload();
+  /** 下载官方最新 Release 的当前平台更新包;可再次调用以续传,paused=true 表示已暂停返回 */
+  updateDownload(): Promise<UpdateDownloadResult> {
+    return inTauri ? invoke<UpdateDownloadResult>("update_download") : mock.updateDownload();
+  },
+  /** 暂停下载(保留断点) */
+  updatePause(): Promise<void> {
+    return inTauri ? invoke<void>("update_pause") : mock.updatePause();
+  },
+  /** 取消下载或放弃已就绪的更新(清理任务文件与更新包) */
+  updateCancel(): Promise<void> {
+    return inTauri ? invoke<void>("update_cancel") : mock.updateCancel();
+  },
+  /** 重启并更新:拉起更新向导后关闭应用,由向导完成安装并启动新版本 */
+  updateRestartInstall(): Promise<void> {
+    return inTauri ? invoke<void>("update_restart_and_install") : mock.updateRestartInstall();
   },
   /** 更改数据存储位置(null = 恢复默认),数据迁移后立即生效 */
   setDataDir(path: string | null): Promise<void> {

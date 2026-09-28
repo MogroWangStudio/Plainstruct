@@ -5,6 +5,7 @@ import { useAppStore } from "@/stores/app";
 import { ipc } from "@/ipc/ipc";
 import type { EditorBreakKey, EditorFontMode, EditorIndentKey, Locale, UiFontMode } from "@/ipc/types";
 import { APP_THEMES, type AppThemeSwatch } from "@/lib/app-themes";
+import { formatSize } from "@/lib/format";
 import AppIcon from "@/components/AppIcon.vue";
 import SelectMenu from "@/components/SelectMenu.vue";
 
@@ -190,7 +191,18 @@ type UpdateState =
 
 const update = ref<UpdateState>({ kind: "idle" });
 
+/** 更新流程进行中(下载/暂停):左栏展示包名与进度明细 */
+const downloading = computed(() => app.updatePhase === "downloading" || app.updatePhase === "paused");
+
 const updateHint = computed(() => {
+  switch (app.updatePhase) {
+    case "downloading":
+      return t("settings.updateDownloading");
+    case "paused":
+      return t("settings.updatePaused");
+    case "ready":
+      return t("settings.updateReady", { v: app.updateVersion });
+  }
   switch (update.value.kind) {
     case "checking":
       return t("settings.checking");
@@ -205,10 +217,27 @@ const updateHint = computed(() => {
   }
 });
 
+const hintTone = computed(() => {
+  if (app.updatePhase === "ready" || update.value.kind === "available") return "text-accent";
+  if (update.value.kind === "error") return "text-danger";
+  return "text-ink-3";
+});
+
 /** 自动更新行:阶段与下载进度 */
 const updateBar = computed(() =>
   app.updateProgress >= 0 ? `${app.updateProgress}%` : "100%",
 );
+
+const speedText = computed(() => {
+  const s = formatSize(app.updateSpeed);
+  return s ? `${s}/s` : "";
+});
+
+/** 重启并更新:确认后关闭应用并拉起更新向导 */
+async function restartUpdate() {
+  const go = await app.confirmRestart(app.updateVersion);
+  if (go) await app.restartToUpdate();
+}
 
 async function checkUpdate() {
   update.value = { kind: "checking" };
@@ -497,50 +526,81 @@ function openRelease(url: string) {
                 <div class="settings-row" style="--i: 1">
                   <div class="min-w-0">
                     <p class="text-[13.5px] font-medium">{{ t("settings.checkUpdate") }}</p>
-                    <p
-                      class="mt-0.5 truncate text-[12px] leading-relaxed"
-                      :class="update.kind === 'available' ? 'text-accent' : update.kind === 'error' ? 'text-danger' : 'text-ink-3'"
-                    >
+                    <p class="mt-0.5 truncate text-[12px] leading-relaxed" :class="hintTone">
                       {{ updateHint }}
                     </p>
-                    <p v-if="app.updatePhase === 'downloading'" class="mt-0.5 text-[12px] text-ink-2">
-                      {{ t("settings.updateDownloading") }}
-                    </p>
-                    <p v-else-if="app.updatePhase === 'ready'" class="mt-0.5 text-[12px] leading-relaxed text-accent">
-                      {{ t("settings.updateReady", { v: app.updateVersion }) }}
-                    </p>
-                    <div
-                      v-if="app.updatePhase === 'downloading'"
-                      class="mt-2 h-1 w-full max-w-[240px] overflow-hidden rounded-full bg-surface-3"
-                    >
-                      <div
-                        class="h-full rounded-full bg-accent transition-[width] duration-200 ease-(--ease-plain)"
-                        :class="{ 'animate-pulse': app.updateProgress < 0 }"
-                        :style="{ width: updateBar }"
-                      />
+
+                    <!-- 下载中/已暂停:更新包名 + 进度 + 速度 -->
+                    <div v-if="downloading" class="mt-2 space-y-1.5">
+                      <p class="truncate text-[12px] text-ink-2">{{ app.updateName }}</p>
+                      <div class="h-1 w-full max-w-[240px] overflow-hidden rounded-full bg-surface-3">
+                        <div
+                          class="h-full rounded-full bg-accent transition-[width] duration-200 ease-(--ease-plain)"
+                          :class="{ 'animate-pulse': app.updateProgress < 0 }"
+                          :style="{ width: updateBar }"
+                        />
+                      </div>
+                      <p class="text-[11.5px] text-ink-3">
+                        <template v-if="app.updateTotal">
+                          {{ formatSize(app.updateReceived) }} / {{ formatSize(app.updateTotal) }}
+                        </template>
+                        <template v-else>{{ formatSize(app.updateReceived) }}</template>
+                        <template v-if="app.updatePhase === 'downloading' && speedText"> · {{ speedText }}</template>
+                      </p>
                     </div>
                   </div>
                   <div class="flex shrink-0 items-center gap-2">
+                    <!-- 下载中:暂停 / 取消下载 -->
+                    <template v-if="app.updatePhase === 'downloading'">
+                      <button class="btn btn-secondary" @click="app.pauseDownload()">
+                        {{ t("settings.updatePause") }}
+                      </button>
+                      <button class="btn btn-secondary" @click="app.cancelDownload()">
+                        {{ t("settings.updateCancelDownload") }}
+                      </button>
+                    </template>
+                    <!-- 已暂停:继续 / 取消下载 -->
+                    <template v-else-if="app.updatePhase === 'paused'">
+                      <button class="btn btn-primary" @click="app.resumeDownload()">
+                        {{ t("settings.updateResume") }}
+                      </button>
+                      <button class="btn btn-secondary" @click="app.cancelDownload()">
+                        {{ t("settings.updateCancelDownload") }}
+                      </button>
+                    </template>
+                    <!-- 已就绪:重启并更新 / 放弃更新 -->
+                    <template v-else-if="app.updatePhase === 'ready'">
+                      <button class="btn btn-primary" @click="restartUpdate">
+                        <AppIcon name="refresh" :size="14" />
+                        {{ t("settings.updateRestart") }}
+                      </button>
+                      <button class="btn btn-secondary" @click="app.cancelDownload()">
+                        {{ t("settings.updateCancelUpdate") }}
+                      </button>
+                    </template>
+                    <!-- 其余阶段:下载更新与查看发布页(检测到新版时) -->
+                    <template v-else>
+                      <button
+                        v-if="update.kind === 'available'"
+                        class="btn btn-primary"
+                        @click="app.updateDownload()"
+                      >
+                        <AppIcon name="download" :size="14" />
+                        {{ t("settings.updateDownload") }}
+                      </button>
+                      <button
+                        v-if="update.kind === 'available'"
+                        class="btn btn-secondary"
+                        @click="openRelease(update.url)"
+                      >
+                        <AppIcon name="external" :size="14" />
+                        {{ t("settings.viewRelease") }}
+                      </button>
+                    </template>
                     <button
-                      v-if="update.kind === 'available' && app.updatePhase !== 'ready'"
-                      class="btn btn-primary"
-                      :disabled="app.updatePhase === 'downloading'"
-                      @click="app.updateDownload()"
-                    >
-                      <AppIcon name="download" :size="14" />
-                      {{ t("settings.updateDownload") }}
-                    </button>
-                    <button
-                      v-if="update.kind === 'available'"
+                      v-if="!downloading"
                       class="btn btn-secondary"
-                      @click="openRelease(update.url)"
-                    >
-                      <AppIcon name="external" :size="14" />
-                      {{ t("settings.viewRelease") }}
-                    </button>
-                    <button
-                      class="btn btn-secondary"
-                      :disabled="update.kind === 'checking' || app.updatePhase === 'downloading'"
+                      :disabled="update.kind === 'checking'"
                       @click="checkUpdate"
                     >
                       <AppIcon name="refresh" :size="14" :class="{ 'animate-spin': update.kind === 'checking' }" />
