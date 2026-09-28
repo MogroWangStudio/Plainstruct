@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import { ipc } from "@/ipc/ipc";
 import type { SiteConfig, TreeNode } from "@/ipc/types";
 import { collectDocPaths, type DocsCache } from "@/lib/builder";
+import { isAssetDirName, isImageFile } from "@/lib/paths";
 import { useEditorStore } from "./editor";
 import { useBuilderStore } from "./builder";
 import { useThemeStore } from "./theme";
@@ -36,6 +37,18 @@ export const useSiteStore = defineStore("site", {
           0,
         );
       return count(state.tree);
+    },
+
+    /** 站点资产目录(asset,兼容旧 images) */
+    assetDirs(state): TreeNode[] {
+      return state.tree.filter((n) => n.type === "dir" && isAssetDirName(n.name));
+    },
+
+    /** 资产目录下的全部图片文件(资产栏与资产页同源) */
+    assetFiles(): TreeNode[] {
+      return this.assetDirs.flatMap((d) =>
+        (d.children ?? []).filter((n) => n.type === "file" && isImageFile(n.name)),
+      );
     },
   },
 
@@ -209,7 +222,7 @@ export const useSiteStore = defineStore("site", {
       return n;
     },
 
-    /** 站点图片统一导入(落至 content/images/),树刷新后 images 文件夹即可见 */
+    /** 站点图片统一导入(落至 content/asset/),树刷新后资产栏即可见 */
     async importSiteImages(srcPaths: string[]) {
       const names = await ipc.importSiteImages(srcPaths);
       if (names.length) await this.refreshTree();

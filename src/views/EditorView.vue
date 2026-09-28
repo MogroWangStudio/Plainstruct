@@ -107,9 +107,9 @@ onBeforeUnmount(() => {
       </template>
 
       <template v-else-if="editor.activePath">
-        <!-- 文档工具条 -->
+        <!-- 文档工具条:标题栏显示文件名(含 .md 后缀),文档标题由配置头与页面承载 -->
         <header class="flex h-11 shrink-0 items-center gap-3 border-b border-line bg-surface px-4">
-          <span class="min-w-0 flex-1 truncate text-[13.5px] font-semibold">{{ editor.docTitle }}</span>
+          <span class="min-w-0 flex-1 truncate text-[13.5px] font-semibold">{{ basename(editor.activePath) }}</span>
 
           <span class="flex items-center gap-1.5 text-[12px] text-ink-3">
             <template v-if="editor.saving">{{ t("editor.saving") }}</template>

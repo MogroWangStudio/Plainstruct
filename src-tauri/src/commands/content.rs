@@ -397,14 +397,14 @@ pub fn import_files(window: tauri::WebviewWindow, state: State<'_, AppState>, sr
     Ok(count)
 }
 
-/// 导入站点图片:统一复制到 content/images/(自动创建,重名自动加序号),
+/// 导入站点图片:统一复制到 content/asset/(自动创建,重名自动加序号),
 /// 返回落盘后的实际文件名(与传入顺序对应、跳过不可导入项),
 /// 供编辑器按当前文档位置插入正确的相对引用路径。
 #[tauri::command]
 pub fn import_site_images(window: tauri::WebviewWindow, state: State<'_, AppState>, src_paths: Vec<String>) -> Result<Vec<String>, String> {
     ensure_main(&window)?;
     let root = state.site_root()?;
-    let dest_parent = safe_join(&content_root(&root), "images")?;
+    let dest_parent = safe_join(&content_root(&root), "asset")?;
     std::fs::create_dir_all(&dest_parent).map_err(|e| e.to_string())?;
 
     let mut names = Vec::new();

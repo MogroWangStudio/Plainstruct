@@ -5,6 +5,7 @@ import { useI18n } from "vue-i18n";
 import { useSiteStore } from "@/stores/site";
 import { ipc } from "@/ipc/ipc";
 import { useUiStore } from "@/stores/ui";
+import { assetRefPrefix } from "@/lib/paths";
 import Modal from "./Modal.vue";
 import AppIcon from "./AppIcon.vue";
 
@@ -17,7 +18,7 @@ export interface FrontMatterForm {
 
 const props = defineProps<{
   open: boolean;
-  /** 目标文档的 content/ 相对路径,决定 images/ 前缀换算与封面建议 */
+  /** 目标文档的 content/ 相对路径,决定 asset 前缀换算与封面建议 */
   docPath: string;
   /** 打开时的预填值(通常来自文档现有配置头) */
   initial: FrontMatterForm;
@@ -41,21 +42,18 @@ watch(
   },
 );
 
-/** 当前文档位置引用 images/ 的路径前缀(根级 images/…,子目录 ../images/…) */
+/** 当前文档位置引用站点资产的路径前缀(根级 asset/…,子目录 ../asset/…) */
 const coverPrefix = computed(() => {
   const depth = props.docPath ? props.docPath.split("/").length - 1 : 0;
-  return "../".repeat(depth) + "images/";
+  return assetRefPrefix(depth);
 });
 
-/** 站点 images 文件夹里的图(按目标文档位置换算为可直接使用的路径建议) */
-const coverSuggestions = computed(() => {
-  const dir = site.tree.find((n) => n.type === "dir" && n.name.toLowerCase() === "images");
-  return (dir?.children ?? [])
-    .filter((n) => n.type === "file")
-    .map((n) => coverPrefix.value + n.name);
-});
+/** 站点资产(asset,兼容旧 images)里的图,按目标文档位置换算为可直接使用的路径建议 */
+const coverSuggestions = computed(() =>
+  site.assetFiles.map((n) => coverPrefix.value + n.name),
+);
 
-/** 直接选取本地图片导入 images,作为表单里的封面图 */
+/** 直接选取本地图片导入 asset,作为表单里的封面图 */
 async function importCover() {
   try {
     const files = await ipc.pickImages();

@@ -6,6 +6,7 @@ import { ipc } from "@/ipc/ipc";
 import { useSiteStore } from "@/stores/site";
 import { useThemeStore } from "@/stores/theme";
 import { useUiStore } from "@/stores/ui";
+import { assetRefPrefix } from "@/lib/paths";
 import AppIcon from "@/components/AppIcon.vue";
 
 const props = defineProps<{ open: boolean; dir: string }>();
@@ -38,20 +39,17 @@ watch(
   },
 );
 
-/** 新文档将位于 dir 下,images 引用按该位置换算前缀 */
+/** 新文档将位于 dir 下,资产引用按该位置换算前缀 */
 function coverPrefix(): string {
   const depth = props.dir ? props.dir.split("/").length : 0;
-  return "../".repeat(depth) + "images/";
+  return assetRefPrefix(depth);
 }
 
-const coverSuggestions = computed(() => {
-  const dir = site.tree.find((n) => n.type === "dir" && n.name.toLowerCase() === "images");
-  return (dir?.children ?? [])
-    .filter((n) => n.type === "file")
-    .map((n) => coverPrefix() + n.name);
-});
+const coverSuggestions = computed(() =>
+  site.assetFiles.map((n) => coverPrefix() + n.name),
+);
 
-/** 选取本地图片导入 images,直接作为封面 */
+/** 选取本地图片导入 asset,直接作为封面 */
 async function importCover() {
   importing.value = true;
   try {

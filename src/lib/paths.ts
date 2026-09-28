@@ -15,6 +15,23 @@ export function isImageFile(p: string): boolean {
   return /\.(png|jpe?g|gif|webp|svg|avif|bmp|ico)$/i.test(p);
 }
 
+/** 站点资产目录名(新建站点用 asset,旧站点的 images 仍兼容识别) */
+export const ASSET_DIR = "asset";
+
+/** 资产拖拽数据类型:拖入编辑器时按此取图片路径 */
+export const ASSET_MIME = "application/x-plainstruct-asset";
+
+/** 目录名是否为站点资产目录(asset 与旧版 images 均算) */
+export function isAssetDirName(name: string): boolean {
+  const n = name.toLowerCase();
+  return n === ASSET_DIR || n === "images";
+}
+
+/** 从文档位置引用站点资产的路径前缀(根级文档 asset/…,子目录 ../asset/…) */
+export function assetRefPrefix(depth: number): string {
+  return "../".repeat(depth) + ASSET_DIR + "/";
+}
+
 export function stripExt(p: string): string {
   const i = p.lastIndexOf(".");
   return i <= p.lastIndexOf("/") ? p : p.slice(0, i);

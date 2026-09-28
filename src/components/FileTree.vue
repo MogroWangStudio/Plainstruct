@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 import type { TreeNode } from "@/ipc/types";
 import { useSiteStore } from "@/stores/site";
 import { useEditorStore } from "@/stores/editor";
+import { useAppStore } from "@/stores/app";
 import { useUiStore } from "@/stores/ui";
 import { useBuilderStore } from "@/stores/builder";
 import { useContextMenuStore, type MenuItem } from "@/stores/contextMenu";
@@ -11,7 +12,8 @@ import { ipc } from "@/ipc/ipc";
 import { applyFrontMatter, parseFrontMatter } from "@/lib/frontmatter";
 import NewDocModal from "@/components/NewDocModal.vue";
 import FrontMatterModal, { type FrontMatterForm } from "@/components/FrontMatterModal.vue";
-import { basename, dirname, isImageFile, safeName, stripExt } from "@/lib/paths";
+import { ASSET_MIME, basename, dirname, isImageFile, safeName, stripExt } from "@/lib/paths";
+import { siteUrl } from "@/lib/preview";
 import AppIcon from "./AppIcon.vue";
 import FileTreeNode, { type DropMark, type SelectClick } from "./FileTreeNode.vue";
 import PromptModal from "./PromptModal.vue";
@@ -19,6 +21,7 @@ import PromptModal from "./PromptModal.vue";
 const { t } = useI18n();
 const site = useSiteStore();
 const editor = useEditorStore();
+const app = useAppStore();
 const ui = useUiStore();
 const ctxMenu = useContextMenuStore();
 
@@ -29,29 +32,29 @@ provide("treeCollapsed", collapsed);
 const dropMark = ref<DropMark>(null);
 provide("treeDropMark", dropMark);
 
-/** 站点图片目录(资源区,固定入口展示,不参与站点输出) */
-const imagesDir = computed(
-  () => site.tree.find((n) => n.type === "dir" && n.name.toLowerCase() === "images") ?? null,
-);
-
-/** 过滤掉根级 index.md(独立首页入口)与根级 images 文件夹(下方固定入口),其余保持不变 */
+/** 过滤掉根级 index.md(独立首页入口)与资产目录(下方资产栏),其余保持不变 */
 const displayTree = computed(() =>
   site.tree.filter(
     (n) =>
       !(n.type === "file" && n.name.toLowerCase() === "index.md") &&
-      !(n.type === "dir" && n === imagesDir.value),
+      !(n.type === "dir" && site.assetDirs.includes(n)),
   ),
 );
 
-const imagesCollapsed = computed(() => !!imagesDir.value && collapsed.value.has(imagesDir.value.path));
+/* ---------- 资产栏:站点图片资源区(卡片/列表视图),图片可拖入正文 ---------- */
 
-function toggleImages() {
-  const dir = imagesDir.value;
-  if (!dir) return;
-  const next = new Set(collapsed.value);
-  if (next.has(dir.path)) next.delete(dir.path);
-  else next.add(dir.path);
-  collapsed.value = next;
+const assetView = ref<"card" | "list">("card");
+const brokenThumbs = ref(new Set<string>());
+
+function assetThumb(path: string): string {
+  // 浏览器 mock 无 site:// 资源服务:返回空让占位文字顶上
+  return app.platform === "browser" ? "" : siteUrl(app.platform, `content/${path}`);
+}
+
+/** 拖动开始:载荷为 content/ 相对路径,编辑器 drop 时换算相对引用 */
+function onAssetDragStart(e: DragEvent, img: TreeNode) {
+  e.dataTransfer?.setData(ASSET_MIME, img.path);
+  if (e.dataTransfer) e.dataTransfer.effectAllowed = "copy";
 }
 
 /** 拖拽中实际移动的路径集合(多选拖拽 = 全部选中项),供各行整体淡化 */
@@ -210,7 +213,7 @@ function collectDirs(): TreeNode[] {
   const dirs: TreeNode[] = [];
   const walk = (nodes: TreeNode[]) => {
     for (const n of nodes) {
-      if (n.type === "dir" && n !== imagesDir.value) {
+      if (n.type === "dir" && !site.assetDirs.includes(n)) {
         dirs.push(n);
         if (n.children) walk(n.children);
       }
@@ -388,7 +391,7 @@ async function onFmConfirm(form: FrontMatterForm) {
   }
 }
 
-/** 选取本地图片导入站点 images 文件夹(images 固定入口与右键共用) */
+/** 选取本地图片导入站点 asset 文件夹(资产栏导入按钮与右键共用) */
 async function importImages() {
   const files = await ipc.pickImages();
   if (!files?.length) return;
@@ -403,15 +406,6 @@ async function importImages() {
 /** 树内右键:命中行弹出该节点的文件操作,空白处弹出根目录操作 */
 function openTreeMenu(e: MouseEvent) {
   const target = e.target as HTMLElement | null;
-  // images 固定入口:仅提供图片导入(内容操作在「资产」页)
-  if (target?.closest<HTMLElement>("[data-images-row]")) {
-    e.preventDefault();
-    e.stopPropagation();
-    ctxMenu.show(e.clientX, e.clientY, [
-      { id: "importImages", label: t("tree.importImages"), icon: "download", run: () => void importImages() },
-    ]);
-    return;
-  }
   const row = target?.closest<HTMLElement>(".tree-row") ?? null;
   const node = row?.dataset.path ? findNodeByPath(row.dataset.path) : null;
   const dir = node ? (node.type === "dir" ? node.path : dirname(node.path)) : "";
@@ -470,7 +464,7 @@ function openTreeMenu(e: MouseEvent) {
       items.splice(2, 0, {
         id: "frontmatter",
         label: t("tree.fmEdit"),
-        icon: "filePlus",
+        icon: "frontmatter",
         run: () => void openFmEditor(node),
       });
     }
@@ -681,37 +675,6 @@ async function onTreeDrop(e: DragEvent) {
           {{ t("tree.homeMissing") }}
         </span>
       </div>
-
-      <!-- 固定 images 入口:站点图片资源区,置顶不可移动,不进入站点输出 -->
-      <div v-if="imagesDir" class="pb-0.5 pt-1.5">
-        <div
-          class="home-row flex h-[30px] cursor-default items-center gap-1 rounded-md px-1 select-none"
-          data-images-row
-          :title="'images'"
-          @click="toggleImages"
-        >
-          <button class="btn-icon !h-5 !w-5 !text-ink-3" :title="imagesCollapsed ? '展开' : '折叠'" tabindex="-1" @click.stop="toggleImages">
-            <AppIcon :name="imagesCollapsed ? 'chevronRight' : 'chevronDown'" :size="13" />
-          </button>
-          <AppIcon name="folder" :size="15" class="shrink-0 text-ink-2" />
-          <span class="min-w-0 flex-1 truncate text-[13px]">{{ imagesDir.name }}</span>
-          <span class="shrink-0 pr-1 text-[10.5px] text-ink-3">{{ imagesDir.children?.length ?? 0 }}</span>
-        </div>
-        <div v-if="!imagesCollapsed">
-          <FileTreeNode
-            v-for="child in imagesDir.children"
-            :key="child.path"
-            :node="child"
-            :depth="0"
-            locked
-            :selected-paths="selectedPaths"
-            :select-mode="selectMode"
-            @rename="(n: TreeNode) => (prompt = { mode: 'rename', node: n })"
-            @remove="onRemove"
-            @select-click="handleSelectClick"
-          />
-        </div>
-      </div>
     </div>
 
     <div
@@ -754,6 +717,76 @@ async function onTreeDrop(e: DragEvent) {
         <!-- 拖到空白处:移动到根目录末尾的指示线 -->
         <div v-if="dropMark?.kind === 'root-end'" class="drop-line-root" aria-hidden="true" />
       </template>
+    </div>
+
+    <!-- 底部资产栏:站点图片资源区,支持卡片/列表视图,按住图片拖入正文即插入引用 -->
+    <div class="flex h-[218px] shrink-0 flex-col border-t border-line">
+      <div class="flex items-center justify-between px-3 pb-1 pt-2">
+        <span class="text-[12px] font-semibold tracking-wide text-ink-3">
+          {{ t("tree.assets") }} · {{ site.assetFiles.length }}
+        </span>
+        <div class="flex items-center gap-0.5">
+          <button
+            class="btn-icon !h-6 !w-6"
+            :class="{ '!text-ink': assetView === 'card' }"
+            :title="t('tree.assetCardView')"
+            @click="assetView = 'card'"
+          >
+            <AppIcon name="grid" :size="13" />
+          </button>
+          <button
+            class="btn-icon !h-6 !w-6"
+            :class="{ '!text-ink': assetView === 'list' }"
+            :title="t('tree.assetListView')"
+            @click="assetView = 'list'"
+          >
+            <AppIcon name="listBullet" :size="13" />
+          </button>
+          <button class="btn-icon !h-6 !w-6" :title="t('tree.importImages')" @click="importImages">
+            <AppIcon name="download" :size="13" />
+          </button>
+        </div>
+      </div>
+
+      <div class="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+        <p v-if="!site.assetFiles.length" class="px-2 py-5 text-center text-[12px] leading-relaxed text-ink-3">
+          {{ t("tree.assetEmpty") }}
+        </p>
+        <div v-else-if="assetView === 'card'" class="grid grid-cols-[repeat(auto-fill,minmax(76px,1fr))] gap-1.5">
+          <div
+            v-for="img in site.assetFiles"
+            :key="img.path"
+            class="asset-chip"
+            :title="t('tree.assetDragHint', { name: img.name })"
+            draggable="true"
+            @dragstart="onAssetDragStart($event, img)"
+          >
+            <img
+              v-if="assetThumb(img.path) && !brokenThumbs.has(img.path)"
+              :src="assetThumb(img.path)"
+              :alt="img.name"
+              loading="lazy"
+              draggable="false"
+              @error="brokenThumbs.add(img.path)"
+            />
+            <span v-else class="asset-chip-fallback">{{ img.name }}</span>
+            <span class="asset-chip-name">{{ img.name }}</span>
+          </div>
+        </div>
+        <div v-else class="flex flex-col">
+          <div
+            v-for="img in site.assetFiles"
+            :key="img.path"
+            class="asset-row"
+            :title="t('tree.assetDragHint', { name: img.name })"
+            draggable="true"
+            @dragstart="onAssetDragStart($event, img)"
+          >
+            <AppIcon name="image" :size="14" class="shrink-0 text-ink-3" />
+            <span class="min-w-0 flex-1 truncate text-[12.5px]">{{ img.name }}</span>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- 底部多选状态条:计数与批量操作固定在侧栏底部,不随树滚动 -->
@@ -870,6 +903,69 @@ async function onTreeDrop(e: DragEvent) {
   border: 1px solid color-mix(in srgb, var(--color-ink) 40%, transparent);
   background: color-mix(in srgb, var(--color-ink) 6%, transparent);
   border-radius: 3px;
+}
+
+/* 资产栏卡片:缩略图 + 文件名,按住可拖入正文 */
+.asset-chip {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  background: var(--color-surface);
+  cursor: grab;
+  transition:
+    border-color var(--duration-base) var(--ease-plain),
+    background-color var(--duration-base) var(--ease-plain);
+}
+.asset-chip:hover {
+  background: var(--color-surface-2);
+}
+.asset-chip:active {
+  cursor: grabbing;
+}
+.asset-chip img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  background: repeating-conic-gradient(var(--color-surface-2) 0 25%, transparent 0 50%) 0 0 / 12px 12px;
+}
+.asset-chip-fallback {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  overflow: hidden;
+  color: var(--color-ink-3);
+  font-size: 10px;
+  text-align: center;
+}
+.asset-chip-name {
+  overflow: hidden;
+  padding: 2px 5px 3px;
+  color: var(--color-ink-3);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 资产栏列表视图 */
+.asset-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 6px;
+  border-radius: 6px;
+  color: var(--color-ink-2);
+  cursor: grab;
+  transition: background-color var(--duration-base) var(--ease-plain);
+}
+.asset-row:hover {
+  background: var(--color-surface-2);
+}
+.asset-row:active {
+  cursor: grabbing;
 }
 
 /* 拖到空白处:根目录末尾的插入线 */

@@ -1,7 +1,7 @@
 {
   "id": "blog-light",
   "name": "手记 · 浅色",
-  "version": "2.3.0",
+  "version": "3.0.0",
   "author": "MogroWang Studio",
   "type": "blog",
   "description": "博客·浅色:纸面素栏,文章为流,日期为记。",
@@ -107,6 +107,118 @@
         "key": "bodyFont",
         "equals": "custom"
       }
+    },
+    {
+      "key": "showLogo",
+      "label": "显示 Logo",
+      "type": "boolean",
+      "default": true
+    },
+    {
+      "key": "showTitle",
+      "label": "显示站点标题",
+      "type": "boolean",
+      "default": true
+    },
+    {
+      "key": "logoWidth",
+      "label": "Logo 宽度(%)",
+      "type": "number",
+      "default": 100,
+      "min": 50,
+      "max": 300,
+      "step": 5
+    },
+    {
+      "key": "logoHeight",
+      "label": "Logo 高度(%)",
+      "type": "number",
+      "default": 100,
+      "min": 50,
+      "max": 300,
+      "step": 5
+    },
+    {
+      "key": "logoRadius",
+      "label": "Logo 圆角(px)",
+      "type": "number",
+      "default": 6,
+      "min": 0,
+      "max": 26,
+      "step": 1
+    },
+    {
+      "key": "logoHover",
+      "label": "Logo 悬停反馈",
+      "type": "select",
+      "default": "无",
+      "options": [
+        "无",
+        "淡化",
+        "放大",
+        "强调色"
+      ]
+    },
+    {
+      "key": "titleHover",
+      "label": "标题悬停反馈",
+      "type": "select",
+      "default": "无",
+      "options": [
+        "无",
+        "淡化",
+        "强调色",
+        "下划线"
+      ]
+    },
+    {
+      "key": "navHover",
+      "label": "导航悬停反馈",
+      "type": "select",
+      "default": "加深",
+      "options": [
+        "无",
+        "加深",
+        "强调色",
+        "下划线",
+        "底色"
+      ]
+    },
+    {
+      "key": "cardShadow",
+      "label": "卡片阴影",
+      "type": "select",
+      "default": "无",
+      "options": [
+        "无",
+        "轻",
+        "中",
+        "深"
+      ]
+    },
+    {
+      "key": "cardShadowHover",
+      "label": "卡片悬停阴影",
+      "type": "select",
+      "default": "轻",
+      "options": [
+        "无",
+        "轻",
+        "中",
+        "深"
+      ]
+    },
+    {
+      "key": "loadingAnim",
+      "label": "页面加载动画",
+      "type": "select",
+      "default": "关闭",
+      "options": [
+        "关闭",
+        "转圈",
+        "点点",
+        "进度条"
+      ]
     },
     {
       "key": "showDate",

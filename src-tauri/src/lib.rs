@@ -39,9 +39,9 @@ fn mime_for(path: &str) -> &'static str {
     }
 }
 
-/// site:// 页面的内容安全策略:允许同站与 https 外链资源,禁止向外部发起
-/// fetch/WebSocket(connect-src),防止构建产物中的不可信脚本外带数据。
-const SITE_CSP: &str = "default-src 'self' site:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; style-src 'self' 'unsafe-inline' https:; img-src * data: site:; font-src * data: https:; connect-src 'self' site:; object-src 'none'; base-uri 'none'";
+/// site:// 页面的内容安全策略:允许同站与 https 外链资源(含文章内嵌的 https iframe 与外链图片),
+/// 禁止向外部发起 fetch/WebSocket(connect-src),防止构建产物中的不可信脚本外带数据。
+const SITE_CSP: &str = "default-src 'self' site:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; style-src 'self' 'unsafe-inline' https:; img-src * data: site:; font-src * data: https:; connect-src 'self' site:; frame-src 'self' site: https:; object-src 'none'; base-uri 'none'";
 
 fn serve_response(status: StatusCode, mime: &str, body: Vec<u8>) -> Response<Cow<'static, [u8]>> {
     Response::builder()

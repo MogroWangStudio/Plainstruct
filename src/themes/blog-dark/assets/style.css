@@ -143,7 +143,7 @@ body.font-custom {
   transition: color 140ms ease;
 }
 
-.blog-nav a:hover {
+body:not([data-hv-nav="无"]) .blog-nav a:hover {
   color: var(--ps-ink);
 }
 
@@ -833,4 +833,278 @@ a.blog-page-step:active {
 }
 .blog-entry-cover-empty .blog-entry-cover-icon {
   opacity: 0.26;
+}
+/* ---------- 正文 HTML 对齐:align 属性与 center 标签(编辑器对齐按钮生成同款代码) ---------- */
+
+.blog-post-body [align="left"],
+.blog-home-body [align="left"] {
+  text-align: left;
+}
+
+.blog-post-body [align="center"],
+.blog-home-body [align="center"],
+.blog-post-body center,
+.blog-home-body center {
+  text-align: center;
+}
+
+.blog-post-body [align="right"],
+.blog-home-body [align="right"] {
+  text-align: right;
+}
+
+/* 图片为容器唯一子元素时按块级对齐;行内图片由 text-align 生效 */
+.blog-post-body [align="center"] > img:only-child,
+.blog-home-body [align="center"] > img:only-child,
+.blog-post-body center > img:only-child,
+.blog-home-body center > img:only-child {
+  display: block;
+  margin-inline: auto;
+}
+
+.blog-post-body [align="right"] > img:only-child,
+.blog-home-body [align="right"] > img:only-child {
+  display: block;
+  margin-left: auto;
+}
+
+/* ---------- 品牌与导航的悬停反馈(主题配置 data-* 驱动) ---------- */
+
+.blog-logo {
+  transition:
+    opacity 160ms ease,
+    transform 260ms cubic-bezier(0.23, 1, 0.32, 1),
+    box-shadow 160ms ease;
+}
+
+.blog-site-name {
+  transition:
+    opacity 160ms ease,
+    color 160ms ease,
+    text-decoration-color 160ms ease;
+}
+
+.blog-nav a {
+  transition:
+    color 140ms ease,
+    opacity 140ms ease,
+    background-color 140ms ease,
+    border-color 140ms ease;
+}
+
+/* 自带 hover 下边框的主题(杂志):其余反馈时让位,避免双重反馈 */
+body[data-hv-nav="淡化"] .blog-nav a:hover,
+body[data-hv-nav="强调色"] .blog-nav a:hover,
+body[data-hv-nav="下划线"] .blog-nav a:hover,
+body[data-hv-nav="底色"] .blog-nav a:hover {
+  border-bottom-color: transparent;
+}
+
+body[data-hv-logo="淡化"] .blog-brand:hover .blog-logo {
+  opacity: 0.6;
+}
+
+body[data-hv-logo="放大"] .blog-brand:hover .blog-logo {
+  transform: scale(1.08);
+}
+
+body[data-hv-logo="强调色"] .blog-brand:hover .blog-logo {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ps-accent) 32%, transparent);
+}
+
+body[data-hv-title="淡化"] .blog-brand:hover .blog-site-name {
+  opacity: 0.6;
+}
+
+body[data-hv-title="强调色"] .blog-brand:hover .blog-site-name {
+  color: var(--ps-accent);
+}
+
+body[data-hv-title="下划线"] .blog-site-name {
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 4px;
+}
+
+body[data-hv-title="下划线"] .blog-brand:hover .blog-site-name {
+  text-decoration-color: var(--ps-accent);
+}
+
+body[data-hv-nav="淡化"] .blog-nav a:hover {
+  opacity: 0.62;
+}
+
+body[data-hv-nav="强调色"] .blog-nav a:hover {
+  color: var(--ps-accent);
+}
+
+body[data-hv-nav="下划线"] .blog-nav a:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--ps-accent);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 4px;
+}
+
+body[data-hv-nav="底色"] .blog-nav a:hover {
+  background: color-mix(in srgb, var(--ps-ink) 7%, transparent);
+}
+
+/* ---------- 文章卡片阴影(一般形态与悬停,主题配置 data-shadow 驱动) ---------- */
+
+.blog-entry {
+  transition:
+    border-color 160ms ease,
+    box-shadow 240ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+body[data-shadow="轻"] .blog-entry,
+body[data-shadow-hv="轻"] .blog-entry:hover {
+  box-shadow: 0 1px 2px rgb(0 0 0 / 5%), 0 2px 8px rgb(0 0 0 / 5%);
+}
+
+body[data-shadow="中"] .blog-entry,
+body[data-shadow-hv="中"] .blog-entry:hover {
+  box-shadow: 0 2px 6px rgb(0 0 0 / 7%), 0 8px 22px rgb(0 0 0 / 9%);
+}
+
+body[data-shadow="深"] .blog-entry,
+body[data-shadow-hv="深"] .blog-entry:hover {
+  box-shadow: 0 4px 12px rgb(0 0 0 / 13%), 0 14px 36px rgb(0 0 0 / 15%);
+}
+
+/* ---------- 页面加载动画(跳转时出现,页面就绪淡出;ps-js 由模板脚本置位,禁脚本环境不显示) ---------- */
+
+.ps-loader {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 99;
+  align-items: center;
+  justify-content: center;
+  background: var(--ps-bg);
+  transition: opacity 360ms ease;
+}
+
+.ps-js .ps-loader {
+  display: flex;
+}
+
+.ps-loader.is-done {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ps-loader-spin {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2.5px solid var(--ps-line);
+  border-top-color: var(--ps-accent);
+}
+
+body[data-loading="转圈"] .ps-loader-spin {
+  animation: ps-loader-spin 900ms cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+
+@keyframes ps-loader-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+body[data-loading="点点"] .ps-loader-spin {
+  position: relative;
+  width: 9px;
+  height: 9px;
+  border: none;
+  border-radius: 50%;
+  background: var(--ps-accent);
+  color: var(--ps-accent);
+  animation: ps-loader-dot 1100ms ease-in-out infinite;
+}
+
+body[data-loading="点点"] .ps-loader-spin::before,
+body[data-loading="点点"] .ps-loader-spin::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+body[data-loading="点点"] .ps-loader-spin::before {
+  left: -15px;
+  animation: ps-loader-dot 1100ms ease-in-out infinite;
+  animation-delay: -180ms;
+}
+
+body[data-loading="点点"] .ps-loader-spin::after {
+  left: 15px;
+  animation: ps-loader-dot 1100ms ease-in-out infinite;
+  animation-delay: 180ms;
+}
+
+@keyframes ps-loader-dot {
+  0%,
+  70%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.8);
+  }
+  35% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+body[data-loading="进度条"] .ps-loader {
+  background: transparent;
+  align-items: stretch;
+  pointer-events: none;
+}
+
+body[data-loading="进度条"] .ps-loader-spin {
+  width: 100%;
+  height: 3px;
+  border: none;
+  border-radius: 0;
+  background: linear-gradient(90deg, transparent, var(--ps-accent));
+  transform-origin: left;
+  animation: ps-loader-bar 1100ms cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+
+@keyframes ps-loader-bar {
+  0% {
+    transform: scaleX(0);
+    transform-origin: left;
+  }
+  49% {
+    transform: scaleX(1);
+    transform-origin: left;
+  }
+  51% {
+    transform: scaleX(1);
+    transform-origin: right;
+  }
+  100% {
+    transform: scaleX(0);
+    transform-origin: right;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ps-loader-spin {
+    animation: none;
+  }
+}
+
+/* ---------- 品牌配置:logo 尺寸按百分比缩放(基准为各主题原尺寸),圆角可调 ---------- */
+
+.blog-logo {
+  width: calc(26px * var(--ps-logo-w, 100) / 100);
+  height: calc(26px * var(--ps-logo-h, 100) / 100);
+  border-radius: var(--ps-logo-r, 6px);
 }

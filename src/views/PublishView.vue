@@ -118,16 +118,24 @@ function openPages() {
 
       <!-- 发布 -->
       <section class="panel p-6">
-        <div class="flex items-center gap-3">
+        <div class="flex flex-col items-center gap-2">
+          <!-- 发布按钮:居中加宽;发布中为非线性旋转;成功后变为「重新发布」 -->
           <button
-            class="btn btn-primary"
+            class="btn btn-primary publish-btn"
+            :class="{ 'is-busy': publish.syncing }"
             :disabled="!canPublish || publish.syncing"
             @click="publish.sync()"
           >
-            <AppIcon name="upload" :size="15" />
-            {{ publish.syncing ? t("publish.publishing") : t("publish.publish") }}
+            <template v-if="publish.syncing">
+              <span class="spin-arc" aria-hidden="true" />
+              {{ t("publish.publishing") }}
+            </template>
+            <template v-else>
+              <AppIcon :name="publish.result ? 'refresh' : 'upload'" :size="15" />
+              {{ publish.result ? t("publish.republish") : t("publish.publish") }}
+            </template>
           </button>
-          <span v-if="!builder.report" class="text-[12.5px] text-ink-3">{{ t("publish.buildFirst") }}</span>
+          <span v-if="!builder.report && !publish.syncing" class="text-[12.5px] text-ink-3">{{ t("publish.buildFirst") }}</span>
         </div>
 
         <!-- 进度 -->
@@ -148,15 +156,21 @@ function openPages() {
             {{ t("publish.done") }}
           </p>
           <p class="mono text-[12px] text-ink-2">{{ t("publish.commit", { sha: publish.result.commitSha.slice(0, 7) }) }}</p>
-          <div class="flex gap-2">
+          <div class="flex flex-wrap gap-2">
+            <!-- 查看站点:Pages 构建中禁用并转圈,完成后亮起主色按钮 -->
             <button
-              class="btn btn-secondary !w-fit"
-              :class="{ 'btn-waiting': publish.checkingDeploy }"
-              :disabled="publish.checkingDeploy"
+              class="btn"
+              :class="publish.deployState === 'ready' ? 'btn-primary !w-fit' : 'btn-secondary !w-fit'"
+              :disabled="publish.checkingDeploy || publish.deployState === 'building'"
               @click="openPages"
             >
-              <AppIcon name="refresh" :size="14" :class="{ 'animate-spin': publish.checkingDeploy }" />
-              {{ publish.checkingDeploy ? t("publish.waitingDeploy") : t("publish.viewSite") }}
+              <span
+                v-if="publish.deployState === 'building' || publish.checkingDeploy"
+                class="spin-arc spin-arc-secondary"
+                aria-hidden="true"
+              />
+              <AppIcon v-else name="globe" :size="14" />
+              {{ publish.deployState === "building" || publish.checkingDeploy ? t("publish.deployBuilding") : t("publish.viewSite") }}
             </button>
             <button class="btn btn-secondary !w-fit" @click="publish.openRepo()">
               <AppIcon name="external" :size="14" />
@@ -205,32 +219,41 @@ function openPages() {
 </template>
 
 <style scoped>
-/* 等待 Pages 部署:按钮非线性呼吸闪烁 ——
-   两短一停的双闪节律(关键帧百分比不对称),每段经平滑缓动衔接,
-   叠加一圈强调色光环扩散,流动地表达「进行中」;reduce-motion 下由全局规则压停 */
-.btn-waiting {
-  animation: waiting-pulse 2s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+/* 发布按钮:居中加宽,发布中带非线性旋转弧 */
+.publish-btn {
+  min-width: 240px;
+  justify-content: center;
 }
-@keyframes waiting-pulse {
-  0%, 100% {
-    opacity: 1;
-    box-shadow: 0 0 0 0 var(--color-accent-soft);
+
+/* 非线性加载弧:两段式加减速旋转(先快后缓再收),比匀速旋转更有节奏 */
+.spin-arc {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--color-on-accent) 35%, transparent);
+  border-top-color: var(--color-on-accent);
+  animation: spin-arc 1100ms cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+/* 次级按钮上的加载弧:用墨色 */
+.spin-arc-secondary {
+  border-color: color-mix(in srgb, var(--color-ink-3) 35%, transparent);
+  border-top-color: var(--color-ink-2);
+}
+@keyframes spin-arc {
+  0% {
+    transform: rotate(0deg);
   }
-  10% {
-    opacity: 0.5;
-    box-shadow: 0 0 0 3px var(--color-accent-soft);
+  55% {
+    transform: rotate(305deg);
   }
-  20% {
-    opacity: 0.9;
-    box-shadow: 0 0 0 0 var(--color-accent-soft);
+  100% {
+    transform: rotate(360deg);
   }
-  30% {
-    opacity: 0.5;
-    box-shadow: 0 0 0 3px var(--color-accent-soft);
-  }
-  42% {
-    opacity: 1;
-    box-shadow: 0 0 0 0 var(--color-accent-soft);
+}
+@media (prefers-reduced-motion: reduce) {
+  .spin-arc {
+    animation-duration: 2.4s;
   }
 }
 

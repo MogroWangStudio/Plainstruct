@@ -478,12 +478,12 @@ export const mock = {
     return srcPaths.length;
   },
 
-  /** 与 Rust 端行为一致:图片落进 content/images/,重名加序号,返回实际文件名 */
+  /** 与 Rust 端行为一致:图片落进 content/asset/,重名加序号,返回实际文件名 */
   async importSiteImages(srcPaths: string[]): Promise<string[]> {
     const taken = new Set(
       [...files.keys()]
-        .filter((k) => k.startsWith(`${currentRoot}/content/images/`))
-        .map((k) => k.slice(`${currentRoot}/content/images/`.length)),
+        .filter((k) => k.startsWith(`${currentRoot}/content/asset/`))
+        .map((k) => k.slice(`${currentRoot}/content/asset/`.length)),
     );
     const names: string[] = [];
     for (const src of srcPaths) {
@@ -495,7 +495,7 @@ export const mock = {
       let i = 2;
       while (taken.has(name)) name = `${stem}-${i++}${ext}`;
       taken.add(name);
-      files.set(`${currentRoot}/content/images/${name}`, `(站点图片 ${name})`);
+      files.set(`${currentRoot}/content/asset/${name}`, `(站点图片 ${name})`);
       names.push(name);
     }
     return names;

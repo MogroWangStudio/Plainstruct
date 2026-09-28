@@ -24,7 +24,7 @@ const props = defineProps<{
   depth: number;
   selectedPaths: Set<string>;
   selectMode: boolean;
-  /** 固定资源区(images)子项:不参与拖拽移动与排序 */
+  /** 锁定行:不参与拖拽移动与排序(如资产栏外部固定入口) */
   locked?: boolean;
 }>();
 

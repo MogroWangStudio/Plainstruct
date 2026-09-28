@@ -1,10 +1,10 @@
 <script setup lang="ts">
-/** 资产页 -- 管理站点 images 文件夹中的图片:预览、重命名(联动更新引用)、删除、查找引用 */
+/** 资产页 -- 管理站点 asset 文件夹(兼容旧 images)中的图片:预览、重命名(联动更新引用)、删除、查找引用 */
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { collectDocPaths } from "@/lib/builder";
 import { countImageRefs, findImageRefs, replaceImageRefs, type ImageRef } from "@/lib/imageRefs";
-import { basename, isImageFile } from "@/lib/paths";
+import { basename } from "@/lib/paths";
 import { siteUrl } from "@/lib/preview";
 import { ipc } from "@/ipc/ipc";
 import type { TreeNode } from "@/ipc/types";
@@ -21,11 +21,8 @@ const site = useSiteStore();
 const editor = useEditorStore();
 const ui = useUiStore();
 
-/** content/images/ 下的图片文件(与构建复制同源) */
-const images = computed<TreeNode[]>(() => {
-  const dir = site.tree.find((n) => n.type === "dir" && n.name.toLowerCase() === "images");
-  return (dir?.children ?? []).filter((n) => n.type === "file" && isImageFile(n.name));
-});
+/** 站点资产(asset,兼容旧 images)下的图片文件(与构建复制同源) */
+const images = computed<TreeNode[]>(() => site.assetFiles);
 
 /* ---------- 引用索引:全部文档读取一次,重命名/删除后刷新 ---------- */
 

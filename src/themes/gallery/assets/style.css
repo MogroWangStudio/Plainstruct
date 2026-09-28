@@ -812,3 +812,29 @@ a.ps-home-link:hover {
     transition: none;
   }
 }
+/* ---------- 正文 HTML 对齐:align 属性与 center 标签(编辑器对齐按钮生成同款代码) ---------- */
+
+.ps-doc-body [align="left"] {
+  text-align: left;
+}
+
+.ps-doc-body [align="center"],
+.ps-doc-body center {
+  text-align: center;
+}
+
+.ps-doc-body [align="right"] {
+  text-align: right;
+}
+
+/* 图片为容器唯一子元素时按块级对齐;行内图片由 text-align 生效 */
+.ps-doc-body [align="center"] > img:only-child,
+.ps-doc-body center > img:only-child {
+  display: block;
+  margin-inline: auto;
+}
+
+.ps-doc-body [align="right"] > img:only-child {
+  display: block;
+  margin-left: auto;
+}

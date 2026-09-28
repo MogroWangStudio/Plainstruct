@@ -13,18 +13,23 @@
       --ps-nav-columns: {{config.navColumns}};
       --ps-cover-h: {{config.coverHeight}}px;
       --ps-topbar-w: {{config.topbarWidth}}px;
+      --ps-logo-w: {{config.logoWidth}};
+      --ps-logo-h: {{config.logoHeight}};
+      --ps-logo-r: {{config.logoRadius}}px;
     }
   </style>
   <link rel="stylesheet" href="{{asset "assets/style.css"}}">
+  <script>document.documentElement.classList.add("ps-js");</script>
 </head>
-  <body class="blog font-{{config.bodyFont}}{{#if (eq config.pageTransition "淡入")}} ps-anim-fade{{/if}}{{#if (eq config.pageTransition "淡入上浮")}} ps-anim-rise{{/if}}{{#if (eq config.pageTransition "缩放浮现")}} ps-anim-zoom{{/if}}{{#if (eq config.pageTransition "滑入")}} ps-anim-slide{{/if}}{{#if (eq config.pageTransition "弹性浮现")}} ps-anim-spring{{/if}}{{#if (eq config.pageTransition "模糊聚焦")}} ps-anim-blur{{/if}}{{#if (eq config.pageTransition "翻页")}} ps-anim-flip{{/if}}{{#if (eq config.pageTransition "揭开")}} ps-anim-wipe{{/if}}"{{#if (eq config.bodyFont "custom")}} style="--ps-font-body: {{config.customFont}}"{{/if}}>
+  <body class="blog font-{{config.bodyFont}}{{#if (eq config.pageTransition "淡入")}} ps-anim-fade{{/if}}{{#if (eq config.pageTransition "淡入上浮")}} ps-anim-rise{{/if}}{{#if (eq config.pageTransition "缩放浮现")}} ps-anim-zoom{{/if}}{{#if (eq config.pageTransition "滑入")}} ps-anim-slide{{/if}}{{#if (eq config.pageTransition "弹性浮现")}} ps-anim-spring{{/if}}{{#if (eq config.pageTransition "模糊聚焦")}} ps-anim-blur{{/if}}{{#if (eq config.pageTransition "翻页")}} ps-anim-flip{{/if}}{{#if (eq config.pageTransition "揭开")}} ps-anim-wipe{{/if}}"{{#if (eq config.bodyFont "custom")}} style="--ps-font-body: {{config.customFont}}"{{/if}} data-hv-logo="{{config.logoHover}}" data-hv-title="{{config.titleHover}}" data-hv-nav="{{config.navHover}}" data-shadow="{{config.cardShadow}}" data-shadow-hv="{{config.cardShadowHover}}" data-loading="{{config.loadingAnim}}">
+  {{#unless (eq config.loadingAnim "关闭")}}<div class="ps-loader" aria-hidden="true"><span class="ps-loader-spin"></span></div>{{/unless}}
   <header class="blog-topbar">
     <a class="blog-brand" href="{{asset "index.html"}}">
-      {{#if site.logo}}<img class="blog-logo" src="{{site.logo}}" alt="{{site.name}}">{{/if}}
-      <span class="blog-brand-text">
+      {{#if config.showLogo}}{{#if site.logo}}<img class="blog-logo" src="{{site.logo}}" alt="{{site.name}}">{{/if}}{{/if}}
+      {{#if config.showTitle}}<span class="blog-brand-text">
         <span class="blog-site-name">{{site.name}}</span>
         {{#if site.description}}<span class="blog-site-desc">{{site.description}}</span>{{/if}}
-      </span>
+      </span>{{/if}}
     </a>
     {{#if nav}}
       <nav class="blog-nav" aria-label="站点导航">
@@ -76,6 +81,18 @@
         }
       }, { passive: true });
       update();
+    })();
+  </script>
+  <script>
+    (function () {
+      var loader = document.querySelector(".ps-loader");
+      if (!loader) return;
+      var done = function () {
+        loader.classList.add("is-done");
+        window.setTimeout(function () { loader.remove(); }, 420);
+      };
+      if (document.readyState === "complete") done();
+      else window.addEventListener("load", done);
     })();
   </script>
 </body>

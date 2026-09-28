@@ -117,14 +117,16 @@ function onAskCancel() {
   askResolve = null;
 }
 
-async function duplicateBuiltin() {
-  const base = theme.builtinForSite[0];
-  const name = await askName(t("theme.newFromBuiltin"), base?.name ?? "");
-  if (!name || !base) return;
+/** 复制当前选中的主题(内置或自定义),完成后自动选中新主题 */
+async function duplicateActive() {
+  const base = theme.activeMeta;
+  if (!base) return;
+  const name = await askName(t("theme.duplicateThis"), base.name);
+  if (!name) return;
   try {
-    const created = await theme.createFrom("builtin", base.id, name);
-    await theme.startEditing(created.id, "custom");
-    tab.value = "maker";
+    const created = await theme.createFrom(sourceOf(base), base.id, name);
+    await theme.adoptAsCustom(created.id);
+    tab.value = "config";
   } catch (e) {
     ui.toast(t("ui.operationFailed", { msg: ipc.errText(e) }), "error");
   }
@@ -264,9 +266,9 @@ async function resetConfig() {
           <AppIcon name="download" :size="15" />
           {{ t("theme.importZip") }}
         </button>
-        <button class="btn btn-secondary" @click="duplicateBuiltin">
+        <button class="btn btn-secondary" @click="duplicateActive">
           <AppIcon name="copy" :size="15" />
-          {{ t("theme.newFromBuiltin") }}
+          {{ t("theme.duplicateThis") }}
         </button>
       </div>
     </header>

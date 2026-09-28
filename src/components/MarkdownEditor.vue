@@ -15,7 +15,7 @@ import { useSiteStore } from "@/stores/site";
 import { useUiStore } from "@/stores/ui";
 import { ipc } from "@/ipc/ipc";
 import { applyFrontMatter, parseFrontMatter } from "@/lib/frontmatter";
-import { encodePath, stripExt } from "@/lib/paths";
+import { encodePath, stripExt, ASSET_MIME, assetRefPrefix } from "@/lib/paths";
 import { registerCmView, unregisterCmView } from "@/lib/contextMenu";
 import AppIcon from "@/components/AppIcon.vue";
 import FrontMatterModal, { type FrontMatterForm } from "@/components/FrontMatterModal.vue";
@@ -323,10 +323,10 @@ function frontMatterEnd(doc: Text): number | null {
 const fmOpen = ref(false);
 const fmInitial: FrontMatterForm = reactive({ title: "", description: "", date: "", cover: "" });
 
-/** 当前文档位置引用 images/ 的路径前缀(根级 images/…,子目录 ../images/…) */
+/** 当前文档位置引用站点资产的路径前缀(根级 asset/…,子目录 ../asset/…) */
 function coverPrefix(): string {
   const depth = editor.activePath ? editor.activePath.split("/").length - 1 : 0;
-  return "../".repeat(depth) + "images/";
+  return assetRefPrefix(depth);
 }
 
 /** 今天的本地日期(YYYY-MM-DD;toISOString 按 UTC 会在东八区晚间差一天) */
@@ -356,10 +356,10 @@ function writeFrontMatter(form: FrontMatterForm) {
 }
 
 /**
- * 插入图片:选取后统一复制进站点 images/ 文件夹(自动建目录、重名加序号),
- * 在光标处插入按当前文档位置换算的相对路径(根级文档 images/…,子目录 ../images/…),
+ * 插入图片:选取后统一复制进站点 asset 文件夹(自动建目录、重名加序号),
+ * 在光标处插入按当前文档位置换算的相对路径(根级文档 asset/…,子目录 ../asset/…),
  * 构建与预览都能正确显示;光标落在 front-matter 内时移到其后插入,避免破坏元数据块;
- * 文件树同步刷新出 images 文件夹,并以提示说明图片去向。
+ * 资产栏同步刷新,并以提示说明图片去向。
  */
 async function insertImage() {
   if (!view) return;
@@ -384,6 +384,54 @@ async function insertImage() {
   } catch (e) {
     ui.toast(t("editor.imageImportFailed", { msg: ipc.errText(e) }), "error");
   }
+}
+
+/* ---------- 对齐:HTML 嵌入块 <div align="…">,构建与预览的主题样式均支持 ---------- */
+
+type Align = "left" | "center" | "right";
+
+const MD_IMAGE_LINE = /^!\[[^\]]*\]\([^)]*\)$/;
+const HTML_IMAGE_LINE = /^<img\b[^>]*>$/;
+
+/** 文字对齐:选区(或占位文字)包进对齐容器,光标落在内容上便于继续编辑 */
+function alignText(align: Align) {
+  if (!view) return;
+  const { state } = view;
+  const range = state.selection.main;
+  const text = state.sliceDoc(range.from, range.to);
+  const lead = range.from > 0 && text ? "\n\n" : "";
+  const wrap = `<div align="${align}">`;
+  const insert = `${lead}${wrap}${text}</div>`;
+  const inner = range.from + lead.length + wrap.length;
+  commit(range.from, range.to, insert, inner, inner + text.length);
+}
+
+/**
+ * 图片对齐:选区或光标所在行是图片(md 或 <img>)时包进对齐容器;
+ * 否则插入带占位路径的图片模板并选中路径,可直接粘贴或填写。
+ */
+function alignImage(align: Align) {
+  if (!view) return;
+  const { state } = view;
+  const range = state.selection.main;
+  const line = state.doc.lineAt(range.from);
+  const selected = state.sliceDoc(range.from, range.to);
+  const candidate = selected || (range.empty ? line.text.trim() : "");
+  if (MD_IMAGE_LINE.test(candidate) || HTML_IMAGE_LINE.test(candidate)) {
+    const from = selected ? range.from : line.from;
+    const to = selected ? range.to : line.to;
+    const insert = `<div align="${align}">${candidate}</div>`;
+    commit(from, to, insert, from + insert.length, from + insert.length);
+    return;
+  }
+  const alt = t("editor.toolbar.imageAlt");
+  const src = "asset/图片.png";
+  const lead = line.text.trim() ? "\n\n" : "";
+  const wrap = `<div align="${align}">`;
+  const tag = `<img src="${src}" alt="${alt}">`;
+  const insert = `${lead}${wrap}${tag}</div>`;
+  const srcFrom = range.from + lead.length + wrap.length + "<img src=\"".length;
+  commit(range.from, range.to, insert, srcFrom, srcFrom + src.length);
 }
 
 function toggleCodeBlock() {
@@ -636,6 +684,55 @@ function deleteClean(v: EditorView): boolean {
   return true;
 }
 
+/* ---------- 资产拖入:资产栏图片拖到正文即插入 md 引用 ---------- */
+
+/**
+ * 从资产栏拖来的图片(ASSET_MIME 载荷为 content/ 相对路径):
+ * 落点行空白时就地插入,否则另起一段;落点在 front-matter 内时移到其后,
+ * 路径按当前文档位置换算为页面相对引用。
+ */
+const assetDrop = EditorView.domEventHandlers({
+  dragover(e) {
+    if (!e.dataTransfer?.types.includes(ASSET_MIME)) return false;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+    return true;
+  },
+  drop(e, v) {
+    const asset = e.dataTransfer?.getData(ASSET_MIME);
+    if (!asset) return false;
+    e.preventDefault();
+    const depth = editor.activePath ? editor.activePath.split("/").length - 1 : 0;
+    const ref = assetRefPrefix(depth) + asset;
+    const md = `![${stripExt(asset.split("/").pop() ?? "") || t("editor.toolbar.imageAlt")}](${encodePath(ref)})`;
+    let pos = v.posAtCoords({ x: e.clientX, y: e.clientY }) ?? v.state.selection.main.head;
+    const fmEnd = frontMatterEnd(v.state.doc);
+    let at: number;
+    let lead: string;
+    if (fmEnd !== null && pos < fmEnd) {
+      at = fmEnd;
+      lead = "\n\n";
+    } else {
+      const line = v.state.doc.lineAt(pos);
+      if (line.text.trim() === "") {
+        at = pos;
+        lead = "";
+      } else {
+        at = line.to;
+        lead = "\n\n";
+      }
+    }
+    const insert = lead + md;
+    v.dispatch({
+      changes: { from: at, to: at, insert },
+      selection: { anchor: at + insert.length },
+      scrollIntoView: true,
+    });
+    v.focus();
+    return true;
+  },
+});
+
 /* ---------- 初始化 ---------- */
 
 onMounted(() => {
@@ -679,6 +776,7 @@ onMounted(() => {
         highlightSelectionMatches(),
         markdown({ base: markdownLanguage }),
         syntaxHighlighting(plainHighlight),
+        assetDrop,
         EditorView.lineWrapping,
         EditorView.updateListener.of((u) => {
           if (u.docChanged) editor.onInput(u.state.doc.toString());
@@ -772,6 +870,15 @@ defineExpose({
       <button class="tb-btn" :title="t('editor.toolbar.image')" @click="insertImage">
         <AppIcon name="image" :size="15" />
       </button>
+      <button class="tb-btn" :title="t('editor.toolbar.imgAlignLeft')" @click="alignImage('left')">
+        <AppIcon name="imgAlignLeft" :size="15" />
+      </button>
+      <button class="tb-btn" :title="t('editor.toolbar.imgAlignCenter')" @click="alignImage('center')">
+        <AppIcon name="imgAlignCenter" :size="15" />
+      </button>
+      <button class="tb-btn" :title="t('editor.toolbar.imgAlignRight')" @click="alignImage('right')">
+        <AppIcon name="imgAlignRight" :size="15" />
+      </button>
       <button class="tb-btn" :title="t('editor.toolbar.codeBlock', { mod })" @click="toggleCodeBlock">
         <AppIcon name="squareCode" :size="15" />
       </button>
@@ -783,6 +890,16 @@ defineExpose({
         <AppIcon name="minus" :size="15" />
       </button>
       <span class="tb-sep" />
+      <button class="tb-btn" :title="t('editor.toolbar.alignLeft')" @click="alignText('left')">
+        <AppIcon name="alignLeft" :size="15" />
+      </button>
+      <button class="tb-btn" :title="t('editor.toolbar.alignCenter')" @click="alignText('center')">
+        <AppIcon name="alignCenter" :size="15" />
+      </button>
+      <button class="tb-btn" :title="t('editor.toolbar.alignRight')" @click="alignText('right')">
+        <AppIcon name="alignRight" :size="15" />
+      </button>
+      <span class="tb-sep" />
       <button class="tb-btn" :title="indentTitle" @click="indentLines">
         <AppIcon name="indent" :size="15" />
       </button>
@@ -791,7 +908,7 @@ defineExpose({
       </button>
       <span class="tb-sep" />
       <button class="tb-btn" :title="t('editor.toolbar.frontmatter')" @click="openFmEditor()">
-        <AppIcon name="filePlus" :size="15" />
+        <AppIcon name="frontmatter" :size="15" />
       </button>
     </div>
 
