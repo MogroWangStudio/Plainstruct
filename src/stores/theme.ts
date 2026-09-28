@@ -4,6 +4,7 @@ import type { SiteType, ThemeMeta, ThemeSource } from "@/ipc/types";
 import { builtinThemes } from "@/themes/manifest";
 import type { ThemeBundle } from "@/lib/theme-engine";
 import { useSiteStore } from "./site";
+import { useBuilderStore } from "./builder";
 import { useUiStore } from "./ui";
 
 /** 主题适用的站点类型,缺省 docs(兼容旧自定义主题) */
@@ -102,6 +103,7 @@ export const useThemeStore = defineStore("theme", {
         ...(fallback ? { theme: { id: fallback.id, source: "builtin" as ThemeSource, config: {} } } : {}),
       });
       await this.loadAll();
+      useBuilderStore().onSiteChanged();
     },
 
     async loadAll() {
@@ -138,6 +140,7 @@ export const useThemeStore = defineStore("theme", {
       this.copyPromptDismissed = false;
       await site.saveConfig({ theme: { id, source, config: {} } });
       await this.loadAll();
+      useBuilderStore().onSiteChanged();
     },
 
     /** 配置面板即时生效并持久化到站点配置 */
@@ -147,6 +150,7 @@ export const useThemeStore = defineStore("theme", {
       const config = { ...site.config.theme.config, [key]: value };
       site.config = { ...site.config, theme: { ...site.config.theme, config } };
       await ipc.saveSiteConfig({ theme: { ...site.config.theme, config } });
+      useBuilderStore().onSiteChanged();
       // 内置主题的配置被改动:置位提示,由主题页弹出"复制为新主题"对话框。
       // 用户已选"继续使用"的改动周期内不再打扰;配置回到默认后重新武装。
       if (this.builtinConfigModified) {
@@ -169,6 +173,7 @@ export const useThemeStore = defineStore("theme", {
       this.suggestCopyForBuiltin = false;
       this.copyPromptDismissed = false;
       await site.saveConfig({ theme: { ...site.config.theme, config: {} } });
+      useBuilderStore().onSiteChanged();
     },
 
     /** 切换到刚从内置主题复制出的自定义主题,并保留当前配置值 */
@@ -180,6 +185,7 @@ export const useThemeStore = defineStore("theme", {
         theme: { id, source: "custom", config: { ...(site.config?.theme.config ?? {}) } },
       });
       await this.loadAll();
+      useBuilderStore().onSiteChanged();
     },
 
     async startEditing(id: string, source: ThemeSource) {
@@ -211,6 +217,7 @@ export const useThemeStore = defineStore("theme", {
       // theme.json 可能被编辑,重新读取元数据
       await this.loadAll();
       await this.startEditing(this.editing.id, "custom");
+      useBuilderStore().onSiteChanged();
     },
 
     async createFrom(baseSource: ThemeSource, baseId: string, name: string) {

@@ -422,7 +422,7 @@ async function resetConfig() {
               </button>
             </div>
             <div class="min-h-0 flex-1">
-              <ThemePreview ref="themePreviewRef" />
+              <ThemePreview ref="themePreviewRef" :follow-editing="tab === 'maker'" />
             </div>
           </div>
         </div>

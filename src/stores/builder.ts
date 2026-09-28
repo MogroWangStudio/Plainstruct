@@ -104,8 +104,8 @@ export const useBuilderStore = defineStore("builder", {
       }
     },
 
-    /** 文档保存后:已构建过则防抖重建 */
-    onDocSaved() {
+    /** 文档保存或主题/站点配置变更后:已构建过则防抖重建,保持构建预览与产物同步 */
+    onSiteChanged() {
       if (!this.autoRebuild || !this.report) return;
       // 构建进行中先记待办,构建结束后自动补一次
       if (this.building) {

@@ -263,6 +263,8 @@ function renderOnePage(
   resolveAsset?: MdEnv["resolveAsset"],
   /** 预览模式:logo 的绝对地址(构建时留空,使用相对路径) */
   logoUrl?: string,
+  /** 预览模式:文章封面的绝对地址(构建时留空,使用相对路径) */
+  coverUrl?: (cover: string) => string,
   /** 站点类型与博客文章流(extras.posts 为当前页应展示的切片,extras.pagination 仅首页系列传入) */
   extras?: { siteType?: SiteType; posts?: PostSummary[]; pagination?: { current: number; total: number } },
 ): PageContext & { html: string } {
@@ -335,7 +337,12 @@ function renderOnePage(
       ? extras?.posts?.map((p) => ({
           ...p,
           url: encodePath(relPosix(outDir, p.htmlPath)),
-          cover: p.cover && !/^(https?:|data:)/i.test(p.cover) ? encodePath(relPosix(outDir, p.cover)) : p.cover,
+          // 预览时封面必须换成可访问的绝对地址(与正文图片同源),相对地址会指向应用自身 origin
+          cover: p.cover
+            ? /^(https?:|data:)/i.test(p.cover)
+              ? p.cover
+              : (coverUrl?.(p.cover) ?? encodePath(relPosix(outDir, p.cover)))
+            : undefined,
         }))
       : undefined,
     config,
@@ -411,6 +418,7 @@ export function renderPreview(
     [],
     (resolved) => siteUrl(platform, "content/" + resolved),
     logoUrl,
+    (cover) => siteUrl(platform, "content/" + cover),
     extras,
   );
   return inlineThemeAssets(html, theme.files);
@@ -474,6 +482,7 @@ export async function buildSite(site: SiteConfig, theme: ThemeBundle): Promise<B
       warnings,
       undefined,
       undefined,
+      undefined,
       docExtras,
     );
     outputs.push({ path: mdToHtml(doc.path), content: html });
@@ -492,12 +501,12 @@ export async function buildSite(site: SiteConfig, theme: ThemeBundle): Promise<B
       order: 0,
       body: isBlog ? "" : tocHtml(navRaw, ""),
     };
-    const { html } = renderOnePage(site, config, render, navRaw, docMap, dirSet, home, warnings, undefined, undefined, homeExtras);
+    const { html } = renderOnePage(site, config, render, navRaw, docMap, dirSet, home, warnings, undefined, undefined, undefined, homeExtras);
     outputs.push({ path: "index.html", content: html });
   } else if (isBlog) {
     // 有 index.md:正文作为公告栏显示在文章流上方
     const homeDoc = metas.get(mdPaths.find((p) => p.toLowerCase() === "index.md")!)!;
-    const { html } = renderOnePage(site, config, render, navRaw, docMap, dirSet, homeDoc, warnings, undefined, undefined, homeExtras);
+    const { html } = renderOnePage(site, config, render, navRaw, docMap, dirSet, homeDoc, warnings, undefined, undefined, undefined, homeExtras);
     outputs.push({ path: "index.html", content: html });
   }
 
@@ -514,6 +523,7 @@ export async function buildSite(site: SiteConfig, theme: ThemeBundle): Promise<B
       dirSet,
       pseudo,
       warnings,
+      undefined,
       undefined,
       undefined,
       blogHomeExtras(siteType, slice, n, totalPages),
@@ -535,7 +545,7 @@ export async function buildSite(site: SiteConfig, theme: ThemeBundle): Promise<B
     });
   });
   for (const page of folderPages) {
-    const { html } = renderOnePage(site, config, render, navRaw, docMap, dirSet, page, warnings, undefined, undefined, docExtras);
+    const { html } = renderOnePage(site, config, render, navRaw, docMap, dirSet, page, warnings, undefined, undefined, undefined, docExtras);
     outputs.push({ path: mdToHtml(page.path), content: html });
   }
 

@@ -110,7 +110,7 @@ export const useEditorStore = defineStore("editor", {
         // 写入快照而非当前 content:保存期间继续输入的内容保持 dirty,由重试落盘
         if (this.activePath === path) this.savedContent = text;
         useSiteStore().updateDocCache(path, text);
-        useBuilderStore().onDocSaved();
+        useBuilderStore().onSiteChanged();
       } finally {
         this.saving = false;
         resolveSaving();

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-/** 主题实时预览 -- 编辑草稿优先,否则当前主题;完整布局渲染首页 */
+/** 主题实时预览 -- 制作器中编辑草稿优先,否则当前主题;完整布局渲染首页 */
 import { onMounted, ref, watch } from "vue";
 import { useThemeStore } from "@/stores/theme";
 import { useSiteStore } from "@/stores/site";
@@ -7,6 +7,9 @@ import { useAppStore } from "@/stores/app";
 import { renderPreview, collectDocPaths } from "@/lib/builder";
 import type { ThemeBundle } from "@/lib/theme-engine";
 import type { ThemeMeta } from "@/ipc/types";
+
+/** followEditing:制作器 tab 传 true,预览跟随编辑草稿;其余场景渲染当前激活主题 */
+const props = defineProps<{ followEditing?: boolean }>();
 
 const theme = useThemeStore();
 const site = useSiteStore();
@@ -20,7 +23,7 @@ let pending = false;
 
 /** 编辑中的草稿(实时含未保存修改),否则当前主题 */
 function currentBundle(): ThemeBundle | null {
-  if (theme.editing) {
+  if (props.followEditing && theme.editing) {
     const base = theme.customMetas.find((m) => m.id === theme.editing!.id);
     let meta: ThemeMeta = base ?? {
       id: theme.editing.id,
@@ -76,6 +79,7 @@ defineExpose({ refresh });
 
 watch(
   [
+    () => props.followEditing,
     () => theme.editing?.files,
     () => theme.activeBundle,
     () => site.config,
