@@ -1022,12 +1022,34 @@ body[data-hv-nav="底色"] .blog-nav a:hover {
   background: color-mix(in srgb, var(--ps-ink) 7%, transparent);
 }
 
-/* ---------- 文章卡片阴影(一般形态与悬停,主题配置 data-shadow 驱动) ---------- */
+/* ---------- 文章卡片阴影(一般形态与悬停,主题配置 data-shadow 驱动)与悬停过渡(data-hv-anim) ---------- */
 
 .blog-entry {
   transition:
     border-color 160ms ease,
     box-shadow 240ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+body[data-hv-anim="关闭"] .blog-entry {
+  transition: border-color 160ms ease;
+}
+
+body[data-hv-anim="轻快"] .blog-entry {
+  transition:
+    border-color 160ms ease,
+    box-shadow 140ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+body[data-hv-anim="舒缓"] .blog-entry {
+  transition:
+    border-color 160ms ease,
+    box-shadow 380ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+body[data-hv-anim="弹性"] .blog-entry {
+  transition:
+    border-color 160ms ease,
+    box-shadow 320ms cubic-bezier(0.34, 1.4, 0.64, 1);
 }
 
 body[data-shadow="轻"] .blog-entry,
@@ -1043,6 +1065,15 @@ body[data-shadow-hv="中"] .blog-entry:hover {
 body[data-shadow="深"] .blog-entry,
 body[data-shadow-hv="深"] .blog-entry:hover {
   box-shadow: 0 4px 12px rgb(0 0 0 / 13%), 0 14px 36px rgb(0 0 0 / 15%);
+}
+
+/* 自定义阴影:数值由模板按配置注入 CSS 变量,缺省回退中等强度 */
+body[data-shadow="自定义"] .blog-entry {
+  box-shadow: var(--ps-shadow-custom, 0 2px 8px rgb(0 0 0 / 9%));
+}
+
+body[data-shadow-hv="自定义"] .blog-entry:hover {
+  box-shadow: var(--ps-shadow-hv-custom, 0 2px 8px rgb(0 0 0 / 9%));
 }
 
 /* ---------- 页面加载动画(跳转时出现,页面就绪淡出;ps-js 由模板脚本置位,禁脚本环境不显示) ---------- */

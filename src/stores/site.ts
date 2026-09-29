@@ -222,10 +222,14 @@ export const useSiteStore = defineStore("site", {
       return n;
     },
 
-    /** 站点图片统一导入(落至 content/asset/),树刷新后资产栏即可见 */
+    /** 站点图片统一导入(落至 content/asset/),树刷新后资产栏即可见;
+     *  导入的图片被文档引用时构建产物需要重新拷贝,同通道触发防抖重建 */
     async importSiteImages(srcPaths: string[]) {
       const names = await ipc.importSiteImages(srcPaths);
-      if (names.length) await this.refreshTree();
+      if (names.length) {
+        await this.refreshTree();
+        void useBuilderStore().onSiteChanged();
+      }
       return names;
     },
   },

@@ -146,10 +146,41 @@ md.core.ruler.after("inline", "plainstruct-tasks", (state) => {
 
 /* ---------- 站内链接与资源改写 ---------- */
 
+/** HTML 属性值里的常见实体:文件名中的 & 会以 &amp; 出现在裸 HTML 里 */
+function decodeHtmlAttr(s: string): string {
+  return s.replace(/&amp;/gi, "&");
+}
+
+/** 解析一个站内资源引用:出根/外链返回 null,其余返回 content/ 相对路径 */
+function resolveAssetPath(raw: string, env: MdEnv): string | null {
+  if (/^(https?:|data:)/i.test(raw)) return null;
+  const resolved = joinPosix(dirname(env.currentMdPath), decodeHref(splitHash(raw)[0]));
+  if (resolved.startsWith("..")) {
+    env.warnings.push({ source: env.currentMdPath, link: raw, message: "out-of-root" });
+    return null;
+  }
+  return resolved;
+}
+
+/** 裸 HTML <img>(html_block/html_inline)的 src 改写:与 Markdown 图片语法同流,
+ *  经 resolveAsset 换算(预览绝对化为协议地址,构建换算为页面相对地址);
+ *  对齐按钮插入的 <div align><img>、用户粘贴的 HTML 由此获得正确的预览路径 */
+function rewriteHtmlImages(html: string, env: MdEnv): string {
+  return html.replace(/<img\b[^>]*?\bsrc\s*=\s*(["'])(.*?)\1/gi, (m, quote: string, raw: string) => {
+    const resolved = resolveAssetPath(decodeHtmlAttr(raw), env);
+    if (!resolved || !env.resolveAsset) return m;
+    return m.slice(0, m.length - raw.length - 1) + env.resolveAsset(resolved) + quote;
+  });
+}
+
 md.core.ruler.after("plainstruct-tasks", "plainstruct-links", (state) => {
   const env = state.env as MdEnv;
   if (!env?.docMap || !env?.warnings) return null;
   for (const block of state.tokens) {
+    if (block.type === "html_block") {
+      block.content = rewriteHtmlImages(block.content, env);
+      continue;
+    }
     if (block.type !== "inline" || !block.children) continue;
     for (const t of block.children) {
       if (t.type === "link_open") {
@@ -164,13 +195,12 @@ md.core.ruler.after("plainstruct-tasks", "plainstruct-links", (state) => {
       } else if (t.type === "image") {
         const srcIdx = t.attrIndex("src");
         if (srcIdx < 0) continue;
-        const raw = String(t.attrs![srcIdx][1]);
-        if (/^(https?:|data:)/i.test(raw)) continue;
-        const resolved = joinPosix(dirname(env.currentMdPath), decodeHref(splitHash(raw)[0]));
-        if (resolved.startsWith("..")) continue;
-        if (env.resolveAsset) {
+        const resolved = resolveAssetPath(String(t.attrs![srcIdx][1]), env);
+        if (resolved && env.resolveAsset) {
           t.attrs![srcIdx][1] = env.resolveAsset(resolved);
         }
+      } else if (t.type === "html_inline") {
+        t.content = rewriteHtmlImages(t.content, env);
       }
     }
   }

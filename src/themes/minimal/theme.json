@@ -1,7 +1,7 @@
 {
   "id": "minimal",
   "name": "留白",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "author": "MogroWang Studio",
   "type": "blog",
   "description": "极简留白风:居中窄栏,间距分层,黑白克制。",
@@ -193,7 +193,8 @@
         "无",
         "轻",
         "中",
-        "深"
+        "深",
+        "自定义"
       ]
     },
     {
@@ -205,7 +206,151 @@
         "无",
         "轻",
         "中",
-        "深"
+        "深",
+        "自定义"
+      ]
+    },
+    {
+      "key": "cardShadowX",
+      "label": "阴影 X 偏移(px)",
+      "type": "number",
+      "default": 0,
+      "min": -24,
+      "max": 24,
+      "step": 1,
+      "visibleIf": {
+        "key": "cardShadow",
+        "equals": "自定义"
+      }
+    },
+    {
+      "key": "cardShadowY",
+      "label": "阴影 Y 偏移(px)",
+      "type": "number",
+      "default": 2,
+      "min": -24,
+      "max": 24,
+      "step": 1,
+      "visibleIf": {
+        "key": "cardShadow",
+        "equals": "自定义"
+      }
+    },
+    {
+      "key": "cardShadowBlur",
+      "label": "阴影模糊(px)",
+      "type": "number",
+      "default": 8,
+      "min": 0,
+      "max": 60,
+      "step": 1,
+      "visibleIf": {
+        "key": "cardShadow",
+        "equals": "自定义"
+      }
+    },
+    {
+      "key": "cardShadowSpread",
+      "label": "阴影扩散(px)",
+      "type": "number",
+      "default": 0,
+      "min": -20,
+      "max": 20,
+      "step": 1,
+      "visibleIf": {
+        "key": "cardShadow",
+        "equals": "自定义"
+      }
+    },
+    {
+      "key": "cardShadowOpacity",
+      "label": "阴影不透明度(%)",
+      "type": "number",
+      "default": 9,
+      "min": 0,
+      "max": 50,
+      "step": 1,
+      "visibleIf": {
+        "key": "cardShadow",
+        "equals": "自定义"
+      }
+    },
+    {
+      "key": "cardShadowHoverX",
+      "label": "悬停阴影 X 偏移(px)",
+      "type": "number",
+      "default": 0,
+      "min": -24,
+      "max": 24,
+      "step": 1,
+      "visibleIf": {
+        "key": "cardShadowHover",
+        "equals": "自定义"
+      }
+    },
+    {
+      "key": "cardShadowHoverY",
+      "label": "悬停阴影 Y 偏移(px)",
+      "type": "number",
+      "default": 2,
+      "min": -24,
+      "max": 24,
+      "step": 1,
+      "visibleIf": {
+        "key": "cardShadowHover",
+        "equals": "自定义"
+      }
+    },
+    {
+      "key": "cardShadowHoverBlur",
+      "label": "悬停阴影模糊(px)",
+      "type": "number",
+      "default": 8,
+      "min": 0,
+      "max": 60,
+      "step": 1,
+      "visibleIf": {
+        "key": "cardShadowHover",
+        "equals": "自定义"
+      }
+    },
+    {
+      "key": "cardShadowHoverSpread",
+      "label": "悬停阴影扩散(px)",
+      "type": "number",
+      "default": 0,
+      "min": -20,
+      "max": 20,
+      "step": 1,
+      "visibleIf": {
+        "key": "cardShadowHover",
+        "equals": "自定义"
+      }
+    },
+    {
+      "key": "cardShadowHoverOpacity",
+      "label": "悬停阴影不透明度(%)",
+      "type": "number",
+      "default": 9,
+      "min": 0,
+      "max": 50,
+      "step": 1,
+      "visibleIf": {
+        "key": "cardShadowHover",
+        "equals": "自定义"
+      }
+    },
+    {
+      "key": "cardHoverAnim",
+      "label": "卡片悬停过渡",
+      "type": "select",
+      "default": "平滑",
+      "options": [
+        "关闭",
+        "轻快",
+        "平滑",
+        "舒缓",
+        "弹性"
       ]
     },
     {
