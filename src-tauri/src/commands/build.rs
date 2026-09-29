@@ -73,7 +73,7 @@ fn copy_recursive(src: &PathBuf, dest: &PathBuf) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn copy_paths(window: tauri::WebviewWindow, state: State<'_, AppState>, items: Vec<CopyItem>) -> Result<(), String> {
+pub fn copy_paths(window: tauri::WebviewWindow, state: State<'_, AppState>, items: Vec<CopyItem>) -> Result<u64, String> {
     ensure_main(&window)?;
     let root = state.site_root()?;
     // dest 相对 build/ 落盘:构建出的页面以 build/ 为根引用资源(图片、站点 logo 等)
@@ -94,7 +94,19 @@ pub fn copy_paths(window: tauri::WebviewWindow, state: State<'_, AppState>, item
             std::fs::copy(&src, &dest).map_err(|e| e.to_string())?;
         }
     }
-    Ok(())
+    // 构建产物就绪,统计 build/ 目录总占用供构建报告展示
+    Ok(dir_size(&build))
+}
+
+/// 递归统计目录内全部文件的字节总数(目录不存在按 0)
+fn dir_size(dir: &std::path::Path) -> u64 {
+    walkdir::WalkDir::new(dir)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.file_type().is_file())
+        .filter_map(|e| e.metadata().ok())
+        .map(|m| m.len())
+        .sum()
 }
 
 /// 供 GitHub 同步收集构建产物

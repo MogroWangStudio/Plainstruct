@@ -558,12 +558,13 @@ export async function buildSite(site: SiteConfig, theme: ThemeBundle): Promise<B
 
   await ipc.clearBuild();
   await ipc.writeBuildFiles(outputs);
-  await ipc.copyPaths(assetCopies);
+  const totalSize = await ipc.copyPaths(assetCopies);
 
   return {
     pages: outputs.filter((o) => o.path.endsWith(".html")).length,
     assets: assetCopies.length,
     warnings,
     durationMs: Math.round(performance.now() - t0),
+    totalSize,
   };
 }

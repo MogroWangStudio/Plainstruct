@@ -510,7 +510,9 @@ export const mock = {
     for (const f of out) buildFiles.set(f.path, f.content);
   },
 
-  async copyPaths(_items: CopyItem[]): Promise<void> {},
+  async copyPaths(_items: CopyItem[]): Promise<number> {
+    return 0;
+  },
 
   getBuildIndex(): string | null {
     return buildFiles.get("index.html") ?? null;

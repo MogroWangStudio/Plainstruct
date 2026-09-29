@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /** 主题可视化配置面板 -- 由 theme.json 的 config schema 自动生成表单 */
-import { computed, ref } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import type { ThemeField } from "@/ipc/types";
 import { navMaxOf, topNavItems } from "@/lib/builder";
@@ -8,6 +8,7 @@ import { useSiteStore } from "@/stores/site";
 import { useThemeStore } from "@/stores/theme";
 import Modal from "@/components/Modal.vue";
 import SelectMenu from "@/components/SelectMenu.vue";
+import AppIcon from "@/components/AppIcon.vue";
 
 const { t } = useI18n();
 const theme = useThemeStore();
@@ -39,7 +40,26 @@ function rangeFill(field: ThemeField): string {
   return `${Math.min(100, Math.max(0, pct))}%`;
 }
 
-/* navlist(博客顶栏导航):可选项与构建同源 -- 内容树顶层的文章/文件夹 */
+/* 数值双击编辑:直接键入精确值(回车/失焦提交,Esc 取消,越界收敛到滑块范围) */
+const editingKey = ref<string | null>(null);
+const editInput = ref<HTMLInputElement | null>(null);
+
+watch(editingKey, async (k) => {
+  if (!k) return;
+  await nextTick();
+  editInput.value?.focus();
+  editInput.value?.select();
+});
+
+function commitEdit(field: ThemeField, e: Event) {
+  const raw = (e.target as HTMLInputElement).value.trim();
+  editingKey.value = null;
+  const n = Number(raw);
+  if (raw === "" || !Number.isFinite(n)) return;
+  onField(field, Math.min(field.max ?? 100, Math.max(field.min ?? 0, n)));
+}
+
+/* navlist(博客顶栏导航):可选项与构建同源 -- 内容树顶层的文章/文件夹(按文件树排序) */
 const navOptions = computed(() => topNavItems(site.tree, site.docsCache));
 
 function pickedOf(field: ThemeField): string[] {
@@ -104,7 +124,7 @@ function confirmPicker() {
         <span class="mono text-[12px] text-ink-2">{{ fieldValue(field) }}</span>
       </div>
 
-      <!-- 数值 -->
+      <!-- 数值:拖动滑块;双击数字可直接输入;偏离默认值时出现一键重置 -->
       <div v-else-if="field.type === 'number'" class="flex items-center gap-3">
         <input
           type="range"
@@ -116,7 +136,35 @@ function confirmPicker() {
           :style="{ '--range-fill': rangeFill(field) }"
           @input="onField(field, Number(($event.target as HTMLInputElement).value))"
         />
-        <span class="mono w-12 text-right text-[12px] text-ink-2">{{ fieldValue(field) }}</span>
+        <input
+          v-if="editingKey === field.key"
+          ref="editInput"
+          class="input h-7 w-14 px-1 text-center text-[12px]"
+          type="text"
+          inputmode="decimal"
+          :value="String(fieldValue(field))"
+          @keydown.enter="commitEdit(field, $event)"
+          @keydown.esc="editingKey = null"
+          @blur="commitEdit(field, $event)"
+        />
+        <button
+          v-else
+          type="button"
+          class="mono w-14 cursor-text rounded text-center text-[12px] text-ink-2 transition-colors hover:text-ink"
+          :title="t('theme.numEditHint')"
+          @dblclick="editingKey = field.key"
+        >
+          {{ fieldValue(field) }}
+        </button>
+        <button
+          v-if="Number(fieldValue(field)) !== Number(field.default ?? 0)"
+          type="button"
+          class="btn-icon h-6 w-6 shrink-0"
+          :title="t('theme.resetValue')"
+          @click="onField(field, Number(field.default ?? 0))"
+        >
+          <AppIcon name="refresh" :size="12" />
+        </button>
       </div>
 
       <!-- 选项:与全应用统一的自定义下拉(无系统原生黑边选中态) -->
@@ -178,8 +226,8 @@ function confirmPicker() {
     </p>
 
     <!-- 顶栏导航选择弹窗:勾选数量上限内的项,确认后才写入配置 -->
-    <Modal v-if="pickerOpen" :title="t('theme.navPickTitle')" :width="360" @cancel="pickerOpen = false">
-      <div class="flex flex-col">
+    <Modal v-if="pickerOpen" :title="t('theme.navPickTitle')" :width="420" @cancel="pickerOpen = false">
+      <div class="flex min-h-[420px] flex-col">
         <label
           v-for="opt in navOptions"
           :key="opt.key"

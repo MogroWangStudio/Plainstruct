@@ -162,8 +162,8 @@ export const ipc = {
       ? invoke<void>("write_build_files", { files })
       : mock.writeBuildFiles(files);
   },
-  copyPaths(items: CopyItem[]): Promise<void> {
-    return inTauri ? invoke<void>("copy_paths", { items }) : mock.copyPaths(items);
+  copyPaths(items: CopyItem[]): Promise<number> {
+    return inTauri ? invoke<number>("copy_paths", { items }) : mock.copyPaths(items);
   },
 
   /* ---------- 主题 ---------- */

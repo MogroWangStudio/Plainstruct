@@ -212,4 +212,6 @@ export interface BuildReport {
   assets: number;
   warnings: BuildWarning[];
   durationMs: number;
+  /** 构建产物(build/)总占用字节数 */
+  totalSize: number;
 }

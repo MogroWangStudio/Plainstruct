@@ -1,7 +1,7 @@
 {
   "id": "blog-light",
   "name": "手记 · 浅色",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "author": "MogroWang Studio",
   "type": "blog",
   "description": "博客·浅色:纸面素栏,文章为流,日期为记。",
@@ -354,6 +354,39 @@
         "淡化",
         "倾斜"
       ]
+    },
+    {
+      "key": "cardHoverEase",
+      "label": "卡片悬停曲线",
+      "type": "select",
+      "default": "标准",
+      "options": [
+        "标准",
+        "缓出",
+        "缓入",
+        "线性",
+        "弹性",
+        "自定义"
+      ]
+    },
+    {
+      "key": "cardHoverEaseCustom",
+      "label": "自定义曲线(cubic-bezier)",
+      "type": "text",
+      "default": "0.23, 1, 0.32, 1",
+      "visibleIf": {
+        "key": "cardHoverEase",
+        "equals": "自定义"
+      }
+    },
+    {
+      "key": "cardHoverDuration",
+      "label": "卡片悬停时长(ms)",
+      "type": "number",
+      "default": 240,
+      "min": 80,
+      "max": 800,
+      "step": 20
     },
     {
       "key": "loadingAnim",

@@ -3,6 +3,7 @@ import { useI18n } from "vue-i18n";
 import { useBuilderStore } from "@/stores/builder";
 import { useSiteStore } from "@/stores/site";
 import { ipc } from "@/ipc/ipc";
+import { formatSize } from "@/lib/format";
 import AppIcon from "@/components/AppIcon.vue";
 import PreviewFrame from "@/components/PreviewFrame.vue";
 
@@ -58,6 +59,10 @@ function openOutput() {
                 <span class="text-[13px] text-ink-2">
                   <span class="text-[17px] font-bold text-ink">{{ builder.report.durationMs }}</span>
                   {{ t("build.statMs") }}
+                </span>
+                <span class="text-[13px] text-ink-2">
+                  <span class="text-[17px] font-bold text-ink">{{ formatSize(builder.report.totalSize) }}</span>
+                  {{ t("build.statSize") }}
                 </span>
               </div>
             </div>
