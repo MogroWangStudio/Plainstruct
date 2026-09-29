@@ -70,6 +70,8 @@ interface State {
   updateName: string;
   updateVersion: string;
   updateError: string;
+  /** 「重启并更新」执行中:防止重复拉起向导 */
+  restartUpdating: boolean;
 }
 
 export const useAppStore = defineStore("app", {
@@ -86,6 +88,8 @@ export const useAppStore = defineStore("app", {
     updateName: "",
     updateVersion: "",
     updateError: "",
+    /** 「重启并更新」执行中:防止重复拉起向导 */
+    restartUpdating: false,
   }),
 
   getters: {
@@ -252,13 +256,17 @@ export const useAppStore = defineStore("app", {
     },
 
     async restartToUpdate() {
+      if (this.restartUpdating) return;
       const ui = useUiStore();
       const t = i18n.global.t;
+      this.restartUpdating = true;
       try {
         await ipc.updateRestartInstall();
-        // 应用交给更新向导:向导确认存活后应用隐藏窗口并被其关闭(浏览器 mock 为空操作)
+        // 应用交给更新向导:向导确认窗体就绪后结束应用并继续安装(浏览器 mock 为空操作)
       } catch (e) {
         ui.toast(t("settings.updateRestartFailed", { msg: ipc.errText(e) }), "error");
+      } finally {
+        this.restartUpdating = false;
       }
     },
 

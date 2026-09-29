@@ -942,9 +942,11 @@ pub fn update_cancel(state: State<'_, AppState>, window: tauri::WebviewWindow) -
 }
 
 /// 用户点击「重启并更新」:复核任务与安装包、生成向导脚本,拉起更新向导。
-/// Windows 上应用不自行退出——向导完成窗体初始化后由它主动结束应用进程;
-/// 此前「应用先退出」的时序下,向导作为刚创建的子进程常在初始化完成前被
-/// 随父进程退出的作业对象连带终结,出现「应用已关、向导未起」。
+/// Windows 上应用不自行退出、也不隐藏窗口 —— 持续轮询向导日志等待「窗体已
+/// 显示」就绪标记(最多 10 秒),期间向导若退出则捕获其输出落盘诊断后以具体
+/// 原因报错;窗体就绪后由向导在「关闭 Plainstruct」阶段关闭应用并继续安装。
+/// 此前的固定延时存活粗判把「脚本解析错误」「杀毒软件拦截」等秒退一律报成
+/// 「请重试」,失败原因无从排查;现在所有失败路径都有落盘的可查线索。
 /// macOS 上向导经 open 拉起、进程完全独立,沿用应用先退出的时序。
 #[tauri::command]
 pub fn update_restart_and_install(app: AppHandle, window: tauri::WebviewWindow) -> Result<(), String> {
@@ -959,17 +961,68 @@ pub fn update_restart_and_install(app: AppHandle, window: tauri::WebviewWindow) 
 
     #[cfg(target_os = "windows")]
     {
+        // 应用自身不再退出、也不再隐藏窗口:窗体就绪前保持可见可重试,
+        // 向导就绪后会在「关闭 Plainstruct」阶段结束本进程
+        let _ = &app;
         let mut child = spawn_update_helper_windows()?;
-        // 宽限向导完成初始化(加载 WinForms、显示窗体);若向导已退出则不隐藏
-        // 窗口并报错,应用保持可用,用户可直接重试
-        std::thread::sleep(std::time::Duration::from_millis(1500));
-        if child.try_wait().map_or(false, |s| s.is_some()) {
-            return Err("更新向导异常退出,请重试".into());
+        let log_path = dir.join(UPDATE_LOG_FILE);
+        // 就绪判定:轮询向导日志等待「窗体已显示」标记 —— 脚本解析通过、WinForms
+        // 加载完成、窗体真正出现在屏幕上之后才会写入。期间向导进程若退出,或日志
+        // 报告窗体建成前失败,均收集具体输出与日志后报错(此前按 1.5 秒存活粗判,
+        // 秒退只提示「请重试」,解析错误/杀毒拦截等真实原因完全不落盘,连修数版
+        // 无从定位)。
+        let mut ready = false;
+        let mut exited = false;
+        let mut wizard_failed = false;
+        for _ in 0..100 {
+            if child.try_wait().map_or(false, |s| s.is_some()) {
+                exited = true;
+                break;
+            }
+            match std::fs::read_to_string(&log_path) {
+                Ok(s) if s.contains(READY_MARKER) => {
+                    ready = true;
+                    break;
+                }
+                Ok(s) if s.contains("更新失败") => {
+                    // 窗体尚未建成的失败:向导自身会以系统弹窗展示错误
+                    wizard_failed = true;
+                    break;
+                }
+                _ => {}
+            }
+            std::thread::sleep(std::time::Duration::from_millis(100));
         }
-        if let Some(win) = tauri::Manager::get_webview_window(&app, "main") {
-            // 隐藏窗口向用户传达「应用已交给向导」;进程仍在,等向导来结束
-            let _ = win.hide();
+        if !ready && !exited && !wizard_failed {
+            // 10 秒未就绪但进程仍在:极慢环境(信任其继续运行,向导内部失败均可见)
+            ready = child.try_wait().map_or(true, |s| s.is_none());
         }
+        if wizard_failed {
+            return Err(format!(
+                "更新向导启动失败,系统弹窗中有具体原因。详情见日志:{}",
+                log_path.display()
+            ));
+        }
+        if !ready {
+            // 向导进程启动后立即退出:读取其输出与日志,落盘诊断并带原因报错
+            let mut stderr_text = String::new();
+            if let Some(mut se) = child.stderr.take() {
+                use std::io::Read;
+                let _ = se.read_to_string(&mut stderr_text);
+            }
+            let hint = if stderr_text.trim().is_empty() {
+                "PowerShell 无任何输出,常见为杀毒软件拦截了脚本执行。".to_string()
+            } else {
+                format!("PowerShell 报错:{}", truncate_chars(&stderr_text, 200))
+            };
+            let diag = format!(
+                "[应用] 向导进程启动后立即退出,窗体未显示。{hint} 请在杀毒软件中放行该脚本,或在资源管理器中右键 update-helper.ps1 选择「使用 PowerShell 运行」手动重试。"
+            );
+            append_wizard_log(&dir, &diag);
+            return Err(format!("{hint} 详情见日志:{}", log_path.display()));
+        }
+        // 窗体已显示(或极慢环境仍在运行):一切交由向导 —— 它会在「关闭 Plainstruct」
+        // 阶段结束本进程并继续安装;失败路径均由向导界面与日志呈现,应用保持可用
     }
 
     #[cfg(target_os = "macos")]
@@ -989,7 +1042,36 @@ pub fn update_restart_and_install(app: AppHandle, window: tauri::WebviewWindow) 
     Ok(())
 }
 
-/// Windows:以独立进程拉起更新向导,返回子进程句柄供调用方确认其存活
+/// 向导窗体就绪标记:脚本在 WinForms 窗体显示后写入日志,应用据此判断交接成功
+#[cfg(target_os = "windows")]
+const READY_MARKER: &str = "窗体已显示";
+
+/// 应用侧诊断写入向导运行日志(与脚本共用一份,用户只需查看一处)
+#[cfg(target_os = "windows")]
+fn append_wizard_log(dir: &std::path::Path, msg: &str) {
+    use std::io::Write;
+    if let Ok(mut f) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(dir.join(UPDATE_LOG_FILE))
+    {
+        let _ = writeln!(f, "{msg}");
+    }
+}
+
+/// 截断长文本用于错误提示(按字符,避免切断多字节)
+#[cfg(target_os = "windows")]
+fn truncate_chars(s: &str, n: usize) -> String {
+    let t = s.trim();
+    if t.chars().count() <= n {
+        t.to_string()
+    } else {
+        format!("{}…", t.chars().take(n).collect::<String>())
+    }
+}
+
+/// Windows:以独立进程拉起更新向导,返回子进程句柄供调用方确认其存活;
+/// stdout/stderr 管道捕获,秒退时读取具体报错(解析错误/环境问题直接可见)
 #[cfg(target_os = "windows")]
 fn spawn_update_helper_windows() -> Result<std::process::Child, String> {
     let dir = update_dir();
@@ -1021,6 +1103,8 @@ fn spawn_update_helper_windows() -> Result<std::process::Child, String> {
                 "-File",
             ])
             .arg(&script)
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
             .creation_flags(flags)
             .spawn()
     };
@@ -1131,6 +1215,10 @@ function Write-Log([string]$msg) {
   try { [System.IO.File]::AppendAllText($logPath, ("[{0}] {1}`r`n" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $msg)) } catch {}
 }
 
+# 首条日志写在 try 之前:此后任何阶段(含窗体建成前的失败)都能留下痕迹;
+# 若连这份日志都没有,说明脚本未被执行(被拦截)或解析失败(应用侧会记录 PowerShell 输出)
+Write-Log ("向导启动,PowerShell " + $PSVersionTable.PSVersion.ToString())
+
 $installer = '__ASSET__'
 $appExe    = '__APP_EXE__'
 $appDir    = '__APP_DIR__'
@@ -1140,8 +1228,6 @@ $verNew    = '__VER_NEW__'
 
 $zip = $null
 try {
-  Write-Log ("向导启动,PowerShell " + $PSVersionTable.PSVersion.ToString())
-
   Add-Type -TypeDefinition 'using System.Runtime.InteropServices; public class DpiHelper { [DllImport("user32.dll")] public static extern bool SetProcessDPIAware(); }'
   [DpiHelper]::SetProcessDPIAware() | Out-Null
   Add-Type -AssemblyName System.Windows.Forms
@@ -1250,23 +1336,37 @@ try {
   }
 
   $form.Show()
+  # 窗体就绪标记:应用轮询日志等待此行,出现后才认为「应用已交给向导」
+  Write-Log "窗体已显示"
   Update-Stages
 
-  # 阶段 1:由向导关闭应用(应用拉起向导后保持运行并已隐藏窗口,退出流程由向导
-  # 负责;主动结束进程后等待其消失,最多宽限 30 秒)
+  # 阶段 1:由向导关闭应用(应用拉起向导后保持运行、窗口可见,退出流程由向导
+  # 负责)。先请求优雅关闭(等效点击窗口关闭按钮,应用可完成收尾),5 秒不退
+  # 再强制结束,仍不退则报错;全程约宽限 15 秒
   Set-Stage 0
   $proc = Get-Process -Name '__PROC__' -ErrorAction SilentlyContinue
   if ($proc) {
-    try { $proc | Stop-Process -Force -ErrorAction Stop; Write-Log "已请求结束应用进程" }
-    catch { Write-Log ("结束应用进程失败: " + $_.Exception.Message) }
-    for ($i = 0; $i -lt 60; $i++) {
+    try { $proc | ForEach-Object { $null = $_.CloseMainWindow() }; Write-Log "已请求应用关闭" }
+    catch { Write-Log ("请求应用关闭失败: " + $_.Exception.Message) }
+    for ($i = 0; $i -lt 20; $i++) {
       if (-not (Get-Process -Name '__PROC__' -ErrorAction SilentlyContinue)) { break }
-      Start-Sleep -Milliseconds 500
+      Start-Sleep -Milliseconds 250
       [System.Windows.Forms.Application]::DoEvents()
     }
     if (Get-Process -Name '__PROC__' -ErrorAction SilentlyContinue) {
-      throw '无法关闭 Plainstruct,请手动退出应用后重试。'
+      Write-Log "应用未响应关闭请求,改为强制结束"
+      try { $proc | Stop-Process -Force -ErrorAction Stop }
+      catch { Write-Log ("强制结束失败: " + $_.Exception.Message) }
+      for ($i = 0; $i -lt 40; $i++) {
+        if (-not (Get-Process -Name '__PROC__' -ErrorAction SilentlyContinue)) { break }
+        Start-Sleep -Milliseconds 250
+        [System.Windows.Forms.Application]::DoEvents()
+      }
+      if (Get-Process -Name '__PROC__' -ErrorAction SilentlyContinue) {
+        throw '无法关闭 Plainstruct,请手动退出应用后重试。'
+      }
     }
+    Write-Log "应用已退出"
   }
   Start-Sleep -Milliseconds 600
 

@@ -592,7 +592,7 @@ function openRelease(url: string) {
                     </template>
                     <!-- 已就绪:重启并更新 / 放弃更新 -->
                     <template v-else-if="app.updatePhase === 'ready'">
-                      <button class="btn btn-primary" @click="restartUpdate">
+                      <button class="btn btn-primary" :disabled="app.restartUpdating" @click="restartUpdate">
                         <AppIcon name="refresh" :size="14" />
                         {{ t("settings.updateRestart") }}
                       </button>
