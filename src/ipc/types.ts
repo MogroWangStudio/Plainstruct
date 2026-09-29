@@ -16,6 +16,9 @@ export type EditorBreakKey = "enter" | "modEnter" | "none";
 /** 首行缩进触发键 */
 export type EditorIndentKey = "tab" | "modShiftI" | "none";
 
+/** 发布成功彩带程度 */
+export type ConfettiLevel = "off" | "light" | "standard" | "grand";
+
 export interface AppSettings {
   locale: Locale;
   autosave: boolean;
@@ -32,6 +35,8 @@ export interface AppSettings {
   editorIndentKey?: EditorIndentKey;
   /** 每次缩进添加的全角空格数量(中文常用 2),默认 2 */
   editorIndentWidth?: number;
+  /** 发布成功彩带程度,默认 standard(标准) */
+  confetti?: ConfettiLevel;
 }
 
 export interface RecentSite {

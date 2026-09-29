@@ -3,12 +3,14 @@ import { computed, nextTick, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { usePublishStore } from "@/stores/publish";
 import { useBuilderStore } from "@/stores/builder";
+import { useAppStore } from "@/stores/app";
 import { fireConfetti } from "@/lib/confetti";
 import AppIcon from "@/components/AppIcon.vue";
 
 const { t } = useI18n();
 const publish = usePublishStore();
 const builder = useBuilderStore();
+const app = useAppStore();
 
 // 目标仓库等配置变更后,上一次的验证结果不再可信:清空,直到重新点「验证连接」
 watch(
@@ -18,11 +20,11 @@ watch(
   },
 );
 
-// 发布成功的一刻撒一次纸屑(仅 result 从无到有时,回看结果不重播)
+// 发布成功的一刻按设置档位撒一次纸屑(仅 result 从无到有时,回看结果不重播)
 watch(
   () => publish.result,
   (val, old) => {
-    if (val && !old) fireConfetti();
+    if (val && !old) fireConfetti(app.settings.confetti ?? "standard");
   },
 );
 

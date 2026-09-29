@@ -3,7 +3,7 @@ import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useAppStore } from "@/stores/app";
 import { ipc } from "@/ipc/ipc";
-import type { EditorBreakKey, EditorFontMode, EditorIndentKey, Locale, UiFontMode } from "@/ipc/types";
+import type { ConfettiLevel, EditorBreakKey, EditorFontMode, EditorIndentKey, Locale, UiFontMode } from "@/ipc/types";
 import { APP_THEMES, type AppThemeSwatch } from "@/lib/app-themes";
 import { formatSize } from "@/lib/format";
 import AppIcon from "@/components/AppIcon.vue";
@@ -100,6 +100,13 @@ const uiFontOptions = computed<{ value: UiFontMode; label: string }[]>(() => [
   { value: "serif", label: t("settings.fontSerif") },
   { value: "mono", label: t("settings.fontMono") },
   { value: "custom", label: t("settings.fontCustom") },
+]);
+
+const confettiOptions = computed<{ value: ConfettiLevel; label: string }[]>(() => [
+  { value: "off", label: t("settings.confettiOff") },
+  { value: "light", label: t("settings.confettiLight") },
+  { value: "standard", label: t("settings.confettiStandard") },
+  { value: "grand", label: t("settings.confettiGrand") },
 ]);
 
 const editorFontOptions = computed<{ value: EditorFontMode; label: string }[]>(() => [
@@ -453,6 +460,21 @@ function openRelease(url: string) {
                     </div>
                   </div>
                   <SelectMenu v-model="editorFontModel" :options="editorFontOptions" align="right" class="shrink-0" />
+                </div>
+
+                <!-- 发布成功彩带 -->
+                <div class="settings-row" style="--i: 3">
+                  <div class="min-w-0">
+                    <p class="text-[13.5px] font-medium">{{ t("settings.confetti") }}</p>
+                    <p class="mt-0.5 text-[12px] leading-relaxed text-ink-3">{{ t("settings.confettiHint") }}</p>
+                  </div>
+                  <SelectMenu
+                    :model-value="app.settings.confetti ?? 'standard'"
+                    :options="confettiOptions"
+                    align="right"
+                    class="shrink-0"
+                    @update:model-value="app.setConfetti($event as ConfettiLevel)"
+                  />
                 </div>
               </div>
             </template>

@@ -1,7 +1,11 @@
 /** 纸屑庆祝特效 -- 发布成功等完成时刻的短暂致意。
  *  无依赖:按需创建一块固定定位的透明 canvas 覆盖窗口,
  *  requestAnimationFrame 驱动重力 + 空气阻力 + 旋转的纸片运动,
- *  约 2.2 秒自然落尽后自动移除画布;遵循系统「减弱动态效果」设置。 */
+ *  约 2.2 秒自然落尽后自动移除画布;遵循系统「减弱动态效果」设置。
+ *  程度三档(设置页「个性化」可选,默认标准):轻为双角束,
+ *  标准与夸张在两角之外加中央上抛束,粒数/初速/纸片逐档加大。 */
+
+import type { ConfettiLevel } from "@/ipc/types";
 
 /** 纸屑配色:取自应用六套配色的低饱和强调色,纸屑般克制 */
 const PALETTE = ["#d9a441", "#c97b5d", "#6fae8f", "#7a9cc6", "#8a837d", "#e3d9c4"];
@@ -27,21 +31,78 @@ interface Particle {
   life: number;
 }
 
-/** 在视口坐标 (ox, oy) 处向 (angleX 方向) 斜上抛出一束纸屑 */
-function burst(px: Particle[], ox: number, oy: number, dirX: number, count: number, now: number) {
+/** 各档抛洒参数:束位与每束粒数、初速区间、滞空时长、纸片尺寸倍率 */
+const LEVELS: Record<
+  Exclude<ConfettiLevel, "off">,
+  {
+    bursts: { x: number; y: number; dir: number; count: number }[];
+    speedBase: number;
+    speedVar: number;
+    lifeBase: number;
+    lifeVar: number;
+    size: number;
+  }
+> = {
+  light: {
+    bursts: [
+      { x: 0.12, y: 0.72, dir: 1, count: 20 },
+      { x: 0.88, y: 0.72, dir: -1, count: 20 },
+    ],
+    speedBase: 8,
+    speedVar: 5,
+    lifeBase: 1400,
+    lifeVar: 600,
+    size: 1,
+  },
+  standard: {
+    bursts: [
+      { x: 0.12, y: 0.72, dir: 1, count: 46 },
+      { x: 0.88, y: 0.72, dir: -1, count: 46 },
+      { x: 0.5, y: 0.8, dir: 0, count: 26 },
+    ],
+    speedBase: 10,
+    speedVar: 7,
+    lifeBase: 1600,
+    lifeVar: 800,
+    size: 1,
+  },
+  grand: {
+    bursts: [
+      { x: 0.1, y: 0.72, dir: 1, count: 74 },
+      { x: 0.9, y: 0.72, dir: -1, count: 74 },
+      { x: 0.5, y: 0.82, dir: 0, count: 46 },
+    ],
+    speedBase: 12,
+    speedVar: 9,
+    lifeBase: 1900,
+    lifeVar: 900,
+    size: 1.18,
+  },
+};
+
+/** 在视口坐标 (ox, oy) 处向 (dirX 方向) 斜上抛出一束纸屑;dirX 为 0 时直上略散 */
+function burst(
+  px: Particle[],
+  ox: number,
+  oy: number,
+  dirX: number,
+  count: number,
+  now: number,
+  L: (typeof LEVELS)[Exclude<ConfettiLevel, "off">],
+) {
   for (let i = 0; i < count; i++) {
     // 仰角 55°–80°,朝向画面中央,带随机散布
     const elevation = (55 + Math.random() * 25) * (Math.PI / 180);
-    const speed = 9 + Math.random() * 6;
+    const speed = L.speedBase + Math.random() * L.speedVar;
     const spread = (Math.random() - 0.5) * 0.35;
-    const life = 1500 + Math.random() * 700;
+    const life = L.lifeBase + Math.random() * L.lifeVar;
     px.push({
       x: ox + (Math.random() - 0.5) * 24,
       y: oy + (Math.random() - 0.5) * 24,
       vx: Math.cos(elevation) * speed * (dirX + spread),
       vy: -Math.sin(elevation) * speed,
-      w: 5 + Math.random() * 4,
-      h: 8 + Math.random() * 6,
+      w: (5 + Math.random() * 4) * L.size,
+      h: (8 + Math.random() * 6) * L.size,
       tilt: Math.random() * Math.PI,
       tiltSpeed: 0.08 + Math.random() * 0.18,
       rotation: Math.random() * Math.PI,
@@ -57,9 +118,10 @@ export function confettiEnabled(): boolean {
   return typeof matchMedia === "function" && !matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-/** 从窗口左下与右下两角向中央斜上抛洒纸屑 */
-export function fireConfetti(): void {
-  if (active || !confettiEnabled()) return;
+/** 按设置档位抛洒纸屑(默认标准档):左右两角向中央斜上,标准/夸张档另有中央上抛束 */
+export function fireConfetti(level: ConfettiLevel = "standard"): void {
+  if (level === "off" || active || !confettiEnabled()) return;
+  const L = LEVELS[level];
   active = true;
 
   const canvas = document.createElement("canvas");
@@ -81,8 +143,9 @@ export function fireConfetti(): void {
 
   const particles: Particle[] = [];
   const start = performance.now();
-  burst(particles, w * 0.12, h * 0.72, 1, 34, start);
-  burst(particles, w * 0.88, h * 0.72, -1, 34, start);
+  for (const b of L.bursts) {
+    burst(particles, w * b.x, h * b.y, b.dir, b.count, start, L);
+  }
 
   let prev = start;
   function frame(now: number) {

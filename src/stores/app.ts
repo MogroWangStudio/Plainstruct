@@ -5,6 +5,7 @@ import type {
   AppSettings,
   AppTheme,
   Bootstrap,
+  ConfettiLevel,
   EditorBreakKey,
   EditorFontMode,
   EditorIndentKey,
@@ -276,6 +277,15 @@ export const useAppStore = defineStore("app", {
         settings: { ...this.settings, autosave: enabled },
       };
       await ipc.saveSettings({ autosave: enabled });
+    },
+
+    /** 保存发布成功彩带程度 */
+    async setConfetti(level: ConfettiLevel) {
+      this.bootstrap = {
+        ...this.bootstrap!,
+        settings: { ...this.settings, confetti: level },
+      };
+      await ipc.saveSettings({ confetti: level });
     },
 
     /** 保存个性化外观并立即应用 */

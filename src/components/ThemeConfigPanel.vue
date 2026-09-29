@@ -7,6 +7,7 @@ import { navMaxOf, topNavItems } from "@/lib/builder";
 import { useSiteStore } from "@/stores/site";
 import { useThemeStore } from "@/stores/theme";
 import Modal from "@/components/Modal.vue";
+import SelectMenu from "@/components/SelectMenu.vue";
 
 const { t } = useI18n();
 const theme = useThemeStore();
@@ -118,15 +119,15 @@ function confirmPicker() {
         <span class="mono w-12 text-right text-[12px] text-ink-2">{{ fieldValue(field) }}</span>
       </div>
 
-      <!-- 选项 -->
-      <select
+      <!-- 选项:与全应用统一的自定义下拉(无系统原生黑边选中态) -->
+      <SelectMenu
         v-else-if="field.type === 'select'"
-        class="select !w-48"
-        :value="String(fieldValue(field))"
-        @change="onField(field, ($event.target as HTMLSelectElement).value)"
-      >
-        <option v-for="opt in field.options ?? []" :key="opt" :value="opt">{{ opt }}</option>
-      </select>
+        :model-value="String(fieldValue(field))"
+        :options="(field.options ?? []).map((o) => ({ value: o, label: o }))"
+        align="right"
+        class="shrink-0"
+        @update:model-value="(v: string) => onField(field, v)"
+      />
 
       <!-- 博客顶栏导航:按钮弹出选择窗口,确认后面板列出当前在导航中显示的项 -->
       <div v-else-if="field.type === 'navlist'" class="flex flex-col gap-2">
