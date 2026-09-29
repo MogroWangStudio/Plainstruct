@@ -341,16 +341,15 @@
       }
     },
     {
-      "key": "cardHoverAnim",
-      "label": "卡片悬停过渡",
+      "key": "cardHover",
+      "label": "卡片悬停反馈",
       "type": "select",
-      "default": "平滑",
+      "default": "无",
       "options": [
-        "关闭",
-        "轻快",
-        "平滑",
-        "舒缓",
-        "弹性"
+        "无",
+        "上浮",
+        "下沉",
+        "放大"
       ]
     },
     {
