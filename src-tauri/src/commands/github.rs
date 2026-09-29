@@ -941,8 +941,11 @@ pub fn update_cancel(state: State<'_, AppState>, window: tauri::WebviewWindow) -
     Ok(())
 }
 
-/// 用户点击「重启并更新」:复核任务与安装包、生成向导脚本,以独立进程拉起向导,
-/// 然后退出应用;向导等进程退出后完成安装并启动新版本。
+/// 用户点击「重启并更新」:复核任务与安装包、生成向导脚本,拉起更新向导。
+/// Windows 上应用不自行退出——向导完成窗体初始化后由它主动结束应用进程;
+/// 此前「应用先退出」的时序下,向导作为刚创建的子进程常在初始化完成前被
+/// 随父进程退出的作业对象连带终结,出现「应用已关、向导未起」。
+/// macOS 上向导经 open 拉起、进程完全独立,沿用应用先退出的时序。
 #[tauri::command]
 pub fn update_restart_and_install(app: AppHandle, window: tauri::WebviewWindow) -> Result<(), String> {
     ensure_main(&window)?;
@@ -953,74 +956,96 @@ pub fn update_restart_and_install(app: AppHandle, window: tauri::WebviewWindow) 
         return Err("更新包不存在,请重新下载".into());
     }
     write_update_helper(&asset_path, &task.version)?;
-    spawn_update_helper()?;
-    // 向导独立于应用进程组,应用退出不影响其运行(其内部会等待应用退出)
-    app.exit(0);
+
+    #[cfg(target_os = "windows")]
+    {
+        let mut child = spawn_update_helper_windows()?;
+        // 宽限向导完成初始化(加载 WinForms、显示窗体);若向导已退出则不隐藏
+        // 窗口并报错,应用保持可用,用户可直接重试
+        std::thread::sleep(std::time::Duration::from_millis(1500));
+        if child.try_wait().map_or(false, |s| s.is_some()) {
+            return Err("更新向导异常退出,请重试".into());
+        }
+        if let Some(win) = tauri::Manager::get_webview_window(&app, "main") {
+            // 隐藏窗口向用户传达「应用已交给向导」;进程仍在,等向导来结束
+            let _ = win.hide();
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        spawn_update_helper_macos()?;
+        // 向导独立于应用进程组,应用退出不影响其运行(其内部会等待应用退出)
+        app.exit(0);
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    {
+        let _ = app;
+        Err("当前平台不支持自动更新".into())
+    }
+
+    #[cfg(any(target_os = "windows", target_os = "macos"))]
     Ok(())
 }
 
-/// 以独立进程拉起平台对应的更新向导
-pub(crate) fn spawn_update_helper() -> Result<(), String> {
+/// Windows:以独立进程拉起更新向导,返回子进程句柄供调用方确认其存活
+#[cfg(target_os = "windows")]
+fn spawn_update_helper_windows() -> Result<std::process::Child, String> {
     let dir = update_dir();
-    #[cfg(target_os = "windows")]
-    {
-        let script = dir.join(format!("{UPDATE_HELPER_FILE}.ps1"));
-        if !script.exists() {
-            return Err("更新向导脚本不存在".into());
-        }
-        use std::os::windows::process::CommandExt;
-        // 优先用绝对路径定位 Windows PowerShell(PATH 被裁剪时仍可用)
-        let system_root =
-            std::env::var_os("SystemRoot").unwrap_or_else(|| r"C:\Windows".into());
-        let powershell = std::path::Path::new(&system_root)
-            .join(r"System32\WindowsPowerShell\v1.0\powershell.exe");
-        let powershell = if powershell.exists() {
-            powershell
-        } else {
-            std::path::PathBuf::from("powershell")
-        };
-        // -STA:显式单线程单元,WinForms 所需;不依赖宿主默认值。
-        // -NonInteractive:脚本意外触发交互请求时立即报错退出,而非隐形挂起。
-        // DETACHED_PROCESS 使 powershell 自创建起就没有控制台,全程只显示向导界面。
-        let spawn_with = |flags: u32| {
-            std::process::Command::new(&powershell)
-                .args([
-                    "-NoProfile",
-                    "-STA",
-                    "-NonInteractive",
-                    "-ExecutionPolicy",
-                    "Bypass",
-                    "-File",
-                ])
-                .arg(&script)
-                .creation_flags(flags)
-                .spawn()
-        };
-        const PLAIN: u32 = 0x0000_0008 | 0x0000_0200; // DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
-        const BREAKAWAY: u32 = 0x0100_0000; // CREATE_BREAKAWAY_FROM_JOB
-        // 先尝试脱离父进程的作业对象:若应用进程处在「退出即杀」的作业里,
-        // 向导可免于被连带终结;作业不允许脱离时创建失败,退回常规创建
-        spawn_with(PLAIN | BREAKAWAY)
-            .or_else(|_| spawn_with(PLAIN))
-            .map_err(|e| format!("无法启动更新向导: {e}"))?;
-        Ok(())
+    let script = dir.join(format!("{UPDATE_HELPER_FILE}.ps1"));
+    if !script.exists() {
+        return Err("更新向导脚本不存在".into());
     }
-    #[cfg(target_os = "macos")]
-    {
-        let script = dir.join(format!("{UPDATE_HELPER_FILE}.command"));
-        if !script.exists() {
-            return Err("更新向导脚本不存在".into());
-        }
-        std::process::Command::new("open")
-            .args(["-a", "Terminal", &script.to_string_lossy()])
+    use std::os::windows::process::CommandExt;
+    // 优先用绝对路径定位 Windows PowerShell(PATH 被裁剪时仍可用)
+    let system_root = std::env::var_os("SystemRoot").unwrap_or_else(|| r"C:\Windows".into());
+    let powershell = std::path::Path::new(&system_root)
+        .join(r"System32\WindowsPowerShell\v1.0\powershell.exe");
+    let powershell = if powershell.exists() {
+        powershell
+    } else {
+        std::path::PathBuf::from("powershell")
+    };
+    // -STA:显式单线程单元,WinForms 所需;不依赖宿主默认值。
+    // -NonInteractive:脚本意外触发交互请求时立即报错退出,而非隐形挂起。
+    // DETACHED_PROCESS 使 powershell 自创建起就没有控制台,全程只显示向导界面。
+    let spawn_with = |flags: u32| {
+        std::process::Command::new(&powershell)
+            .args([
+                "-NoProfile",
+                "-STA",
+                "-NonInteractive",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+            ])
+            .arg(&script)
+            .creation_flags(flags)
             .spawn()
-            .map_err(|e| format!("无法启动更新向导: {e}"))?;
-        Ok(())
+    };
+    const PLAIN: u32 = 0x0000_0008 | 0x0000_0200; // DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
+    const BREAKAWAY: u32 = 0x0100_0000; // CREATE_BREAKAWAY_FROM_JOB
+    // 先尝试脱离父进程的作业对象:若应用进程处在「退出即杀」的作业里,
+    // 向导可免于被连带终结;作业不允许脱离时创建失败,退回常规创建
+    spawn_with(PLAIN | BREAKAWAY)
+        .or_else(|_| spawn_with(PLAIN))
+        .map_err(|e| format!("无法启动更新向导: {e}"))
+}
+
+/// macOS:以独立进程拉起终端里的更新向导
+#[cfg(target_os = "macos")]
+fn spawn_update_helper_macos() -> Result<(), String> {
+    let dir = update_dir();
+    let script = dir.join(format!("{UPDATE_HELPER_FILE}.command"));
+    if !script.exists() {
+        return Err("更新向导脚本不存在".into());
     }
-    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
-    {
-        Err("当前平台不支持自动更新".into())
-    }
+    std::process::Command::new("open")
+        .args(["-a", "Terminal", &script.to_string_lossy()])
+        .spawn()
+        .map_err(|e| format!("无法启动更新向导: {e}"))?;
+    Ok(())
 }
 
 /// 生成更新向导脚本(路径与版本在生成时嵌入,向导无需解析任务文件)。
@@ -1095,6 +1120,7 @@ fn write_update_helper(asset_path: &std::path::Path, latest_version: &str) -> Re
 /// 展示进度,并防范压缩包内路径逃逸。整个脚本包在 try/catch 内:窗体建成前
 /// 的失败回退为系统弹窗提示(此前这段出错会因无控制台而完全静默),
 /// 全程写运行日志 update-wizard-log.txt,成功结束自动删除。
+/// 应用进程由向导在阶段 1 主动结束(应用拉起向导后不再自行退出)。
 #[cfg(target_os = "windows")]
 const WIN_WIZARD_SCRIPT: &str = r#"$ErrorActionPreference = 'Stop'
 
@@ -1143,7 +1169,7 @@ try {
   $verLabel.Location = New-Object System.Drawing.Point(20, 16)
   $form.Controls.Add($verLabel)
 
-  $stages = @('等待 Plainstruct 退出', '校验更新包', '解压并安装新版本', '启动新版本')
+  $stages = @('关闭 Plainstruct', '校验更新包', '解压并安装新版本', '启动新版本')
   $script:states = @(0, 0, 0, 0)
   $stageLabels = @()
   for ($i = 0; $i -lt $stages.Count; $i++) {
@@ -1226,12 +1252,21 @@ try {
   $form.Show()
   Update-Stages
 
-  # 阶段 1:等待应用退出(显式更新流程下应用随即退出;兜底最多等 60 秒)
+  # 阶段 1:由向导关闭应用(应用拉起向导后保持运行并已隐藏窗口,退出流程由向导
+  # 负责;主动结束进程后等待其消失,最多宽限 30 秒)
   Set-Stage 0
-  for ($i = 0; $i -lt 120; $i++) {
-    if (-not (Get-Process -Name '__PROC__' -ErrorAction SilentlyContinue)) { break }
-    Start-Sleep -Milliseconds 500
-    [System.Windows.Forms.Application]::DoEvents()
+  $proc = Get-Process -Name '__PROC__' -ErrorAction SilentlyContinue
+  if ($proc) {
+    try { $proc | Stop-Process -Force -ErrorAction Stop; Write-Log "已请求结束应用进程" }
+    catch { Write-Log ("结束应用进程失败: " + $_.Exception.Message) }
+    for ($i = 0; $i -lt 60; $i++) {
+      if (-not (Get-Process -Name '__PROC__' -ErrorAction SilentlyContinue)) { break }
+      Start-Sleep -Milliseconds 500
+      [System.Windows.Forms.Application]::DoEvents()
+    }
+    if (Get-Process -Name '__PROC__' -ErrorAction SilentlyContinue) {
+      throw '无法关闭 Plainstruct,请手动退出应用后重试。'
+    }
   }
   Start-Sleep -Milliseconds 600
 

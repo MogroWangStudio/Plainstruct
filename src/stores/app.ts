@@ -239,7 +239,7 @@ export const useAppStore = defineStore("app", {
       });
     },
 
-    /** 重启并更新:拉起更新向导后关闭应用,由向导完成安装并启动新版本 */
+    /** 重启并更新:拉起更新向导,由向导关闭应用并完成安装后启动新版本 */
     async confirmRestart(version: string): Promise<boolean> {
       const ui = useUiStore();
       const t = i18n.global.t;
@@ -255,7 +255,7 @@ export const useAppStore = defineStore("app", {
       const t = i18n.global.t;
       try {
         await ipc.updateRestartInstall();
-        // 应用将退出(浏览器 mock 为空操作),无需进一步处理
+        // 应用交给更新向导:向导确认存活后应用隐藏窗口并被其关闭(浏览器 mock 为空操作)
       } catch (e) {
         ui.toast(t("settings.updateRestartFailed", { msg: ipc.errText(e) }), "error");
       }

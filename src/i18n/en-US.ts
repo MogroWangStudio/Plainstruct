@@ -427,7 +427,7 @@ export default {
     updateCancelUpdate: "Discard update",
     updateRestart: "Restart & Update",
     updateRestartAskTitle: "Restart & Update",
-    updateRestartAskBody: "The app will close and the update wizard will install v{v}, then relaunch it.",
+    updateRestartAskBody: "The update wizard will close the app, install v{v} and relaunch it.",
     updateRestartAskConfirm: "Restart now",
     updateRestartFailed: "Failed to launch the update wizard: {msg}",
     sectionData: "Data",

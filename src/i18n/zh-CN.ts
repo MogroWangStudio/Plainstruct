@@ -427,7 +427,7 @@ export default {
     updateCancelUpdate: "放弃更新",
     updateRestart: "重启并更新",
     updateRestartAskTitle: "重启并更新",
-    updateRestartAskBody: "应用将关闭并运行更新向导,完成后自动启动 v{v}。",
+    updateRestartAskBody: "更新向导将关闭应用并安装 v{v},完成后自动启动。",
     updateRestartAskConfirm: "立即重启",
     updateRestartFailed: "无法启动更新向导:{msg}",
     sectionData: "数据",
