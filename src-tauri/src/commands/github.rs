@@ -1091,7 +1091,10 @@ fn spawn_update_helper_windows() -> Result<std::process::Child, String> {
     };
     // -STA:显式单线程单元,WinForms 所需;不依赖宿主默认值。
     // -NonInteractive:脚本意外触发交互请求时立即报错退出,而非隐形挂起。
-    // DETACHED_PROCESS 使 powershell 自创建起就没有控制台,全程只显示向导界面。
+    // CREATE_NO_WINDOW:不显示命令行窗口,但进程持有可用的(隐藏)控制台。
+    // 此前用 DETACHED_PROCESS 使 PowerShell 完全无控制台,部分环境下其启动
+    // 即失败退出(手动运行同一脚本正常)——改用 CREATE_NO_WINDOW 后启动环境
+    // 与常规一致,向导界面照常独立显示。
     let spawn_with = |flags: u32| {
         std::process::Command::new(&powershell)
             .args([
@@ -1103,12 +1106,13 @@ fn spawn_update_helper_windows() -> Result<std::process::Child, String> {
                 "-File",
             ])
             .arg(&script)
+            .current_dir(&dir)
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
             .creation_flags(flags)
             .spawn()
     };
-    const PLAIN: u32 = 0x0000_0008 | 0x0000_0200; // DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
+    const PLAIN: u32 = 0x0800_0000 | 0x0000_0200; // CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP
     const BREAKAWAY: u32 = 0x0100_0000; // CREATE_BREAKAWAY_FROM_JOB
     // 先尝试脱离父进程的作业对象:若应用进程处在「退出即杀」的作业里,
     // 向导可免于被连带终结;作业不允许脱离时创建失败,退回常规创建
