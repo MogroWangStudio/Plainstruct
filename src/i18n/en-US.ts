@@ -359,6 +359,7 @@ export default {
     title: "About Plainstruct",
     description:
       "Build your own local static site visually, all in one place.\nSupports documentation and blog sites, great as an introduction site for your software or project, with customizable themes and optional publishing to GitHub Pages.",
+    studioHint: "Visit the MogroWang Studio website",
   },
   settings: {
     title: "Settings",
