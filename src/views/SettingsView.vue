@@ -4,7 +4,7 @@ import { useI18n } from "vue-i18n";
 import { useAppStore } from "@/stores/app";
 import { useUiStore } from "@/stores/ui";
 import { ipc } from "@/ipc/ipc";
-import type { ConfettiLevel, EditorBreakKey, EditorFontMode, EditorIndentKey, Locale, UiFontSize, UiFontMode, UiFontWeight } from "@/ipc/types";
+import type { ConfettiLevel, EditorBreakKey, EditorFontMode, EditorIndentKey, Locale, StartAnim, UiFontSize, UiFontMode, UiFontWeight } from "@/ipc/types";
 import { APP_THEMES, type AppThemeSwatch } from "@/lib/app-themes";
 import { formatSize } from "@/lib/format";
 import AppIcon from "@/components/AppIcon.vue";
@@ -122,6 +122,13 @@ const uiFontWeightOptions = computed<{ value: UiFontWeight; label: string }[]>((
   { value: "normal", label: t("settings.uiFontWeightNormal") },
   { value: "medium", label: t("settings.uiFontWeightMedium") },
   { value: "semibold", label: t("settings.uiFontWeightSemibold") },
+]);
+
+const startAnimOptions = computed<{ value: StartAnim; label: string }[]>(() => [
+  { value: "fade", label: t("settings.startAnimFade") },
+  { value: "pulse", label: t("settings.startAnimPulse") },
+  { value: "progress", label: t("settings.startAnimProgress") },
+  { value: "off", label: t("settings.startAnimOff") },
 ]);
 
 const editorFontOptions = computed<{ value: EditorFontMode; label: string }[]>(() => [
@@ -537,6 +544,21 @@ function openRelease(url: string) {
                     align="right"
                     class="shrink-0"
                     @update:model-value="app.setConfetti($event as ConfettiLevel)"
+                  />
+                </div>
+
+                <!-- 启动动画(更改自下次启动生效) -->
+                <div class="settings-row" style="--i: 6">
+                  <div class="min-w-0">
+                    <p class="text-[13.5px] font-medium">{{ t("settings.startAnim") }}</p>
+                    <p class="mt-0.5 text-[12px] leading-relaxed text-ink-3">{{ t("settings.startAnimHint") }}</p>
+                  </div>
+                  <SelectMenu
+                    :model-value="app.settings.startAnim ?? 'fade'"
+                    :options="startAnimOptions"
+                    align="right"
+                    class="shrink-0"
+                    @update:model-value="app.setAppearance({ startAnim: $event as StartAnim })"
                   />
                 </div>
               </div>

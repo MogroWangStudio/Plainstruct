@@ -13,6 +13,8 @@ export type UiFontMode = "system" | "serif" | "mono" | "custom";
 export type UiFontSize = "small" | "default" | "large" | "xlarge";
 /** 界面字重档位:作用于未显式指定字重的界面文本 */
 export type UiFontWeight = "normal" | "medium" | "semibold";
+/** 启动动画预设:浮现 / 呼吸 / 进度线 / 关闭 */
+export type StartAnim = "fade" | "pulse" | "progress" | "off";
 /** 编辑器字体模式:默认等宽 / 跟随界面 / 衬线 / 自定义 font-family */
 export type EditorFontMode = "default" | "ui" | "serif" | "custom";
 /** 硬换行触发键 */
@@ -33,6 +35,8 @@ export interface AppSettings {
   uiFontSize?: UiFontSize;
   /** 界面字重档位,默认 normal(400) */
   uiFontWeight?: UiFontWeight;
+  /** 启动动画预设,默认 fade(浮现) */
+  startAnim?: StartAnim;
   editorFont?: EditorFontMode;
   editorFontCustom?: string;
   /** 空白标记显示:硬换行(¶)与首行缩进(⇥)的可见标记 */
