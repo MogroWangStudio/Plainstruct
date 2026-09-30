@@ -748,21 +748,13 @@ async function onTreeDrop(e: DragEvent) {
           {{ t("tree.assets") }} · {{ site.assetFiles.length }}
         </span>
         <div class="flex items-center gap-0.5">
+          <!-- 单按钮切换:图标显示将要切换到的视图 -->
           <button
             class="btn-icon !h-6 !w-6"
-            :class="{ '!text-ink': assetView === 'card' }"
-            :title="t('tree.assetCardView')"
-            @click="assetView = 'card'"
+            :title="assetView === 'card' ? t('tree.assetListView') : t('tree.assetCardView')"
+            @click="assetView = assetView === 'card' ? 'list' : 'card'"
           >
-            <AppIcon name="grid" :size="13" />
-          </button>
-          <button
-            class="btn-icon !h-6 !w-6"
-            :class="{ '!text-ink': assetView === 'list' }"
-            :title="t('tree.assetListView')"
-            @click="assetView = 'list'"
-          >
-            <AppIcon name="listBullet" :size="13" />
+            <AppIcon :name="assetView === 'card' ? 'listBullet' : 'grid'" :size="13" />
           </button>
           <button class="btn-icon !h-6 !w-6" :title="t('tree.importImages')" @click="importImages">
             <AppIcon name="download" :size="13" />
