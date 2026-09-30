@@ -1,6 +1,7 @@
 <script setup lang="ts">
 /** 自定义下拉选择 -- 面板以带轻微过冲的非线性缓动弹出;选项无系统黑边框选中态 */
 import { nextTick, onBeforeUnmount, onMounted, ref } from "vue";
+import { toCssPx, uiZoom } from "@/lib/scale";
 
 const props = withDefaults(
   defineProps<{
@@ -32,13 +33,15 @@ function placePanel() {
   if (!t) return;
   const r = t.getBoundingClientRect();
   const estimatedH = props.options.length * 34 + 10;
-  flipUp.value = r.bottom + 6 + estimatedH > window.innerHeight - 8;
+  // 界面缩放(zoom)下:rect/视口比较在视觉像素中进行,面板 CSS 定位值经 toCssPx 还原
+  const z = uiZoom();
+  flipUp.value = r.bottom + 6 + estimatedH * z > window.innerHeight - 8;
   pos.value = {
-    left: (props.align === "right" ? r.right : r.left) + "px",
-    minWidth: Math.max(r.width, 150) + "px",
+    left: toCssPx(props.align === "right" ? r.right : r.left) + "px",
+    minWidth: toCssPx(Math.max(r.width, 150)) + "px",
     ...(flipUp.value
-      ? { bottom: window.innerHeight - r.top + 6 + "px" }
-      : { top: r.bottom + 6 + "px" }),
+      ? { bottom: toCssPx(window.innerHeight - r.top + 6) + "px" }
+      : { top: toCssPx(r.bottom + 6) + "px" }),
   };
 }
 

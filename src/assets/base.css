@@ -8,6 +8,8 @@ body {
   margin: 0;
   font-family: var(--font-sans);
   font-size: 14px;
+  /* 界面字重(个性化设置):仅作用于未显式指定字重的文本,标题/按钮等加重元素不受影响 */
+  font-weight: var(--font-weight-ui, 400);
   line-height: 1.5;
   color: var(--color-ink);
   background: var(--color-bg);

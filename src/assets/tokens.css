@@ -48,6 +48,8 @@
   --duration-slow: 220ms;
   /* 编辑器字体:个性化设置可覆盖 */
   --font-editor: var(--font-mono);
+  /* 界面基础字重:个性化设置可覆盖 */
+  --font-weight-ui: 400;
   /* 代码语法高亮(克制的语义色) */
   --code-string: #0f766e;
   --code-number: #92400e;

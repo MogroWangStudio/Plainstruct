@@ -2,6 +2,7 @@
 /** 软件专属右键菜单渲染器:视口内自动收位,Esc/点击空白/滚轮关闭 */
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useContextMenuStore } from "@/stores/contextMenu";
+import { toCssPx } from "@/lib/scale";
 import AppIcon from "./AppIcon.vue";
 
 const ui = useContextMenuStore();
@@ -16,10 +17,12 @@ watch(
     await nextTick();
     const el = panel.value;
     if (!el) return;
+    // 收位比较在视觉像素中进行(ui.x/rect/视口同系);赋值经 toCssPx 还原为
+    // 面板 CSS 坐标,界面缩放(zoom)档位下位置不漂移
     const rect = el.getBoundingClientRect();
     pos.value = {
-      x: Math.max(4, Math.min(ui.x, window.innerWidth - rect.width - 4)),
-      y: Math.max(4, Math.min(ui.y, window.innerHeight - rect.height - 4)),
+      x: toCssPx(Math.max(4, Math.min(ui.x, window.innerWidth - rect.width - 4))),
+      y: toCssPx(Math.max(4, Math.min(ui.y, window.innerHeight - rect.height - 4))),
     };
   },
 );

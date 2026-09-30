@@ -9,6 +9,10 @@ export type SiteType = "docs" | "blog";
 export type AppTheme = "light" | "dark" | "sepia" | "mint" | "ocean" | "plum" | "system";
 /** 界面字体模式:系统默认 / 衬线 / 等宽 / 自定义 font-family */
 export type UiFontMode = "system" | "serif" | "mono" | "custom";
+/** 界面字号档位:整页等比缩放(等效浏览器缩放) */
+export type UiFontSize = "small" | "default" | "large" | "xlarge";
+/** 界面字重档位:作用于未显式指定字重的界面文本 */
+export type UiFontWeight = "normal" | "medium" | "semibold";
 /** 编辑器字体模式:默认等宽 / 跟随界面 / 衬线 / 自定义 font-family */
 export type EditorFontMode = "default" | "ui" | "serif" | "custom";
 /** 硬换行触发键 */
@@ -25,6 +29,10 @@ export interface AppSettings {
   theme?: AppTheme;
   uiFont?: UiFontMode;
   uiFontCustom?: string;
+  /** 界面字号档位,默认 default(100%) */
+  uiFontSize?: UiFontSize;
+  /** 界面字重档位,默认 normal(400) */
+  uiFontWeight?: UiFontWeight;
   editorFont?: EditorFontMode;
   editorFontCustom?: string;
   /** 空白标记显示:硬换行(¶)与首行缩进(⇥)的可见标记 */

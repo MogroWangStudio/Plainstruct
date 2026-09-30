@@ -12,7 +12,9 @@ import type {
   Locale,
   Platform,
   RecentSite,
+  UiFontSize,
   UiFontMode,
+  UiFontWeight,
   UpdateProgress,
 } from "@/ipc/types";
 import { i18n, type Locale as I18nLocale } from "@/i18n";
@@ -35,6 +37,8 @@ export interface AppearanceSettings {
   theme?: AppTheme;
   uiFont?: UiFontMode;
   uiFontCustom?: string;
+  uiFontSize?: UiFontSize;
+  uiFontWeight?: UiFontWeight;
   editorFont?: EditorFontMode;
   editorFontCustom?: string;
 }
@@ -51,6 +55,21 @@ export interface EditorPrefs {
 const FONT_STACKS: Record<"serif" | "mono", string> = {
   serif: `Georgia, "Times New Roman", "Songti SC", "SimSun", serif`,
   mono: `ui-monospace, SFMono-Regular, Menlo, Consolas, "PingFang SC", "Microsoft YaHei", monospace`,
+};
+
+/** 界面字号档位 -> 整页等比缩放倍率(等效浏览器缩放,布局随文字一同缩放) */
+const UI_SIZE_ZOOM: Record<UiFontSize, string> = {
+  small: "0.9",
+  default: "1",
+  large: "1.1",
+  xlarge: "1.25",
+};
+
+/** 界面字重档位 -> 基础文本字重(显式加重的标题/按钮不受影响) */
+const UI_WEIGHT_VALUE: Record<UiFontWeight, string> = {
+  normal: "400",
+  medium: "500",
+  semibold: "600",
 };
 
 interface State {
@@ -103,6 +122,8 @@ export const useAppStore = defineStore("app", {
           autosave: true,
           theme: "system",
           uiFont: "system",
+          uiFontSize: "default",
+          uiFontWeight: "normal",
           editorFont: "default",
           editorWhitespace: true,
           editorBreakKey: "enter",
@@ -317,15 +338,21 @@ export const useAppStore = defineStore("app", {
       await ipc.saveSettings(patch);
     },
 
-    /** 把主题与字体落到 html 根节点(data-theme + 字体变量) */
+    /** 把主题与字体落到 html 根节点(data-theme + 字体变量 + 缩放/字重) */
     applyAppearance() {
       if (typeof document === "undefined") return;
-      const { theme, uiFont, uiFontCustom, editorFont, editorFontCustom } = this.settings;
+      const { theme, uiFont, uiFontCustom, uiFontSize, uiFontWeight, editorFont, editorFontCustom } = this.settings;
       const root = document.documentElement;
       // 跟随系统时落到 light/dark,其余主题直接以自身 id 生效
       const preferDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
       const resolved = theme ?? "system";
       root.dataset.theme = resolved === "system" ? (preferDark ? "dark" : "light") : resolved;
+
+      // 界面字号:整页等比缩放(等效浏览器缩放),文字与布局一同缩放保持排布完整
+      root.style.setProperty("zoom", UI_SIZE_ZOOM[uiFontSize ?? "default"]);
+
+      // 界面字重:落到基础字重变量,标题/按钮等显式加重的元素不受影响
+      root.style.setProperty("--font-weight-ui", UI_WEIGHT_VALUE[uiFontWeight ?? "normal"]);
 
       let ui: string | undefined;
       if (uiFont === "custom") ui = (uiFontCustom ?? "").trim() || undefined;

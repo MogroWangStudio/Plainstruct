@@ -4,7 +4,7 @@ import { useI18n } from "vue-i18n";
 import { useAppStore } from "@/stores/app";
 import { useUiStore } from "@/stores/ui";
 import { ipc } from "@/ipc/ipc";
-import type { ConfettiLevel, EditorBreakKey, EditorFontMode, EditorIndentKey, Locale, UiFontMode } from "@/ipc/types";
+import type { ConfettiLevel, EditorBreakKey, EditorFontMode, EditorIndentKey, Locale, UiFontSize, UiFontMode, UiFontWeight } from "@/ipc/types";
 import { APP_THEMES, type AppThemeSwatch } from "@/lib/app-themes";
 import { formatSize } from "@/lib/format";
 import AppIcon from "@/components/AppIcon.vue";
@@ -111,6 +111,19 @@ const confettiOptions = computed<{ value: ConfettiLevel; label: string }[]>(() =
   { value: "grand", label: t("settings.confettiGrand") },
 ]);
 
+const uiFontSizeOptions = computed<{ value: UiFontSize; label: string }[]>(() => [
+  { value: "small", label: t("settings.uiFontSizeSmall") },
+  { value: "default", label: t("settings.uiFontSizeDefault") },
+  { value: "large", label: t("settings.uiFontSizeLarge") },
+  { value: "xlarge", label: t("settings.uiFontSizeXLarge") },
+]);
+
+const uiFontWeightOptions = computed<{ value: UiFontWeight; label: string }[]>(() => [
+  { value: "normal", label: t("settings.uiFontWeightNormal") },
+  { value: "medium", label: t("settings.uiFontWeightMedium") },
+  { value: "semibold", label: t("settings.uiFontWeightSemibold") },
+]);
+
 const editorFontOptions = computed<{ value: EditorFontMode; label: string }[]>(() => [
   { value: "default", label: t("settings.fontEditorDefault") },
   { value: "ui", label: t("settings.fontUi") },
@@ -121,6 +134,14 @@ const editorFontOptions = computed<{ value: EditorFontMode; label: string }[]>((
 const uiFontModel = computed({
   get: () => app.settings.uiFont ?? "system",
   set: (v: UiFontMode) => void app.setAppearance({ uiFont: v }),
+});
+const uiFontSizeModel = computed({
+  get: () => app.settings.uiFontSize ?? "default",
+  set: (v: UiFontSize) => void app.setAppearance({ uiFontSize: v }),
+});
+const uiFontWeightModel = computed({
+  get: () => app.settings.uiFontWeight ?? "normal",
+  set: (v: UiFontWeight) => void app.setAppearance({ uiFontWeight: v }),
 });
 const editorFontModel = computed({
   get: () => app.settings.editorFont ?? "default",
@@ -466,8 +487,26 @@ function openRelease(url: string) {
                   <SelectMenu v-model="uiFontModel" :options="uiFontOptions" align="right" class="shrink-0" />
                 </div>
 
-                <!-- 编辑器字体 -->
+                <!-- 界面字号 -->
                 <div class="settings-row" style="--i: 2">
+                  <div class="min-w-0">
+                    <p class="text-[13.5px] font-medium">{{ t("settings.uiFontSize") }}</p>
+                    <p class="mt-0.5 text-[12px] leading-relaxed text-ink-3">{{ t("settings.uiFontSizeHint") }}</p>
+                  </div>
+                  <SelectMenu v-model="uiFontSizeModel" :options="uiFontSizeOptions" align="right" class="shrink-0" />
+                </div>
+
+                <!-- 界面字重 -->
+                <div class="settings-row" style="--i: 3">
+                  <div class="min-w-0">
+                    <p class="text-[13.5px] font-medium">{{ t("settings.uiFontWeight") }}</p>
+                    <p class="mt-0.5 text-[12px] leading-relaxed text-ink-3">{{ t("settings.uiFontWeightHint") }}</p>
+                  </div>
+                  <SelectMenu v-model="uiFontWeightModel" :options="uiFontWeightOptions" align="right" class="shrink-0" />
+                </div>
+
+                <!-- 编辑器字体 -->
+                <div class="settings-row" style="--i: 4">
                   <div class="min-w-0">
                     <p class="text-[13.5px] font-medium">{{ t("settings.editorFont") }}</p>
                     <p class="mt-0.5 text-[12px] leading-relaxed text-ink-3">{{ t("settings.editorFontHint") }}</p>
@@ -487,7 +526,7 @@ function openRelease(url: string) {
                 </div>
 
                 <!-- 发布成功彩带 -->
-                <div class="settings-row" style="--i: 3">
+                <div class="settings-row" style="--i: 5">
                   <div class="min-w-0">
                     <p class="text-[13.5px] font-medium">{{ t("settings.confetti") }}</p>
                     <p class="mt-0.5 text-[12px] leading-relaxed text-ink-3">{{ t("settings.confettiHint") }}</p>
