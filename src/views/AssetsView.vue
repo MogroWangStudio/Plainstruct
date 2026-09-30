@@ -244,18 +244,24 @@ function thumbUrl(path: string): string {
           >
             {{ img.name }}
           </p>
-          <div class="flex items-center justify-between px-2 pb-2 pt-0.5">
-            <span class="ref-count" :class="{ zero: !(refCounts.get(img.path) ?? 0) }">
-              {{ t("assets.refCount", { n: refCounts.get(img.path) ?? 0 }) }}
-            </span>
-            <div class="actions flex items-center gap-0.5">
-              <button class="btn-icon !h-6 !w-6" :title="t('assets.rename')" @click.stop="rename(img)">
-                <AppIcon name="pencil" :size="13" />
-              </button>
-              <button class="btn-icon !h-6 !w-6 hover:!text-danger" :title="t('common.delete')" @click.stop="remove(img)">
-                <AppIcon name="trash" :size="13" />
-              </button>
+          <div class="px-2 pb-2 pt-0.5">
+            <div class="flex items-center justify-between">
+              <span class="ref-count" :class="{ zero: !(refCounts.get(img.path) ?? 0) }">
+                {{ t("assets.refCount", { n: refCounts.get(img.path) ?? 0 }) }}
+              </span>
+              <div class="actions flex items-center gap-0.5">
+                <button class="btn-icon !h-6 !w-6" :title="t('assets.rename')" @click.stop="rename(img)">
+                  <AppIcon name="pencil" :size="13" />
+                </button>
+                <button class="btn-icon !h-6 !w-6 hover:!text-danger" :title="t('common.delete')" @click.stop="remove(img)">
+                  <AppIcon name="trash" :size="13" />
+                </button>
+              </div>
             </div>
+            <!-- 文件大小:默认显示在引用计数下一行 -->
+            <p v-if="img.size" class="mono pt-0.5 text-[calc(11px*var(--ui-font-scale))] text-ink-3">
+              {{ formatSize(img.size) }}
+            </p>
           </div>
         </div>
       </div>
