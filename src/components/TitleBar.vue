@@ -53,9 +53,9 @@ async function goToStart() {
     >
       <span class="brand-id flex items-center gap-2">
         <BrandLogo :size="20" :gaze-scale-x="onMac ? 0.5 : 1" class="shrink-0" />
-        <span class="text-[13px] font-semibold tracking-tight">{{ t("app.name") }}</span>
-        <span v-if="site.open && site.config" class="text-[13px] text-ink-3">/</span>
-        <span v-if="site.open && site.config" class="text-[13px] text-ink-2">{{ site.config.name }}</span>
+        <span class="text-[calc(13px*var(--ui-font-scale))] font-semibold tracking-tight">{{ t("app.name") }}</span>
+        <span v-if="site.open && site.config" class="text-[calc(13px*var(--ui-font-scale))] text-ink-3">/</span>
+        <span v-if="site.open && site.config" class="text-[calc(13px*var(--ui-font-scale))] text-ink-2">{{ site.config.name }}</span>
       </span>
       <!-- 悬停提示:以非线性缓动浮现的「返回主菜单」(设置页中禁用,不显示) -->
       <span v-if="canGoBack" class="brand-back" aria-hidden="true">
@@ -119,7 +119,7 @@ async function goToStart() {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 13px;
+  font-size: calc(13px * var(--ui-font-scale));
   color: var(--color-ink-2);
   white-space: nowrap;
   pointer-events: none;

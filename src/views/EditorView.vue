@@ -106,8 +106,8 @@ onBeforeUnmount(() => {
       <template v-if="editor.activeImage">
         <header class="flex h-11 shrink-0 items-center gap-3 border-b border-line bg-surface px-4">
           <AppIcon name="image" :size="15" class="shrink-0 text-ink-3" />
-          <span class="min-w-0 flex-1 truncate text-[13.5px] font-semibold">{{ basename(editor.activeImage) }}</span>
-          <span class="mono shrink-0 text-[12px] text-ink-3">{{ editor.activeImage }}</span>
+          <span class="min-w-0 flex-1 truncate text-[calc(13.5px*var(--ui-font-scale))] font-semibold">{{ basename(editor.activeImage) }}</span>
+          <span class="mono shrink-0 text-[calc(12px*var(--ui-font-scale))] text-ink-3">{{ editor.activeImage }}</span>
         </header>
         <div class="flex min-h-0 flex-1 items-center justify-center p-8">
           <img
@@ -120,8 +120,8 @@ onBeforeUnmount(() => {
           />
           <div v-else class="flex flex-col items-center gap-3 text-ink-3">
             <AppIcon name="image" :size="40" />
-            <span class="text-[13px]">{{ basename(editor.activeImage) }}</span>
-            <span v-if="imageFailed" class="text-[12px]">{{ t("editor.imageLoadFailed") }}</span>
+            <span class="text-[calc(13px*var(--ui-font-scale))]">{{ basename(editor.activeImage) }}</span>
+            <span v-if="imageFailed" class="text-[calc(12px*var(--ui-font-scale))]">{{ t("editor.imageLoadFailed") }}</span>
           </div>
         </div>
       </template>
@@ -129,9 +129,9 @@ onBeforeUnmount(() => {
       <template v-else-if="editor.activePath">
         <!-- 文档工具条:标题栏显示文件名(含 .md 后缀),文档标题由配置头与页面承载 -->
         <header class="flex h-11 shrink-0 items-center gap-3 border-b border-line bg-surface px-4">
-          <span class="min-w-0 flex-1 truncate text-[13.5px] font-semibold">{{ basename(editor.activePath) }}</span>
+          <span class="min-w-0 flex-1 truncate text-[calc(13.5px*var(--ui-font-scale))] font-semibold">{{ basename(editor.activePath) }}</span>
 
-          <span class="flex items-center gap-1.5 text-[12px] text-ink-3">
+          <span class="flex items-center gap-1.5 text-[calc(12px*var(--ui-font-scale))] text-ink-3">
             <template v-if="editor.saving">{{ t("editor.saving") }}</template>
             <template v-else-if="!editor.dirty">
               <AppIcon name="check" :size="13" class="text-ink-3" />
@@ -186,8 +186,8 @@ onBeforeUnmount(() => {
         <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-surface-2">
           <AppIcon name="doc" :size="22" class="text-ink-3" />
         </div>
-        <p class="text-[15px] font-semibold">{{ t("editor.emptyTitle") }}</p>
-        <p class="text-[13px] text-ink-3">{{ t("editor.emptyBody") }}</p>
+        <p class="text-[calc(15px*var(--ui-font-scale))] font-semibold">{{ t("editor.emptyTitle") }}</p>
+        <p class="text-[calc(13px*var(--ui-font-scale))] text-ink-3">{{ t("editor.emptyBody") }}</p>
       </div>
     </section>
   </div>

@@ -258,8 +258,8 @@ async function resetConfig() {
     <!-- 头部 -->
     <header class="flex h-14 shrink-0 items-center gap-4 border-b border-line bg-surface px-5">
       <div class="min-w-0">
-        <h1 class="text-[15px] font-semibold leading-tight">{{ t("theme.title") }}</h1>
-        <p class="truncate text-[12px] text-ink-3">{{ t("theme.subtitle") }}</p>
+        <h1 class="text-[calc(15px*var(--ui-font-scale))] font-semibold leading-tight">{{ t("theme.title") }}</h1>
+        <p class="truncate text-[calc(12px*var(--ui-font-scale))] text-ink-3">{{ t("theme.subtitle") }}</p>
       </div>
       <div class="ml-auto flex items-center gap-2">
         <button class="btn btn-secondary" @click="importZip">
@@ -286,10 +286,10 @@ async function resetConfig() {
               :class="{ current: isActive(meta) }"
             >
               <div class="min-w-0 flex-1">
-                <p class="truncate text-[13px] font-medium">{{ meta.name }}</p>
+                <p class="truncate text-[calc(13px*var(--ui-font-scale))] font-medium">{{ meta.name }}</p>
                 <!-- 版本行:标签放在 truncate 之外,避免被省略号截断 -->
                 <div class="flex min-w-0 items-center">
-                  <p class="mono min-w-0 truncate text-[11px] text-ink-3">v{{ meta.version }}</p>
+                  <p class="mono min-w-0 truncate text-[calc(11px*var(--ui-font-scale))] text-ink-3">v{{ meta.version }}</p>
                   <span
                     v-if="isActive(meta) && theme.builtinConfigModified"
                     class="modified-tag"
@@ -315,7 +315,7 @@ async function resetConfig() {
           </div>
 
           <h2 class="field-label mb-1 mt-5">{{ t("theme.custom") }}</h2>
-          <p v-if="!theme.customForSite.length" class="rounded-lg border border-dashed border-line px-3 py-4 text-[12px] leading-relaxed text-ink-3">
+          <p v-if="!theme.customForSite.length" class="rounded-lg border border-dashed border-line px-3 py-4 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">
             {{ t("theme.noCustom") }}
           </p>
           <div v-else class="flex flex-col gap-1">
@@ -326,8 +326,8 @@ async function resetConfig() {
               :class="{ current: isActive(meta) }"
             >
               <div class="min-w-0 flex-1">
-                <p class="truncate text-[13px] font-medium">{{ meta.name }}</p>
-                <p class="mono truncate text-[11px] text-ink-3">v{{ meta.version }}</p>
+                <p class="truncate text-[calc(13px*var(--ui-font-scale))] font-medium">{{ meta.name }}</p>
+                <p class="mono truncate text-[calc(11px*var(--ui-font-scale))] text-ink-3">v{{ meta.version }}</p>
               </div>
               <span v-if="isActive(meta)" class="badge">{{ t("theme.active") }}</span>
               <div class="item-actions flex items-center gap-0.5">
@@ -393,7 +393,7 @@ async function resetConfig() {
                 <CodeEditor v-model="activeFileContent" :language="langOf(theme.editingActiveFile)" />
               </div>
               <div class="flex h-12 shrink-0 items-center gap-2 border-t border-line bg-surface px-4">
-                <span class="text-[12px] text-ink-3">{{ theme.editing.name }}</span>
+                <span class="text-[calc(12px*var(--ui-font-scale))] text-ink-3">{{ theme.editing.name }}</span>
                 <div class="ml-auto flex gap-2">
                   <button class="btn btn-secondary" @click="exportMaker">
                     <AppIcon name="download" :size="14" />
@@ -406,7 +406,7 @@ async function resetConfig() {
               </div>
             </template>
 
-            <div v-else class="flex flex-1 items-center justify-center text-[13px] text-ink-3">
+            <div v-else class="flex flex-1 items-center justify-center text-[calc(13px*var(--ui-font-scale))] text-ink-3">
               {{ t("theme.noCustom") }}
             </div>
           </div>
@@ -414,7 +414,7 @@ async function resetConfig() {
           <!-- 右:实时预览 -->
           <div class="flex w-[46%] min-w-[320px] shrink-0 flex-col border-l border-line">
             <div class="flex h-10 shrink-0 items-center gap-2 border-b border-line bg-surface px-4">
-              <span class="text-[12.5px] font-semibold text-ink-2">{{ t("theme.previewDoc") }}</span>
+              <span class="text-[calc(12.5px*var(--ui-font-scale))] font-semibold text-ink-2">{{ t("theme.previewDoc") }}</span>
               <button
                 class="btn-icon ml-auto !h-7 !w-7"
                 :title="t('common.refresh')"
@@ -449,10 +449,10 @@ async function resetConfig() {
           <div class="absolute inset-0 bg-[var(--color-scrim)]" @click="dismissCopyAsk" />
           <div class="modal-card panel relative w-full max-w-[380px] shadow-window">
             <header class="px-6 pb-2 pt-5">
-              <h2 class="text-[16px] font-semibold">{{ t("theme.modifiedTitle") }}</h2>
+              <h2 class="text-[calc(16px*var(--ui-font-scale))] font-semibold">{{ t("theme.modifiedTitle") }}</h2>
             </header>
             <div class="px-6">
-              <p class="text-[13.5px] leading-relaxed text-ink-2">
+              <p class="text-[calc(13.5px*var(--ui-font-scale))] leading-relaxed text-ink-2">
                 {{ t("theme.modifiedBody", { name: activeBuiltinName }) }}
               </p>
             </div>
@@ -504,7 +504,7 @@ async function resetConfig() {
   border-radius: 4px;
   background: var(--color-accent);
   color: var(--color-on-accent);
-  font-size: 10.5px;
+  font-size: calc(10.5px * var(--ui-font-scale));
   font-weight: 600;
   letter-spacing: 0.02em;
 }
@@ -519,7 +519,7 @@ async function resetConfig() {
   background: var(--color-surface);
   color: var(--color-ink-2);
   font-family: var(--font-sans);
-  font-size: 10.5px;
+  font-size: calc(10.5px * var(--ui-font-scale));
   font-weight: 600;
   letter-spacing: 0.02em;
   white-space: nowrap;
@@ -556,7 +556,7 @@ async function resetConfig() {
   border-radius: 6px;
   background: transparent;
   color: var(--color-ink-2);
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--ui-font-scale));
   font-weight: 500;
   cursor: pointer;
   transition:
@@ -583,7 +583,7 @@ async function resetConfig() {
   border-radius: 6px;
   background: transparent;
   color: var(--color-ink-2);
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--ui-font-scale));
   cursor: pointer;
   transition:
     background-color var(--duration-base) var(--ease-plain),

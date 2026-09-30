@@ -193,7 +193,7 @@ onBeforeUnmount(() => {
   border-radius: var(--radius-md, 8px);
   background: var(--color-bg);
   color: var(--color-ink);
-  font-size: 13px;
+  font-size: calc(13px * var(--ui-font-scale));
   cursor: pointer;
   transition:
     border-color var(--duration-base) var(--ease-plain),
@@ -250,7 +250,7 @@ onBeforeUnmount(() => {
   border-radius: 6px;
   background: transparent;
   color: var(--color-ink-2);
-  font-size: 13px;
+  font-size: calc(13px * var(--ui-font-scale));
   text-align: left;
   cursor: pointer;
   transition: background-color var(--duration-fast) var(--ease-plain);

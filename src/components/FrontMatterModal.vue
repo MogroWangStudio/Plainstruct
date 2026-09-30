@@ -94,7 +94,7 @@ async function importCover() {
           <option v-for="s in coverSuggestions" :key="s" :value="s" />
         </datalist>
       </label>
-      <p class="text-[12px] leading-relaxed text-ink-3">{{ t("editor.fmHint") }}</p>
+      <p class="text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("editor.fmHint") }}</p>
     </div>
     <template #footer>
       <button class="btn btn-secondary" @click="emit('cancel')">{{ t("common.cancel") }}</button>

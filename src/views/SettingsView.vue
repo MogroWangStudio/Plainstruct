@@ -328,9 +328,9 @@ function openRelease(url: string) {
         <button class="btn-icon" :title="t('common.back')" @click="app.setView('editor')">
           <AppIcon name="arrowLeft" :size="17" />
         </button>
-        <h2 class="truncate text-[14.5px] font-semibold tracking-tight">{{ t("settings.title") }}</h2>
+        <h2 class="truncate text-[calc(14.5px*var(--ui-font-scale))] font-semibold tracking-tight">{{ t("settings.title") }}</h2>
       </div>
-      <p class="px-4 text-[11.5px] leading-relaxed text-ink-3">{{ t("settings.subtitle") }}</p>
+      <p class="px-4 text-[calc(11.5px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.subtitle") }}</p>
 
       <nav class="mt-5 flex flex-col gap-0.5 px-2">
         <button
@@ -344,7 +344,7 @@ function openRelease(url: string) {
         </button>
       </nav>
 
-      <div class="mt-auto px-4 pb-4 text-[11px] text-ink-3 mono">v{{ app.version }}</div>
+      <div class="mt-auto px-4 pb-4 text-[calc(11px*var(--ui-font-scale))] text-ink-3 mono">v{{ app.version }}</div>
     </aside>
 
     <!-- 右侧:当前类别页(切换时整体按方向滑动淡入,行内设置次第浮现) -->
@@ -360,8 +360,8 @@ function openRelease(url: string) {
               <div class="settings-card">
                 <div class="settings-row" style="--i: 0">
                   <div class="min-w-0">
-                    <p class="text-[13.5px] font-medium">{{ t("settings.language") }}</p>
-                    <p class="mt-0.5 text-[12px] leading-relaxed text-ink-3">{{ t("settings.languageHint") }}</p>
+                    <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.language") }}</p>
+                    <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.languageHint") }}</p>
                   </div>
                   <SelectMenu v-model="localeModel" :options="localeOptions" align="right" class="shrink-0" />
                 </div>
@@ -376,8 +376,8 @@ function openRelease(url: string) {
               <div class="settings-card">
                 <div class="settings-row" style="--i: 0">
                   <div class="min-w-0">
-                    <p class="text-[13.5px] font-medium">{{ t("settings.autosave") }}</p>
-                    <p class="mt-0.5 text-[12px] leading-relaxed text-ink-3">{{ t("settings.autosaveHint") }}</p>
+                    <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.autosave") }}</p>
+                    <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.autosaveHint") }}</p>
                   </div>
                   <button
                     class="relative inline-flex h-6 w-10 shrink-0 items-center rounded-full transition-colors"
@@ -400,8 +400,8 @@ function openRelease(url: string) {
               <div class="settings-card">
                 <div class="settings-row" style="--i: 0">
                   <div class="min-w-0">
-                    <p class="text-[13.5px] font-medium">{{ t("settings.editorWhitespace") }}</p>
-                    <p class="mt-0.5 text-[12px] leading-relaxed text-ink-3">{{ t("settings.editorWhitespaceHint") }}</p>
+                    <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.editorWhitespace") }}</p>
+                    <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.editorWhitespaceHint") }}</p>
                   </div>
                   <button
                     class="relative inline-flex h-6 w-10 shrink-0 items-center rounded-full transition-colors"
@@ -418,22 +418,22 @@ function openRelease(url: string) {
                 </div>
                 <div class="settings-row" style="--i: 1">
                   <div class="min-w-0">
-                    <p class="text-[13.5px] font-medium">{{ t("settings.editorBreakKey") }}</p>
-                    <p class="mt-0.5 text-[12px] leading-relaxed text-ink-3">{{ t("settings.editorBreakKeyHint") }}</p>
+                    <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.editorBreakKey") }}</p>
+                    <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.editorBreakKeyHint") }}</p>
                   </div>
                   <SelectMenu v-model="breakKeyModel" :options="breakKeyOptions" align="right" class="shrink-0" />
                 </div>
                 <div class="settings-row" style="--i: 2">
                   <div class="min-w-0">
-                    <p class="text-[13.5px] font-medium">{{ t("settings.editorIndentKey") }}</p>
-                    <p class="mt-0.5 text-[12px] leading-relaxed text-ink-3">{{ t("settings.editorIndentKeyHint") }}</p>
+                    <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.editorIndentKey") }}</p>
+                    <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.editorIndentKeyHint") }}</p>
                   </div>
                   <SelectMenu v-model="indentKeyModel" :options="indentKeyOptions" align="right" class="shrink-0" />
                 </div>
                 <div class="settings-row" style="--i: 3">
                   <div class="min-w-0">
-                    <p class="text-[13.5px] font-medium">{{ t("settings.editorIndentWidth") }}</p>
-                    <p class="mt-0.5 text-[12px] leading-relaxed text-ink-3">{{ t("settings.editorIndentWidthHint") }}</p>
+                    <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.editorIndentWidth") }}</p>
+                    <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.editorIndentWidthHint") }}</p>
                   </div>
                   <SelectMenu v-model="indentWidthModel" :options="indentWidthOptions" align="right" class="shrink-0" />
                 </div>
@@ -448,8 +448,8 @@ function openRelease(url: string) {
               <div class="settings-card">
                 <!-- 软件主题:配色预览网格,点选即换 -->
                 <div class="settings-block" style="--i: 0">
-                  <p class="text-[13.5px] font-medium">{{ t("settings.theme") }}</p>
-                  <p class="mt-0.5 text-[12px] leading-relaxed text-ink-3">{{ t("settings.themeHint") }}</p>
+                  <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.theme") }}</p>
+                  <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.themeHint") }}</p>
                   <div class="theme-grid">
                     <button
                       v-for="th in APP_THEMES"
@@ -477,18 +477,18 @@ function openRelease(url: string) {
                 <!-- 界面字体 -->
                 <div class="settings-row" style="--i: 1">
                   <div class="min-w-0">
-                    <p class="text-[13.5px] font-medium">{{ t("settings.uiFont") }}</p>
-                    <p class="mt-0.5 text-[12px] leading-relaxed text-ink-3">{{ t("settings.uiFontHint") }}</p>
+                    <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.uiFont") }}</p>
+                    <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.uiFontHint") }}</p>
                     <div v-if="uiFontModel === 'custom'" class="mt-2.5">
                       <input
-                        class="input h-8 w-full max-w-[320px] text-[12.5px]"
+                        class="input h-8 w-full max-w-[320px] text-[calc(12.5px*var(--ui-font-scale))]"
                         type="text"
                         spellcheck="false"
                         :placeholder="t('settings.fontCustomPlaceholder')"
                         :value="app.settings.uiFontCustom ?? ''"
                         @change="onUiFontCustom"
                       />
-                      <p class="mt-1 text-[11px] leading-relaxed text-ink-3">{{ t("settings.fontCustomHint") }}</p>
+                      <p class="mt-1 text-[calc(11px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.fontCustomHint") }}</p>
                     </div>
                   </div>
                   <SelectMenu v-model="uiFontModel" :options="uiFontOptions" align="right" class="shrink-0" />
@@ -497,8 +497,8 @@ function openRelease(url: string) {
                 <!-- 界面字号 -->
                 <div class="settings-row" style="--i: 2">
                   <div class="min-w-0">
-                    <p class="text-[13.5px] font-medium">{{ t("settings.uiFontSize") }}</p>
-                    <p class="mt-0.5 text-[12px] leading-relaxed text-ink-3">{{ t("settings.uiFontSizeHint") }}</p>
+                    <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.uiFontSize") }}</p>
+                    <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.uiFontSizeHint") }}</p>
                   </div>
                   <SelectMenu v-model="uiFontSizeModel" :options="uiFontSizeOptions" align="right" class="shrink-0" />
                 </div>
@@ -506,8 +506,8 @@ function openRelease(url: string) {
                 <!-- 界面字重 -->
                 <div class="settings-row" style="--i: 3">
                   <div class="min-w-0">
-                    <p class="text-[13.5px] font-medium">{{ t("settings.uiFontWeight") }}</p>
-                    <p class="mt-0.5 text-[12px] leading-relaxed text-ink-3">{{ t("settings.uiFontWeightHint") }}</p>
+                    <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.uiFontWeight") }}</p>
+                    <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.uiFontWeightHint") }}</p>
                   </div>
                   <SelectMenu v-model="uiFontWeightModel" :options="uiFontWeightOptions" align="right" class="shrink-0" />
                 </div>
@@ -515,18 +515,18 @@ function openRelease(url: string) {
                 <!-- 编辑器字体 -->
                 <div class="settings-row" style="--i: 4">
                   <div class="min-w-0">
-                    <p class="text-[13.5px] font-medium">{{ t("settings.editorFont") }}</p>
-                    <p class="mt-0.5 text-[12px] leading-relaxed text-ink-3">{{ t("settings.editorFontHint") }}</p>
+                    <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.editorFont") }}</p>
+                    <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.editorFontHint") }}</p>
                     <div v-if="editorFontModel === 'custom'" class="mt-2.5">
                       <input
-                        class="input h-8 w-full max-w-[320px] text-[12.5px]"
+                        class="input h-8 w-full max-w-[320px] text-[calc(12.5px*var(--ui-font-scale))]"
                         type="text"
                         spellcheck="false"
                         :placeholder="t('settings.fontCustomPlaceholder')"
                         :value="app.settings.editorFontCustom ?? ''"
                         @change="onEditorFontCustom"
                       />
-                      <p class="mt-1 text-[11px] leading-relaxed text-ink-3">{{ t("settings.fontCustomHint") }}</p>
+                      <p class="mt-1 text-[calc(11px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.fontCustomHint") }}</p>
                     </div>
                   </div>
                   <SelectMenu v-model="editorFontModel" :options="editorFontOptions" align="right" class="shrink-0" />
@@ -535,8 +535,8 @@ function openRelease(url: string) {
                 <!-- 发布成功彩带 -->
                 <div class="settings-row" style="--i: 5">
                   <div class="min-w-0">
-                    <p class="text-[13.5px] font-medium">{{ t("settings.confetti") }}</p>
-                    <p class="mt-0.5 text-[12px] leading-relaxed text-ink-3">{{ t("settings.confettiHint") }}</p>
+                    <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.confetti") }}</p>
+                    <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.confettiHint") }}</p>
                   </div>
                   <SelectMenu
                     :model-value="app.settings.confetti ?? 'standard'"
@@ -550,8 +550,8 @@ function openRelease(url: string) {
                 <!-- 启动动画(更改自下次启动生效) -->
                 <div class="settings-row" style="--i: 6">
                   <div class="min-w-0">
-                    <p class="text-[13.5px] font-medium">{{ t("settings.startAnim") }}</p>
-                    <p class="mt-0.5 text-[12px] leading-relaxed text-ink-3">{{ t("settings.startAnimHint") }}</p>
+                    <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.startAnim") }}</p>
+                    <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.startAnimHint") }}</p>
                   </div>
                   <SelectMenu
                     :model-value="app.settings.startAnim ?? 'fade'"
@@ -572,11 +572,11 @@ function openRelease(url: string) {
               <div class="settings-card">
                 <div class="settings-row" style="--i: 0">
                   <div class="min-w-0">
-                    <p class="text-[13.5px] font-medium">{{ t("settings.dataDir") }}</p>
-                    <p class="mt-0.5 break-all text-[12px] leading-relaxed text-ink-3 mono">
+                    <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.dataDir") }}</p>
+                    <p class="mt-0.5 break-all text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3 mono">
                       {{ app.bootstrap?.appDataDir || "—" }}
                     </p>
-                    <p class="mt-1 text-[11.5px] leading-relaxed text-ink-3">{{ t("settings.dataDirHint") }}</p>
+                    <p class="mt-1 text-[calc(11.5px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.dataDirHint") }}</p>
                   </div>
                   <button class="btn btn-secondary shrink-0" @click="openDataDir">
                     <AppIcon name="folder" :size="14" />
@@ -586,11 +586,11 @@ function openRelease(url: string) {
 
                 <div class="settings-row" style="--i: 1">
                   <div class="min-w-0">
-                    <p class="text-[13.5px] font-medium">{{ t("settings.moveData") }}</p>
-                    <p class="mt-0.5 text-[12px] leading-relaxed text-ink-3">{{ t("settings.moveDataHint") }}</p>
+                    <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.moveData") }}</p>
+                    <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.moveDataHint") }}</p>
                     <p
                       v-if="dataError"
-                      class="mt-1 text-[11.5px] leading-relaxed text-danger"
+                      class="mt-1 text-[calc(11.5px*var(--ui-font-scale))] leading-relaxed text-danger"
                     >
                       {{ dataError }}
                     </p>
@@ -612,8 +612,8 @@ function openRelease(url: string) {
 
                 <div class="settings-row" style="--i: 2">
                   <div class="min-w-0">
-                    <p class="text-[13.5px] font-medium">{{ t("settings.repairWebview") }}</p>
-                    <p class="mt-0.5 text-[12px] leading-relaxed text-ink-3">{{ t("settings.repairWebviewHint") }}</p>
+                    <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.repairWebview") }}</p>
+                    <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.repairWebviewHint") }}</p>
                   </div>
                   <button class="btn btn-secondary shrink-0" :disabled="repairing" @click="repairWebview">
                     {{ t("settings.repairWebview") }}
@@ -630,8 +630,8 @@ function openRelease(url: string) {
               <div class="settings-card">
                 <div class="settings-row" style="--i: 0">
                   <div class="min-w-0">
-                    <p class="text-[13.5px] font-medium">{{ t("settings.version") }}</p>
-                    <p class="mt-0.5 text-[12px] leading-relaxed text-ink-3">{{ app.version }}</p>
+                    <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.version") }}</p>
+                    <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ app.version }}</p>
                   </div>
                   <button class="btn btn-secondary shrink-0" @click="app.setView('about')">
                     <AppIcon name="info" :size="14" />
@@ -642,14 +642,14 @@ function openRelease(url: string) {
                 <!-- 检查更新与自动更新 -->
                 <div class="settings-row" style="--i: 1">
                   <div class="min-w-0">
-                    <p class="text-[13.5px] font-medium">{{ t("settings.checkUpdate") }}</p>
-                    <p class="mt-0.5 truncate text-[12px] leading-relaxed" :class="hintTone">
+                    <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.checkUpdate") }}</p>
+                    <p class="mt-0.5 truncate text-[calc(12px*var(--ui-font-scale))] leading-relaxed" :class="hintTone">
                       {{ updateHint }}
                     </p>
 
                     <!-- 下载中/已暂停:更新包名 + 进度 + 速度 -->
                     <div v-if="downloading" class="mt-2 space-y-1.5">
-                      <p class="truncate text-[12px] text-ink-2">{{ app.updateName }}</p>
+                      <p class="truncate text-[calc(12px*var(--ui-font-scale))] text-ink-2">{{ app.updateName }}</p>
                       <div class="h-1 w-full max-w-[240px] overflow-hidden rounded-full bg-surface-3">
                         <div
                           class="h-full rounded-full bg-accent transition-[width] duration-200 ease-(--ease-plain)"
@@ -657,7 +657,7 @@ function openRelease(url: string) {
                           :style="{ width: updateBar }"
                         />
                       </div>
-                      <p class="text-[11.5px] text-ink-3">
+                      <p class="text-[calc(11.5px*var(--ui-font-scale))] text-ink-3">
                         <template v-if="app.updateTotal">
                           {{ formatSize(app.updateReceived) }} / {{ formatSize(app.updateTotal) }}
                         </template>
@@ -751,7 +751,7 @@ function openRelease(url: string) {
   border-radius: 7px;
   background: transparent;
   color: var(--color-ink-2);
-  font-size: 13px;
+  font-size: calc(13px * var(--ui-font-scale));
   text-align: left;
   cursor: pointer;
   transition:
@@ -822,7 +822,7 @@ function openRelease(url: string) {
 /* 类别标题与设置卡片 */
 .settings-heading {
   margin-bottom: 10px;
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--ui-font-scale));
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -898,7 +898,7 @@ function openRelease(url: string) {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--ui-font-scale));
   color: var(--color-ink-2);
 }
 .theme-card.active .theme-card-name {

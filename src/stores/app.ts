@@ -76,8 +76,8 @@ const FONT_STACKS: Record<"serif" | "mono", string> = {
   mono: `ui-monospace, SFMono-Regular, Menlo, Consolas, "PingFang SC", "Microsoft YaHei", monospace`,
 };
 
-/** 界面字号档位 -> 整页等比缩放倍率(等效浏览器缩放,布局随文字一同缩放) */
-const UI_SIZE_ZOOM: Record<UiFontSize, string> = {
+/** 界面字号档位 -> 文字缩放系数(只缩放文字,布局随内容自适应) */
+const UI_SIZE_SCALE: Record<UiFontSize, string> = {
   small: "0.9",
   default: "1",
   large: "1.1",
@@ -390,8 +390,8 @@ export const useAppStore = defineStore("app", {
       const resolved = theme ?? "system";
       root.dataset.theme = resolved === "system" ? (preferDark ? "dark" : "light") : resolved;
 
-      // 界面字号:整页等比缩放(等效浏览器缩放),文字与布局一同缩放保持排布完整
-      root.style.setProperty("zoom", UI_SIZE_ZOOM[uiFontSize ?? "default"]);
+      // 界面字号:只缩放文字(--ui-font-scale 乘算所有界面字号),布局随内容自适应
+      root.style.setProperty("--ui-font-scale", UI_SIZE_SCALE[uiFontSize ?? "default"]);
 
       // 界面字重:落到基础字重变量,标题/按钮等显式加重的元素不受影响
       root.style.setProperty("--font-weight-ui", UI_WEIGHT_VALUE[uiFontWeight ?? "normal"]);

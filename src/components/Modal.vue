@@ -15,7 +15,7 @@ defineProps<{ title: string; width?: number }>();
           :style="{ maxWidth: (width ?? 400) + 'px' }"
         >
           <header class="flex items-center justify-between px-5 pb-3 pt-4">
-            <h2 class="text-[15px] font-semibold">{{ title }}</h2>
+            <h2 class="text-[calc(15px*var(--ui-font-scale))] font-semibold">{{ title }}</h2>
             <button class="btn-icon" @click="$emit('cancel')">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
             </button>

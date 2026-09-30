@@ -649,7 +649,7 @@ async function onTreeDrop(e: DragEvent) {
 <template>
   <div ref="treeHost" class="flex h-full flex-col" @contextmenu="openTreeMenu">
     <div class="flex items-center justify-between px-3 pb-1 pt-3">
-      <span class="text-[12px] font-semibold tracking-wide text-ink-3">
+      <span class="text-[calc(12px*var(--ui-font-scale))] font-semibold tracking-wide text-ink-3">
         {{ t("nav.editor") }} · {{ site.docCount }}
       </span>
       <div class="flex items-center gap-0.5">
@@ -683,10 +683,10 @@ async function onTreeDrop(e: DragEvent) {
       >
         <span class="w-5 shrink-0" />
         <AppIcon name="home" :size="15" class="home-row-icon shrink-0" :class="homeActive ? 'text-ink-2' : 'text-ink-3'" />
-        <span class="min-w-0 flex-1 truncate text-[13px]" :class="homeActive ? 'font-medium' : ''">
+        <span class="min-w-0 flex-1 truncate text-[calc(13px*var(--ui-font-scale))]" :class="homeActive ? 'font-medium' : ''">
           {{ t("tree.home") }}
         </span>
-        <span v-if="!homeNode" class="shrink-0 pr-1 text-[10.5px] text-ink-3">
+        <span v-if="!homeNode" class="shrink-0 pr-1 text-[calc(10.5px*var(--ui-font-scale))] text-ink-3">
           {{ t("tree.homeMissing") }}
         </span>
       </div>
@@ -710,7 +710,7 @@ async function onTreeDrop(e: DragEvent) {
         class="band"
         :style="{ left: band.x + 'px', top: band.y + 'px', width: band.w + 'px', height: band.h + 'px' }"
       />
-      <p v-if="!displayTree.length && !site.treeLoading" class="px-2 py-8 text-center text-[12.5px] leading-relaxed text-ink-3">
+      <p v-if="!displayTree.length && !site.treeLoading" class="px-2 py-8 text-center text-[calc(12.5px*var(--ui-font-scale))] leading-relaxed text-ink-3">
         {{ t("tree.empty") }}
       </p>
       <template v-else>
@@ -744,7 +744,7 @@ async function onTreeDrop(e: DragEvent) {
     <!-- 底部资产栏:站点图片资源区,支持卡片/列表视图,按住图片拖入正文即插入引用 -->
     <div class="flex shrink-0 flex-col" :style="{ height: assetH + 'px' }">
       <div class="flex items-center justify-between px-3 pb-1 pt-2">
-        <span class="text-[12px] font-semibold tracking-wide text-ink-3">
+        <span class="text-[calc(12px*var(--ui-font-scale))] font-semibold tracking-wide text-ink-3">
           {{ t("tree.assets") }} · {{ site.assetFiles.length }}
         </span>
         <div class="flex items-center gap-0.5">
@@ -763,7 +763,7 @@ async function onTreeDrop(e: DragEvent) {
       </div>
 
       <div class="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
-        <p v-if="!site.assetFiles.length" class="px-2 py-5 text-center text-[12px] leading-relaxed text-ink-3">
+        <p v-if="!site.assetFiles.length" class="px-2 py-5 text-center text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">
           {{ t("tree.assetEmpty") }}
         </p>
         <div v-else-if="assetView === 'card'" class="grid grid-cols-[repeat(auto-fill,minmax(76px,1fr))] gap-1.5">
@@ -797,7 +797,7 @@ async function onTreeDrop(e: DragEvent) {
             @dragstart="onAssetDragStart($event, img)"
           >
             <AppIcon name="image" :size="14" class="shrink-0 text-ink-3" />
-            <span class="min-w-0 flex-1 truncate text-[12.5px]">{{ img.name }}</span>
+            <span class="min-w-0 flex-1 truncate text-[calc(12.5px*var(--ui-font-scale))]">{{ img.name }}</span>
           </div>
         </div>
       </div>
@@ -808,9 +808,9 @@ async function onTreeDrop(e: DragEvent) {
       v-if="selectedCount > 0"
       class="flex shrink-0 items-center gap-2 border-t border-line bg-surface-2 px-3 py-2"
     >
-      <span class="shrink-0 whitespace-nowrap text-[12px] font-medium text-ink-2">{{ t("tree.selected", { n: selectedCount }) }}</span>
+      <span class="shrink-0 whitespace-nowrap text-[calc(12px*var(--ui-font-scale))] font-medium text-ink-2">{{ t("tree.selected", { n: selectedCount }) }}</span>
       <div class="ml-auto flex items-center gap-1">
-        <button class="btn btn-sm btn-secondary text-[11.5px]" @click="showMoveDialog = true">
+        <button class="btn btn-sm btn-secondary text-[calc(11.5px*var(--ui-font-scale))]" @click="showMoveDialog = true">
           <AppIcon name="folder" :size="13" />
           {{ t("tree.moveTo") }}
         </button>
@@ -850,11 +850,11 @@ async function onTreeDrop(e: DragEvent) {
           <div class="absolute inset-0 bg-[var(--color-scrim)]" @click="showMoveDialog = false" />
           <div class="modal-card panel relative w-full max-w-[360px] shadow-window">
             <header class="px-6 pb-2 pt-5">
-              <h2 class="text-[16px] font-semibold">{{ t("tree.moveToFolder") }}</h2>
+              <h2 class="text-[calc(16px*var(--ui-font-scale))] font-semibold">{{ t("tree.moveToFolder") }}</h2>
             </header>
             <div class="max-h-[300px] overflow-y-auto px-6 pb-2">
               <button
-                class="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-[13.5px] hover:bg-surface-2"
+                class="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-[calc(13.5px*var(--ui-font-scale))] hover:bg-surface-2"
                 @click="batchMoveTo('')"
               >
                 <AppIcon name="folder" :size="15" class="text-ink-3" />
@@ -863,14 +863,14 @@ async function onTreeDrop(e: DragEvent) {
               <button
                 v-for="dir in collectDirs()"
                 :key="dir.path"
-                class="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-[13.5px] hover:bg-surface-2"
+                class="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-[calc(13.5px*var(--ui-font-scale))] hover:bg-surface-2"
                 :disabled="selectedPaths.has(dir.path)"
                 @click="batchMoveTo(dir.path)"
               >
                 <AppIcon name="folder" :size="15" class="text-ink-3" />
                 <span class="truncate">{{ dir.path }}</span>
               </button>
-              <p v-if="collectDirs().length === 0" class="py-4 text-center text-[12.5px] text-ink-3">
+              <p v-if="collectDirs().length === 0" class="py-4 text-center text-[calc(12.5px*var(--ui-font-scale))] text-ink-3">
                 {{ t("tree.empty") }}
               </p>
             </div>
@@ -952,14 +952,14 @@ async function onTreeDrop(e: DragEvent) {
   padding: 4px;
   overflow: hidden;
   color: var(--color-ink-3);
-  font-size: 10px;
+  font-size: calc(10px * var(--ui-font-scale));
   text-align: center;
 }
 .asset-chip-name {
   overflow: hidden;
   padding: 2px 5px 3px;
   color: var(--color-ink-3);
-  font-size: 10px;
+  font-size: calc(10px * var(--ui-font-scale));
   text-overflow: ellipsis;
   white-space: nowrap;
 }

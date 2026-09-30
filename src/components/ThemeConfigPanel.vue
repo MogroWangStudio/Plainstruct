@@ -121,7 +121,7 @@ function confirmPicker() {
           :value="String(fieldValue(field))"
           @input="onField(field, ($event.target as HTMLInputElement).value)"
         />
-        <span class="mono text-[12px] text-ink-2">{{ fieldValue(field) }}</span>
+        <span class="mono text-[calc(12px*var(--ui-font-scale))] text-ink-2">{{ fieldValue(field) }}</span>
       </div>
 
       <!-- 数值:拖动滑块;双击数字可直接输入;偏离默认值时出现一键重置 -->
@@ -139,7 +139,7 @@ function confirmPicker() {
         <input
           v-if="editingKey === field.key"
           ref="editInput"
-          class="input h-7 w-14 px-1 text-center text-[12px]"
+          class="input h-7 w-14 px-1 text-center text-[calc(12px*var(--ui-font-scale))]"
           type="text"
           inputmode="decimal"
           :value="String(fieldValue(field))"
@@ -150,7 +150,7 @@ function confirmPicker() {
         <button
           v-else
           type="button"
-          class="mono w-14 cursor-text rounded text-center text-[12px] text-ink-2 transition-colors hover:text-ink"
+          class="mono w-14 cursor-text rounded text-center text-[calc(12px*var(--ui-font-scale))] text-ink-2 transition-colors hover:text-ink"
           :title="t('theme.numEditHint')"
           @dblclick="editingKey = field.key"
         >
@@ -179,18 +179,18 @@ function confirmPicker() {
 
       <!-- 博客顶栏导航:按钮弹出选择窗口,确认后面板列出当前在导航中显示的项 -->
       <div v-else-if="field.type === 'navlist'" class="flex flex-col gap-2">
-        <p v-if="!navOptions.length" class="text-[13px] text-ink-3">{{ t("theme.navlistEmpty") }}</p>
+        <p v-if="!navOptions.length" class="text-[calc(13px*var(--ui-font-scale))] text-ink-3">{{ t("theme.navlistEmpty") }}</p>
         <template v-else>
           <button type="button" class="select !w-64 cursor-pointer text-left" @click="openPicker(field)">
             {{ pickedOf(field).length ? t("theme.navPickedCount", { n: pickedOf(field).length }) : t("theme.navPickEmpty") }}
           </button>
           <template v-if="pickedLabels(field).length">
-            <p class="text-[12px] text-ink-3">{{ t("theme.navPickedHeading") }}</p>
+            <p class="text-[calc(12px*var(--ui-font-scale))] text-ink-3">{{ t("theme.navPickedHeading") }}</p>
             <ul class="flex flex-col">
               <li
                 v-for="(label, i) in pickedLabels(field)"
                 :key="i"
-                class="max-w-64 truncate py-0.5 text-[13px] text-ink-2"
+                class="max-w-64 truncate py-0.5 text-[calc(13px*var(--ui-font-scale))] text-ink-2"
                 :title="label"
               >
                 {{ label }}
@@ -208,7 +208,7 @@ function confirmPicker() {
           :checked="Boolean(fieldValue(field))"
           @change="onField(field, ($event.target as HTMLInputElement).checked)"
         />
-        <span class="text-[13px] text-ink-2">{{ field.label }}</span>
+        <span class="text-[calc(13px*var(--ui-font-scale))] text-ink-2">{{ field.label }}</span>
       </label>
 
       <!-- 文本 -->
@@ -221,7 +221,7 @@ function confirmPicker() {
       />
     </div>
 
-    <p v-if="!(theme.activeMeta?.config ?? []).length" class="text-[13px] text-ink-3">
+    <p v-if="!(theme.activeMeta?.config ?? []).length" class="text-[calc(13px*var(--ui-font-scale))] text-ink-3">
       {{ t("common.empty") }}
     </p>
 
@@ -241,10 +241,10 @@ function confirmPicker() {
             :disabled="draftFull && !draft.has(opt.key)"
             @change="toggleDraft(opt.key, ($event.target as HTMLInputElement).checked)"
           />
-          <span class="min-w-0 truncate text-[13px] text-ink-2">{{ opt.title }}{{ opt.dir ? " /" : "" }}</span>
+          <span class="min-w-0 truncate text-[calc(13px*var(--ui-font-scale))] text-ink-2">{{ opt.title }}{{ opt.dir ? " /" : "" }}</span>
         </label>
       </div>
-      <p v-if="draftFull" class="mt-1 text-[12px] text-ink-3">{{ t("theme.navlistMax", { n: maxNav }) }}</p>
+      <p v-if="draftFull" class="mt-1 text-[calc(12px*var(--ui-font-scale))] text-ink-3">{{ t("theme.navlistMax", { n: maxNav }) }}</p>
       <template #footer>
         <button class="btn btn-secondary" @click="pickerOpen = false">{{ t("common.cancel") }}</button>
         <button class="btn btn-primary" @click="confirmPicker">{{ t("common.confirm") }}</button>

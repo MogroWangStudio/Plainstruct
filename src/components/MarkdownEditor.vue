@@ -938,7 +938,7 @@ defineExpose({
   border-radius: 5px;
   background: transparent;
   color: var(--color-ink-3);
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-font-scale));
   font-weight: 600;
   cursor: pointer;
   transition:

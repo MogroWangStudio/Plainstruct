@@ -219,7 +219,7 @@ function onDrop(e: DragEvent) {
         class="shrink-0 text-ink-3"
         :class="{ 'text-ink-2': isDir }"
       />
-      <span class="min-w-0 flex-1 truncate text-[13px]" :class="isActive ? 'font-medium' : ''">
+      <span class="min-w-0 flex-1 truncate text-[calc(13px*var(--ui-font-scale))]" :class="isActive ? 'font-medium' : ''">
         {{ label }}
       </span>
 

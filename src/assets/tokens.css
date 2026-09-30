@@ -46,6 +46,8 @@
   --duration-fast: 120ms;
   --duration-base: 160ms;
   --duration-slow: 220ms;
+  /* 界面字号缩放(个性化设置可覆盖):只缩放文字,布局随内容自适应 */
+  --ui-font-scale: 1;
   /* 编辑器字体:个性化设置可覆盖 */
   --font-editor: var(--font-mono);
   /* 界面基础字重:个性化设置可覆盖 */

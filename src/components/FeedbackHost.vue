@@ -15,7 +15,7 @@ const ui = useUiStore();
     :width="380"
     @cancel="ui.resolveConfirm(false)"
   >
-    <p class="text-[13.5px] leading-relaxed text-ink-2">{{ ui.confirm.body }}</p>
+    <p class="text-[calc(13.5px*var(--ui-font-scale))] leading-relaxed text-ink-2">{{ ui.confirm.body }}</p>
     <template #footer>
       <button class="btn btn-secondary" @click="ui.resolveConfirm(false)">
         {{ t("common.cancel") }}
@@ -37,7 +37,7 @@ const ui = useUiStore();
         <div
           v-for="toast in ui.toasts"
           :key="toast.id"
-          class="flex items-center gap-2 rounded-lg border border-line bg-surface px-4 py-2 text-[13px] shadow-popover"
+          class="flex items-center gap-2 rounded-lg border border-line bg-surface px-4 py-2 text-[calc(13px*var(--ui-font-scale))] shadow-popover"
         >
           <AppIcon
             :name="toast.kind === 'success' ? 'check' : toast.kind === 'error' ? 'alert' : 'doc'"

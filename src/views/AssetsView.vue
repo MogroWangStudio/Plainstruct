@@ -205,8 +205,8 @@ function thumbUrl(path: string): string {
     <!-- 头部 -->
     <header class="flex h-14 shrink-0 items-center gap-4 border-b border-line bg-surface px-5">
       <div class="min-w-0">
-        <h1 class="text-[15px] font-semibold leading-tight">{{ t("assets.title") }}</h1>
-        <p class="truncate text-[12px] text-ink-3">{{ t("assets.subtitle") }}</p>
+        <h1 class="text-[calc(15px*var(--ui-font-scale))] font-semibold leading-tight">{{ t("assets.title") }}</h1>
+        <p class="truncate text-[calc(12px*var(--ui-font-scale))] text-ink-3">{{ t("assets.subtitle") }}</p>
       </div>
       <button class="btn-icon ml-auto !h-8 !w-8" :title="t('common.refresh')" @click="loadDocs">
         <AppIcon name="refresh" :size="15" />
@@ -216,7 +216,7 @@ function thumbUrl(path: string): string {
     <!-- 左:图片网格 | 右:详情窗(宽度可拖拽) -->
     <div ref="splitHost" class="flex min-h-0 flex-1">
     <div class="min-w-0 flex-1 overflow-y-auto p-5">
-      <p v-if="!images.length" class="rounded-lg border border-dashed border-line px-4 py-10 text-center text-[13px] leading-relaxed text-ink-3">
+      <p v-if="!images.length" class="rounded-lg border border-dashed border-line px-4 py-10 text-center text-[calc(13px*var(--ui-font-scale))] leading-relaxed text-ink-3">
         {{ t("assets.empty") }}
       </p>
 
@@ -239,7 +239,7 @@ function thumbUrl(path: string): string {
             <span v-else class="thumb-fallback">{{ img.name }}</span>
           </div>
           <p
-            class="truncate px-2 pt-1.5 text-[12px]"
+            class="truncate px-2 pt-1.5 text-[calc(12px*var(--ui-font-scale))]"
             :title="img.size != null ? `${img.name} · ${formatSize(img.size)}` : img.name"
           >
             {{ img.name }}
@@ -266,7 +266,7 @@ function thumbUrl(path: string): string {
       <div class="divider w-px shrink-0 cursor-col-resize bg-line" @pointerdown="onDividerDown" @pointermove="onDividerMove" />
       <aside class="shrink-0 overflow-y-auto border-l border-line bg-surface px-4 py-4" :style="{ width: detailW + 'px' }">
         <div class="flex items-center gap-1">
-          <span class="min-w-0 flex-1 truncate text-[13.5px] font-semibold" :title="basename(selected)">{{ basename(selected) }}</span>
+          <span class="min-w-0 flex-1 truncate text-[calc(13.5px*var(--ui-font-scale))] font-semibold" :title="basename(selected)">{{ basename(selected) }}</span>
           <button v-if="selectedNode" class="btn-icon !h-7 !w-7" :title="t('assets.rename')" @click="rename(selectedNode)">
             <AppIcon name="pencil" :size="14" />
           </button>
@@ -288,9 +288,9 @@ function thumbUrl(path: string): string {
           />
           <span v-else class="thumb-fallback h-full w-full">{{ basename(selected) }}</span>
         </div>
-        <p class="mono mt-2 break-all text-[11px] text-ink-3">{{ selected }}</p>
+        <p class="mono mt-2 break-all text-[calc(11px*var(--ui-font-scale))] text-ink-3">{{ selected }}</p>
         <!-- 详细大小:人类可读 + 精确字节 -->
-        <p v-if="selectedSize != null" class="mono mt-1 text-[11px] text-ink-3">
+        <p v-if="selectedSize != null" class="mono mt-1 text-[calc(11px*var(--ui-font-scale))] text-ink-3">
           {{ formatSize(selectedSize) }} · {{ selectedSize.toLocaleString("en-US") }} B
         </p>
 
@@ -304,7 +304,7 @@ function thumbUrl(path: string): string {
             </button>
           </li>
         </ul>
-        <p v-else class="mt-1 text-[12px] text-ink-3">{{ t("assets.noRefs") }}</p>
+        <p v-else class="mt-1 text-[calc(12px*var(--ui-font-scale))] text-ink-3">{{ t("assets.noRefs") }}</p>
       </aside>
     </template>
 
@@ -358,7 +358,7 @@ function thumbUrl(path: string): string {
   justify-content: center;
   padding: 4px;
   text-align: center;
-  font-size: 11px;
+  font-size: calc(11px * var(--ui-font-scale));
   color: var(--color-ink-3);
   background: var(--color-surface-2);
   overflow: hidden;
@@ -373,7 +373,7 @@ function thumbUrl(path: string): string {
 }
 
 .ref-count {
-  font-size: 10.5px;
+  font-size: calc(10.5px * var(--ui-font-scale));
   color: var(--color-ink-3);
 }
 .ref-count.zero {
@@ -405,7 +405,7 @@ function thumbUrl(path: string): string {
   border-radius: 6px;
   background: transparent;
   color: var(--color-ink-2);
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--ui-font-scale));
   cursor: pointer;
   transition: background-color var(--duration-base) var(--ease-plain);
 }

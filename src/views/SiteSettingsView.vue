@@ -183,7 +183,7 @@ function openFolder() {
             <input
               v-if="form.locale === CUSTOM_LOCALE"
               v-model="form.customLocale"
-              class="input mt-2 h-8 w-full max-w-[220px] text-[12.5px]"
+              class="input mt-2 h-8 w-full max-w-[220px] text-[calc(12.5px*var(--ui-font-scale))]"
               type="text"
               spellcheck="false"
               :placeholder="t('site.languageCustomPlaceholder')"
@@ -229,7 +229,7 @@ function openFolder() {
       <!-- 文件夹信息 -->
       <section class="panel p-6">
         <h2 class="text-title mb-4">{{ t("site.folder") }}</h2>
-        <p class="break-all rounded-lg bg-surface-2 px-3 py-2 text-[12px] text-ink-2">{{ site.root }}</p>
+        <p class="break-all rounded-lg bg-surface-2 px-3 py-2 text-[calc(12px*var(--ui-font-scale))] text-ink-2">{{ site.root }}</p>
         <p class="field-hint">{{ t("site.folderHint") }}</p>
         <button class="btn btn-secondary mt-3" @click="openFolder">
           <AppIcon name="external" :size="15" />
@@ -249,7 +249,7 @@ function openFolder() {
   background: var(--color-surface);
   color: var(--color-ink-2);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: calc(11px * var(--ui-font-scale));
   line-height: 1.4;
   cursor: pointer;
   transition:

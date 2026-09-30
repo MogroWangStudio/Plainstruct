@@ -21,11 +21,11 @@ function openOutput() {
     <!-- 头部 -->
     <header class="flex h-14 shrink-0 items-center gap-4 border-b border-line bg-surface px-5">
       <div class="min-w-0">
-        <h1 class="text-[15px] font-semibold leading-tight">{{ t("build.title") }}</h1>
-        <p class="truncate text-[12px] text-ink-3">{{ t("build.subtitle") }}</p>
+        <h1 class="text-[calc(15px*var(--ui-font-scale))] font-semibold leading-tight">{{ t("build.title") }}</h1>
+        <p class="truncate text-[calc(12px*var(--ui-font-scale))] text-ink-3">{{ t("build.subtitle") }}</p>
       </div>
       <div class="ml-auto flex items-center gap-3">
-        <label class="flex cursor-pointer items-center gap-2 text-[12.5px] text-ink-2">
+        <label class="flex cursor-pointer items-center gap-2 text-[calc(12.5px*var(--ui-font-scale))] text-ink-2">
           <input v-model="builder.autoRebuild" type="checkbox" class="checkbox-input" @change="builder.setAutoRebuild(builder.autoRebuild)" />
           {{ t("build.autoRebuild") }}
         </label>
@@ -48,20 +48,20 @@ function openOutput() {
             <div>
               <h2 class="field-label">{{ t("build.report") }}</h2>
               <div class="flex flex-wrap items-baseline gap-x-5 gap-y-1">
-                <span class="text-[13px] text-ink-2">
-                  <span class="text-[17px] font-bold text-ink">{{ builder.report.pages }}</span>
+                <span class="text-[calc(13px*var(--ui-font-scale))] text-ink-2">
+                  <span class="text-[calc(17px*var(--ui-font-scale))] font-bold text-ink">{{ builder.report.pages }}</span>
                   {{ t("build.statPages") }}
                 </span>
-                <span class="text-[13px] text-ink-2">
-                  <span class="text-[17px] font-bold text-ink">{{ builder.report.assets }}</span>
+                <span class="text-[calc(13px*var(--ui-font-scale))] text-ink-2">
+                  <span class="text-[calc(17px*var(--ui-font-scale))] font-bold text-ink">{{ builder.report.assets }}</span>
                   {{ t("build.statAssets") }}
                 </span>
-                <span class="text-[13px] text-ink-2">
-                  <span class="text-[17px] font-bold text-ink">{{ builder.report.durationMs }}</span>
+                <span class="text-[calc(13px*var(--ui-font-scale))] text-ink-2">
+                  <span class="text-[calc(17px*var(--ui-font-scale))] font-bold text-ink">{{ builder.report.durationMs }}</span>
                   {{ t("build.statMs") }}
                 </span>
-                <span class="text-[13px] text-ink-2">
-                  <span class="text-[17px] font-bold text-ink">{{ formatSize(builder.report.totalSize) }}</span>
+                <span class="text-[calc(13px*var(--ui-font-scale))] text-ink-2">
+                  <span class="text-[calc(17px*var(--ui-font-scale))] font-bold text-ink">{{ formatSize(builder.report.totalSize) }}</span>
                   {{ t("build.statSize") }}
                 </span>
               </div>
@@ -77,8 +77,8 @@ function openOutput() {
                   :key="i"
                   class="rounded-lg border border-line bg-bg px-3 py-2"
                 >
-                  <p class="mono truncate text-[11.5px] text-ink-2">{{ w.source }}</p>
-                  <p class="mono truncate text-[11.5px] text-danger">
+                  <p class="mono truncate text-[calc(11.5px*var(--ui-font-scale))] text-ink-2">{{ w.source }}</p>
+                  <p class="mono truncate text-[calc(11.5px*var(--ui-font-scale))] text-danger">
                     {{ w.link }} - {{ w.message === "missing" ? t("build.warningMissing") : w.message }}
                   </p>
                 </div>
@@ -86,7 +86,7 @@ function openOutput() {
             </div>
           </template>
 
-          <div v-else-if="builder.error" class="rounded-lg border border-line bg-danger-soft px-3 py-3 text-[12.5px] leading-relaxed text-danger">
+          <div v-else-if="builder.error" class="rounded-lg border border-line bg-danger-soft px-3 py-3 text-[calc(12.5px*var(--ui-font-scale))] leading-relaxed text-danger">
             {{ builder.error }}
           </div>
 
@@ -94,8 +94,8 @@ function openOutput() {
             <div class="flex h-11 w-11 items-center justify-center rounded-lg bg-surface-2">
               <AppIcon name="box" :size="20" class="text-ink-3" />
             </div>
-            <p class="text-[13.5px] font-semibold">{{ t("build.emptyTitle") }}</p>
-            <p class="text-[12.5px] leading-relaxed text-ink-3">{{ t("build.emptyBody") }}</p>
+            <p class="text-[calc(13.5px*var(--ui-font-scale))] font-semibold">{{ t("build.emptyTitle") }}</p>
+            <p class="text-[calc(12.5px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("build.emptyBody") }}</p>
           </div>
 
           <!-- 输出操作:与「重新构建」同规格的大按钮 -->
@@ -116,12 +116,12 @@ function openOutput() {
       <!-- 预览 -->
       <section class="flex min-w-0 flex-1 flex-col">
         <div class="flex h-10 shrink-0 items-center gap-2 border-b border-line bg-surface px-4">
-          <span class="text-[12.5px] font-semibold text-ink-2">{{ t("build.preview") }}</span>
-          <span class="text-[11.5px] text-ink-3">{{ t("build.previewHint") }}</span>
+          <span class="text-[calc(12.5px*var(--ui-font-scale))] font-semibold text-ink-2">{{ t("build.preview") }}</span>
+          <span class="text-[calc(11.5px*var(--ui-font-scale))] text-ink-3">{{ t("build.previewHint") }}</span>
         </div>
         <div class="min-h-0 flex-1">
           <PreviewFrame v-if="builder.report" />
-          <div v-else class="flex h-full items-center justify-center text-[13px] text-ink-3">
+          <div v-else class="flex h-full items-center justify-center text-[calc(13px*var(--ui-font-scale))] text-ink-3">
             {{ t("build.emptyBody") }}
           </div>
         </div>

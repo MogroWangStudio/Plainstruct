@@ -25,25 +25,25 @@ function openStudioSite() {
       <img :src="app.isDark ? '/logo-full-dark.svg' : '/logo-full.svg'" alt="Plainstruct" class="h-12 select-none" draggable="false" />
 
       <div class="mt-8 flex items-baseline gap-3">
-        <h1 class="text-[22px] font-bold tracking-tight">素构 Plainstruct</h1>
-        <span class="rounded border border-line bg-surface px-1.5 py-0.5 text-[11px] font-medium text-ink-2 mono">
+        <h1 class="text-[calc(22px*var(--ui-font-scale))] font-bold tracking-tight">素构 Plainstruct</h1>
+        <span class="rounded border border-line bg-surface px-1.5 py-0.5 text-[calc(11px*var(--ui-font-scale))] font-medium text-ink-2 mono">
           v{{ app.version }}
         </span>
       </div>
-      <p class="mt-3 text-center text-[14px] leading-relaxed text-ink-2">{{ t("app.tagline") }}</p>
+      <p class="mt-3 text-center text-[calc(14px*var(--ui-font-scale))] leading-relaxed text-ink-2">{{ t("app.tagline") }}</p>
 
       <!-- 三个板块:简介 / 架构 / 工作室 -->
       <div class="mt-10 w-full">
         <!-- 简介 -->
         <div class="rounded-xl border border-line bg-surface p-6">
           <h2 class="field-label">{{ t("about.sectionIntro") }}</h2>
-          <p class="whitespace-pre-line text-[13.5px] leading-relaxed text-ink-2">{{ t("about.description") }}</p>
+          <p class="whitespace-pre-line text-[calc(13.5px*var(--ui-font-scale))] leading-relaxed text-ink-2">{{ t("about.description") }}</p>
         </div>
 
         <!-- 架构 -->
         <div class="mt-3 rounded-xl border border-line bg-surface p-6">
           <h2 class="field-label">{{ t("about.sectionArchitecture") }}</h2>
-          <p class="text-[13px] leading-relaxed text-ink-2">Vue 3 · TypeScript · Tauri 2</p>
+          <p class="text-[calc(13px*var(--ui-font-scale))] leading-relaxed text-ink-2">Vue 3 · TypeScript · Tauri 2</p>
         </div>
 
         <!-- 工作室:署名字标可点击前往官网 + 版权 -->
@@ -62,7 +62,7 @@ function openStudioSite() {
             />
             <span class="studio-hint">{{ t("about.studioHint") }}</span>
           </a>
-          <p class="mt-5 border-t border-line pt-4 text-center text-[12.5px] text-ink-3">
+          <p class="mt-5 border-t border-line pt-4 text-center text-[calc(12.5px*var(--ui-font-scale))] text-ink-3">
             © 2026 MogroWang Studio
           </p>
         </div>
@@ -85,7 +85,7 @@ function openStudioSite() {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-font-scale));
   font-weight: 500;
   color: var(--color-ink);
   white-space: nowrap;

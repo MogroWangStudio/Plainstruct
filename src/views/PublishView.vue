@@ -67,7 +67,7 @@ function openPages() {
     <div class="mx-auto flex w-full max-w-[560px] flex-col gap-6 px-8 py-10">
       <header>
         <h1 class="text-h1">{{ t("publish.title") }}</h1>
-        <p class="mt-1 text-[13px] leading-relaxed text-ink-2">{{ t("publish.subtitle") }}</p>
+        <p class="mt-1 text-[calc(13px*var(--ui-font-scale))] leading-relaxed text-ink-2">{{ t("publish.subtitle") }}</p>
       </header>
 
       <section class="panel p-6">
@@ -90,11 +90,11 @@ function openPages() {
 
           <div>
             <label class="field-label">{{ t("publish.token") }}</label>
-            <input v-model="publish.config.token" class="input mono !text-[12.5px]" type="password" :placeholder="t('publish.tokenPlaceholder')" />
+            <input v-model="publish.config.token" class="input mono !text-[calc(12.5px*var(--ui-font-scale))]" type="password" :placeholder="t('publish.tokenPlaceholder')" />
             <p class="field-hint">{{ t("publish.tokenHint") }}</p>
           </div>
 
-          <label class="flex cursor-pointer items-center gap-2 text-[13px] text-ink-2">
+          <label class="flex cursor-pointer items-center gap-2 text-[calc(13px*var(--ui-font-scale))] text-ink-2">
             <input v-model="publish.config.autoCreate" type="checkbox" class="checkbox-input" />
             {{ t("publish.autoCreate") }}
           </label>
@@ -105,7 +105,7 @@ function openPages() {
             </button>
             <span
               v-if="publish.verifyResult"
-              class="flex items-center gap-1.5 text-[12.5px]"
+              class="flex items-center gap-1.5 text-[calc(12.5px*var(--ui-font-scale))]"
               :class="publish.verifyResult.ok ? 'text-ink-2' : 'text-danger'"
             >
               <AppIcon :name="publish.verifyResult.ok ? 'check' : 'alert'" :size="14" />
@@ -137,12 +137,12 @@ function openPages() {
               {{ publish.result ? t("publish.republish") : t("publish.publish") }}
             </template>
           </button>
-          <span v-if="!builder.report && !publish.syncing" class="text-[12.5px] text-ink-3">{{ t("publish.buildFirst") }}</span>
+          <span v-if="!builder.report && !publish.syncing" class="text-[calc(12.5px*var(--ui-font-scale))] text-ink-3">{{ t("publish.buildFirst") }}</span>
         </div>
 
         <!-- 进度 -->
         <div v-if="publish.syncing && publish.progress" class="mt-5">
-          <div class="mb-2 flex items-center justify-between text-[12.5px] text-ink-2">
+          <div class="mb-2 flex items-center justify-between text-[calc(12.5px*var(--ui-font-scale))] text-ink-2">
             <span>{{ t("publish.progress", { done: publish.progress.done, total: publish.progress.total }) }}</span>
             <span class="mono">{{ progressPct }}%</span>
           </div>
@@ -153,11 +153,11 @@ function openPages() {
 
         <!-- 结果 -->
         <div v-if="publish.result" class="mt-5 flex flex-col gap-3 rounded-lg border border-line bg-bg p-4">
-          <p class="flex items-center gap-2 text-[13.5px] font-semibold">
+          <p class="flex items-center gap-2 text-[calc(13.5px*var(--ui-font-scale))] font-semibold">
             <AppIcon name="check" :size="16" class="text-ink" />
             {{ t("publish.done") }}
           </p>
-          <p class="mono text-[12px] text-ink-2">{{ t("publish.commit", { sha: publish.result.commitSha.slice(0, 7) }) }}</p>
+          <p class="mono text-[calc(12px*var(--ui-font-scale))] text-ink-2">{{ t("publish.commit", { sha: publish.result.commitSha.slice(0, 7) }) }}</p>
           <div class="flex flex-wrap gap-2">
             <!-- 查看站点:Pages 构建中禁用并转圈,完成后亮起主色按钮 -->
             <button
@@ -181,7 +181,7 @@ function openPages() {
           </div>
         </div>
 
-        <p v-if="publish.error" class="mt-5 rounded-lg border border-line bg-danger-soft px-4 py-3 text-[12.5px] leading-relaxed text-danger">
+        <p v-if="publish.error" class="mt-5 rounded-lg border border-line bg-danger-soft px-4 py-3 text-[calc(12.5px*var(--ui-font-scale))] leading-relaxed text-danger">
           {{ publish.error }}
         </p>
 
@@ -202,7 +202,7 @@ function openPages() {
           </button>
         </div>
         <div ref="logBox" class="log-box mt-2">
-          <p v-if="publish.logs.length === 0" class="px-4 py-3 text-[12px] text-ink-3">
+          <p v-if="publish.logs.length === 0" class="px-4 py-3 text-[calc(12px*var(--ui-font-scale))] text-ink-3">
             {{ t("publish.logEmpty") }}
           </p>
           <p
@@ -273,7 +273,7 @@ function openPages() {
   gap: 10px;
   padding: 2px 14px;
   font-family: var(--font-mono);
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--ui-font-scale));
   line-height: 1.7;
 }
 .log-time {

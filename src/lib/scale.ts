@@ -1,9 +1,8 @@
-/** 界面缩放换算 —— 个性化「界面字号」经 html 的 CSS zoom 实现,放大后:
- *  getBoundingClientRect 与指针坐标返回视觉像素(已含 zoom),而
- *  window.innerWidth/innerHeight 不含 zoom,fixed/absolute 定位的 CSS px
- *  又会被 zoom 放大 —— 浮层定位需经此处换算,保证任意档位下位置正确 */
+/** 界面缩放换算 —— 历史遗留兼容层:「界面字号」曾以 html 的 CSS zoom 整页
+ *  缩放实现(浮层定位需在此换算),现改为只缩放文字(--ui-font-scale),
+ *  无 zoom,本模块恒返回 1;保留函数以兼容既有调用点 */
 
-/** 当前界面缩放倍率(未开启缩放时为 1) */
+/** 当前界面缩放倍率(恒为 1) */
 export function uiZoom(): number {
   const z = parseFloat(getComputedStyle(document.documentElement).zoom || "1");
   return Number.isFinite(z) && z > 0 ? z : 1;

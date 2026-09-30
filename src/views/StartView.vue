@@ -70,7 +70,7 @@ async function openRecent(path: string) {
   <div class="h-full overflow-y-auto bg-bg">
     <div class="mx-auto flex min-h-full w-full max-w-[480px] flex-col items-center justify-center px-6 py-16">
       <img :src="app.isDark ? '/logo-full-dark.svg' : '/logo-full.svg'" alt="Plainstruct" class="h-11 select-none" draggable="false" />
-      <p class="mt-6 text-center text-[14px] leading-relaxed text-ink-2">{{ t("app.tagline") }}</p>
+      <p class="mt-6 text-center text-[calc(14px*var(--ui-font-scale))] leading-relaxed text-ink-2">{{ t("app.tagline") }}</p>
 
       <div class="mt-10 flex w-full gap-3">
         <button class="btn btn-primary h-10 flex-1" @click="showWizard = true">
@@ -85,7 +85,7 @@ async function openRecent(path: string) {
 
       <div class="mt-12 w-full">
         <h2 class="field-label">{{ t("start.recent") }}</h2>
-        <div v-if="!app.recentSites.length" class="rounded-lg border border-dashed border-line px-4 py-6 text-center text-[13px] text-ink-3">
+        <div v-if="!app.recentSites.length" class="rounded-lg border border-dashed border-line px-4 py-6 text-center text-[calc(13px*var(--ui-font-scale))] text-ink-3">
           {{ t("start.recentEmpty") }}
         </div>
         <TransitionGroup v-else name="list" tag="div" class="panel divide-y divide-line overflow-hidden">
@@ -97,20 +97,20 @@ async function openRecent(path: string) {
           >
             <AppIcon name="folder" :size="16" class="text-ink-3" />
             <span class="min-w-0 flex-1 text-left">
-              <span class="block truncate text-[13.5px] font-medium">{{ item.name }}</span>
-              <span class="block truncate text-[11.5px] text-ink-3">{{ item.path }}</span>
+              <span class="block truncate text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ item.name }}</span>
+              <span class="block truncate text-[calc(11.5px*var(--ui-font-scale))] text-ink-3">{{ item.path }}</span>
             </span>
-            <span class="shrink-0 text-[11.5px] text-ink-3">{{ formatTime(item.openedAt) }}</span>
+            <span class="shrink-0 text-[calc(11.5px*var(--ui-font-scale))] text-ink-3">{{ formatTime(item.openedAt) }}</span>
           </button>
         </TransitionGroup>
       </div>
 
-      <button class="btn btn-ghost mt-10 h-9 px-4 text-[12.5px] text-ink-3" @click="app.setView('about')">
+      <button class="btn btn-ghost mt-10 h-9 px-4 text-[calc(12.5px*var(--ui-font-scale))] text-ink-3" @click="app.setView('about')">
         <AppIcon name="info" :size="15" />
         {{ t("nav.about") }}
       </button>
 
-      <button class="btn btn-ghost mt-2 h-9 px-4 text-[12.5px] text-ink-3" @click="app.setView('settings')">
+      <button class="btn btn-ghost mt-2 h-9 px-4 text-[calc(12.5px*var(--ui-font-scale))] text-ink-3" @click="app.setView('settings')">
         <AppIcon name="settings" :size="15" />
         {{ t("nav.settings") }}
       </button>
@@ -121,9 +121,9 @@ async function openRecent(path: string) {
       <Transition name="modal">
         <div v-if="showWizard" class="fixed inset-0 z-50 flex items-center justify-center p-6">
           <div class="absolute inset-0 bg-[var(--color-scrim)]" @click="showWizard = false" />
-          <div class="modal-card panel relative w-full max-w-[440px] shadow-window">
+          <div class="modal-card panel relative max-h-[calc(100vh-80px)] w-full max-w-[440px] overflow-y-auto shadow-window">
             <header class="px-6 pb-2 pt-5">
-              <h2 class="text-[16px] font-semibold">{{ t("wizard.title") }}</h2>
+              <h2 class="text-[calc(16px*var(--ui-font-scale))] font-semibold">{{ t("wizard.title") }}</h2>
             </header>
             <div class="flex flex-col gap-4 px-6 pb-2">
               <div>
@@ -146,8 +146,8 @@ async function openRecent(path: string) {
                     <span class="type-card-body">
                       <AppIcon name="doc" :size="17" class="shrink-0" />
                       <span class="min-w-0">
-                        <span class="block text-[13px] font-medium">{{ t("wizard.typeDocs") }}</span>
-                        <span class="block text-[11.5px] leading-snug text-ink-3">{{ t("wizard.typeDocsHint") }}</span>
+                        <span class="block text-[calc(13px*var(--ui-font-scale))] font-medium">{{ t("wizard.typeDocs") }}</span>
+                        <span class="block text-[calc(11.5px*var(--ui-font-scale))] leading-snug text-ink-3">{{ t("wizard.typeDocsHint") }}</span>
                       </span>
                     </span>
                   </button>
@@ -166,8 +166,8 @@ async function openRecent(path: string) {
                     <span class="type-card-body">
                       <AppIcon name="pencil" :size="17" class="shrink-0" />
                       <span class="min-w-0">
-                        <span class="block text-[13px] font-medium">{{ t("wizard.typeBlog") }}</span>
-                        <span class="block text-[11.5px] leading-snug text-ink-3">{{ t("wizard.typeBlogHint") }}</span>
+                        <span class="block text-[calc(13px*var(--ui-font-scale))] font-medium">{{ t("wizard.typeBlog") }}</span>
+                        <span class="block text-[calc(11.5px*var(--ui-font-scale))] leading-snug text-ink-3">{{ t("wizard.typeBlogHint") }}</span>
                       </span>
                     </span>
                   </button>
@@ -197,14 +197,14 @@ async function openRecent(path: string) {
               <div>
                 <label class="field-label">{{ t("wizard.folder") }}</label>
                 <div class="flex gap-2">
-                  <input class="input !text-[12px]" type="text" readonly :value="wizard.folder" :placeholder="t('wizard.chooseFolder')" />
+                  <input class="input !text-[calc(12px*var(--ui-font-scale))]" type="text" readonly :value="wizard.folder" :placeholder="t('wizard.chooseFolder')" />
                   <button class="btn btn-secondary shrink-0" @click="chooseFolder">
                     {{ t("wizard.chooseFolder") }}
                   </button>
                 </div>
                 <p class="field-hint">{{ t("wizard.folderHint") }}</p>
               </div>
-              <p v-if="wizardError" class="text-[12.5px] text-danger">{{ wizardError }}</p>
+              <p v-if="wizardError" class="text-[calc(12.5px*var(--ui-font-scale))] text-danger">{{ wizardError }}</p>
             </div>
             <footer class="mt-4 flex justify-end gap-2 border-t border-line px-6 py-4">
               <button class="btn btn-secondary" @click="showWizard = false">{{ t("common.cancel") }}</button>

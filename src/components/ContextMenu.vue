@@ -102,7 +102,7 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKey));
   border-radius: 7px;
   background: transparent;
   color: var(--color-ink);
-  font-size: 13px;
+  font-size: calc(13px * var(--ui-font-scale));
   text-align: left;
   cursor: pointer;
   transition: background-color var(--duration-fast) var(--ease-plain);
@@ -132,7 +132,7 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKey));
 
 .ctx-kbd {
   flex-shrink: 0;
-  font-size: 11px;
+  font-size: calc(11px * var(--ui-font-scale));
   color: var(--color-ink-3);
 }
 

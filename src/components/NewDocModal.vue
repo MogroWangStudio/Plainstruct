@@ -83,7 +83,7 @@ function submit() {
       <div class="absolute inset-0 bg-[var(--color-scrim)]" @click="emit('cancel')" />
       <div class="modal-card panel relative flex max-h-[86vh] w-full max-w-[400px] flex-col shadow-window" style="max-width: 400px">
         <header class="flex items-center justify-between px-5 pb-3 pt-4">
-          <h2 class="text-[15px] font-semibold">{{ t("tree.newDocTitle") }}</h2>
+          <h2 class="text-[calc(15px*var(--ui-font-scale))] font-semibold">{{ t("tree.newDocTitle") }}</h2>
           <button class="btn-icon" @click="emit('cancel')">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
           </button>
@@ -121,7 +121,7 @@ function submit() {
                 <option v-for="s in coverSuggestions" :key="s" :value="s" />
               </datalist>
             </label>
-            <p class="text-[12px] leading-relaxed text-ink-3">{{ t("tree.newDocFmHint") }}</p>
+            <p class="text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("tree.newDocFmHint") }}</p>
           </div>
         </div>
         <footer class="flex justify-end gap-2 border-t border-line px-5 py-3">
