@@ -168,8 +168,22 @@ export const useAppStore = defineStore("app", {
 
   actions: {
     async init() {
+      // 初始化失败会让启动画面滞留,必须留下诊断线索;并以默认设置降级启动,
+      // 保证界面可用(getter 对 bootstrap 缺失均有回退)
+      try {
+        await this.initInner();
+      } catch (e) {
+        const msg = ipc.errText(e);
+        console.error("[boot] init failed:", e);
+        void ipc.logFrontend(`[boot] init failed: ${msg}`);
+        this.ready = true;
+      }
+    },
+
+    async initInner() {
       this.bootstrap = await ipc.getBootstrap();
-      i18n.global.locale.value = this.settings.locale as I18nLocale;
+      // locale 缺失/损坏时回退默认,避免 vue-i18n 对非字符串 locale 抛错
+      i18n.global.locale.value = (this.settings.locale as I18nLocale) || "zh-CN";
       this.applyAppearance();
       this.watchSystemTheme();
       this.watchUpdateProgress();

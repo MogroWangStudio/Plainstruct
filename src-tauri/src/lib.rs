@@ -117,7 +117,16 @@ fn handle_site<R: tauri::Runtime>(
 
 pub fn run() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|_app, _argv, _cwd| {}))
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            // 二次启动:macOS 关窗后进程保留、Windows 退出也存在短暂窗口期,
+            // 此时旧实例的窗口可能已关闭 —— 把主窗口重新带回前台,
+            // 避免「关闭后立即重启软件看不到任何界面」
+            if let Some(win) = app.get_webview_window("main") {
+                let _ = win.unminimize();
+                let _ = win.show();
+                let _ = win.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
@@ -183,25 +192,25 @@ pub fn run() {
             commands::open_external,
             commands::reload_webview,
         ])
+        .on_window_event(|window, event| {
+            // macOS 关窗惯例:主窗口隐藏而非销毁 —— 保留 WebView,单实例
+            // 回调把窗口带回前台时界面完整;否则销毁后只剩空壳窗口。
+            // 应用级退出(Cmd+Q / Dock 退出)不走窗口关闭,不受影响。
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                #[cfg(target_os = "macos")]
+                if window.label() == "main" {
+                    api.prevent_close();
+                    let _ = window.hide();
+                }
+            }
+            let _ = window; // 非 macOS 下不拦截,保持关窗即销毁的默认行为
+        })
         .setup(|app| {
             let state = app.state::<AppState>();
             // 清理更新任务残留:任务版本已不新于当前(装上了/过期)或包缺失时清空;
             // 仍有待安装任务则保留,前端在设置页显示「重启并更新」。
             // 更新向导改由用户点击按钮显式拉起,退出应用不再自动执行更新。
             commands::github::cleanup_update_task(env!("CARGO_PKG_VERSION"));
-            // 启动自愈预防:上一轮已连续失败 ≥2 次(自动修复档已用尽)时,本轮在
-            // 页面加载前先清一次 WebView 浏览数据,给应用一个干净环境,随后重置
-            // 计数重新观察;若仍失败,前端上报会重新走分级自愈
-            let boot = commands::app::read_boot_state(&state);
-            if boot.failures >= 2 {
-                if let Some(win) = app.get_webview_window("main") {
-                    match win.clear_all_browsing_data() {
-                        Ok(()) => println!("[boot] 检测到连续启动失败,已预清理 WebView 浏览数据"),
-                        Err(e) => println!("[boot] 预清理浏览数据失败: {e}"),
-                    }
-                }
-                commands::app::reset_boot_state(&state);
-            }
             // 便携版策略:默认数据目录为可执行文件所在根目录下的 data/,数据随程序
             // 一起迁移;exe 所在目录不可写(如安装进 Program Files)时回退系统 AppData
             let portable = std::env::current_exe().ok().and_then(|exe| {
@@ -226,6 +235,20 @@ pub fn run() {
             }
             if let Ok(mut guard) = state.app_data_dir.lock() {
                 *guard = data_dir;
+            }
+            // 启动自愈预防(必须在数据目录初始化之后,否则读到空路径永远失效):
+            // 上一轮已连续失败 ≥2 次(自动修复档已用尽)时,本轮在页面加载前先清
+            // 一次 WebView 浏览数据,给应用一个干净环境,随后重置计数重新观察;
+            // 若仍失败,前端上报会重新走分级自愈
+            let boot = commands::app::read_boot_state(&state);
+            if boot.failures >= 2 {
+                if let Some(win) = app.get_webview_window("main") {
+                    match win.clear_all_browsing_data() {
+                        Ok(()) => println!("[boot] 检测到连续启动失败,已预清理 WebView 浏览数据"),
+                        Err(e) => println!("[boot] 预清理浏览数据失败: {e}"),
+                    }
+                }
+                commands::app::reset_boot_state(&state);
             }
             // 平台窗口装饰:macOS 保留原生圆角与红绿灯(conf 里 titleBarStyle Overlay + hiddenTitle),
             // 其余平台维持无边框自绘标题栏;窗口初始隐藏,装饰调整完成后再显示,避免启动闪烁

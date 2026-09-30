@@ -96,6 +96,38 @@ pub fn touch_recent(state: &AppState, name: &str, path: &str) {
     let _ = write_app_data(state, &data);
 }
 
+/// settings 的完整默认表:历史数据可能缺字段(全新数据目录上第一次更改的
+/// 设置若不是语言,落盘的 settings 里就没有 locale),读取时必须补齐,
+/// 否则前端 settings.locale 为 undefined 会让启动初始化崩溃、画面滞留
+pub(crate) fn settings_defaults() -> Value {
+    serde_json::json!({
+        "locale": "zh-CN",
+        "autosave": true,
+        "theme": "system",
+        "uiFont": "system",
+        "uiFontSize": "default",
+        "uiFontWeight": "normal",
+        "startAnim": "fade",
+        "editorFont": "default",
+        "editorWhitespace": true,
+        "editorBreakKey": "enter",
+        "editorIndentKey": "tab",
+        "editorIndentWidth": 2,
+        "confetti": "standard",
+    })
+}
+
+/// 以默认表补齐 settings 的缺失字段(已有值不动)
+pub(crate) fn settings_with_defaults(settings: &Value) -> Value {
+    let mut merged = settings_defaults();
+    if let (Some(base), Some(supplied)) = (merged.as_object_mut(), settings.as_object()) {
+        for (k, v) in supplied {
+            base.insert(k.clone(), v.clone());
+        }
+    }
+    merged
+}
+
 #[tauri::command]
 pub fn get_bootstrap(state: State<'_, AppState>, window: tauri::WebviewWindow) -> Result<Bootstrap, String> {
     ensure_main(&window)?;
@@ -118,11 +150,8 @@ pub fn get_bootstrap(state: State<'_, AppState>, window: tauri::WebviewWindow) -
         platform: platform.to_string(),
         app_data_dir: state.app_data().to_string_lossy().to_string(),
         custom_data_dir: read_app_data_at(&state.default_data_dir()).custom_data_dir,
-        settings: if data.settings.is_null() {
-            serde_json::json!({ "locale": "zh-CN", "autosave": true, "theme": "system", "uiFont": "system", "editorFont": "default" })
-        } else {
-            data.settings
-        },
+        // 缺失字段补默认:老数据 / 全新数据目录上首次保存的部分设置也能完整返回
+        settings: settings_with_defaults(&data.settings),
         recent_sites: data.recent_sites,
         pending_update,
     })
@@ -140,6 +169,14 @@ pub fn save_settings(state: State<'_, AppState>, window: tauri::WebviewWindow, p
     if let Some(patch_obj) = patch.as_object() {
         for (k, v) in patch_obj {
             obj.insert(k.clone(), v.clone());
+        }
+    }
+    // 落盘前补齐缺失默认字段:只写过单个设置的旧 settings 就地自愈
+    if let Some(def) = settings_defaults().as_object() {
+        if let Some(obj) = data.settings.as_object_mut() {
+            for (k, v) in def {
+                obj.entry(k.clone()).or_insert(v.clone());
+            }
         }
     }
     write_app_data(&state, &data)?;
