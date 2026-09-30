@@ -1,7 +1,7 @@
 export default {
   app: {
     name: "Plainstruct",
-    tagline: "Local static site creator — docs and blogs alike",
+    tagline: "Local static site creator",
   },
   common: {
     save: "Save",

@@ -1,7 +1,7 @@
 export default {
   app: {
     name: "素构",
-    tagline: "本地静态站点创建器,文档与博客皆宜",
+    tagline: "本地静态站点创建器",
   },
   common: {
     save: "保存",
