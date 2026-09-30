@@ -171,8 +171,9 @@ const BOOT_DETAIL_MAX: usize = 2000;
 #[derive(Serialize, Deserialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct BootState {
+    /// 连续启动失败次数(启动自愈分级依据;lib.rs setup 的预防性清理也会读取)
     #[serde(default)]
-    failures: u32,
+    pub(crate) failures: u32,
     #[serde(default)]
     last_stage: String,
     #[serde(default)]

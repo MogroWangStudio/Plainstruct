@@ -587,7 +587,7 @@ async fn github_sync_inner(app: &AppHandle, state: &AppState, cfg: GithubConfig)
     let patch_body = json!({ "sha": commit_sha, "force": true });
     let mut ref_updated = false;
     if branch_exists {
-        let (ref_status, ref_body) = request(
+        let (ref_status, _ref_body) = request(
             &http,
             reqwest::Method::PATCH,
             &ref_update_url,
