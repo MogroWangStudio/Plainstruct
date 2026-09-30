@@ -255,7 +255,13 @@ function buildTree(root: string): TreeNode[] {
   }
   for (const rel of rels) {
     const name = rel.split("/").pop()!;
-    const node: TreeNode = { name, path: rel, type: "file" };
+    const content = files.get(`${root}/content/${rel}`) ?? "";
+    const node: TreeNode = {
+      name,
+      path: rel,
+      type: "file",
+      size: new TextEncoder().encode(content).length,
+    };
     const parts = rel.split("/");
     const parentDir = parts.slice(0, -1).join("/");
     const parent = parentDir ? dirNodes.get(parentDir) : undefined;

@@ -3,6 +3,7 @@
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { collectDocPaths } from "@/lib/builder";
+import { formatSize } from "@/lib/format";
 import { countImageRefs, findImageRefs, replaceImageRefs, type ImageRef } from "@/lib/imageRefs";
 import { basename } from "@/lib/paths";
 import { siteUrl } from "@/lib/preview";
@@ -76,6 +77,8 @@ const selectedRefs = computed<ImageRef[]>(() =>
 );
 
 const selectedNode = computed(() => images.value.find((i) => i.path === selected.value));
+/** 选中文件的字节数(TreeNode.size,目录/未知为 undefined) */
+const selectedSize = computed(() => selectedNode.value?.size);
 
 function select(path: string) {
   selected.value = selected.value === path ? null : path;
@@ -233,7 +236,12 @@ function thumbUrl(path: string): string {
             />
             <span v-else class="thumb-fallback">{{ img.name }}</span>
           </div>
-          <p class="truncate px-2 pt-1.5 text-[12px]" :title="img.name">{{ img.name }}</p>
+          <p
+            class="truncate px-2 pt-1.5 text-[12px]"
+            :title="img.size != null ? `${img.name} · ${formatSize(img.size)}` : img.name"
+          >
+            {{ img.name }}
+          </p>
           <div class="flex items-center justify-between px-2 pb-2 pt-0.5">
             <span class="ref-count" :class="{ zero: !(refCounts.get(img.path) ?? 0) }">
               {{ t("assets.refCount", { n: refCounts.get(img.path) ?? 0 }) }}
@@ -279,6 +287,10 @@ function thumbUrl(path: string): string {
           <span v-else class="thumb-fallback h-full w-full">{{ basename(selected) }}</span>
         </div>
         <p class="mono mt-2 break-all text-[11px] text-ink-3">{{ selected }}</p>
+        <!-- 详细大小:人类可读 + 精确字节 -->
+        <p v-if="selectedSize != null" class="mono mt-1 text-[11px] text-ink-3">
+          {{ formatSize(selectedSize) }} · {{ selectedSize.toLocaleString("en-US") }} B
+        </p>
 
         <h3 class="field-label mt-4">{{ t("assets.refsHeading") }}</h3>
         <ul v-if="selectedRefs.length" class="mt-1 flex flex-col">

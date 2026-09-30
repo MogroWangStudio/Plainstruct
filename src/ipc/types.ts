@@ -116,6 +116,8 @@ export interface TreeNode {
   name: string;
   path: string; // 相对 content/,POSIX 风格,如 "guide/setup.md"
   type: "dir" | "file";
+  /** 文件字节数(仅文件节点携带) */
+  size?: number;
   children?: TreeNode[];
 }
 
