@@ -153,6 +153,136 @@ pub fn log_frontend(window: tauri::WebviewWindow, msg: String) -> Result<(), Str
     Ok(())
 }
 
+/* ---------- 启动自愈:白屏(WebView 浏览数据损坏)的检测与分级恢复 ----------
+ *
+ * 白屏的经典根因是 WebView2/WKWebView 的用户数据(磁盘缓存、Code Cache、GPU 缓存)
+ * 损坏:应用更新解压覆盖、WebView2 运行时自动升级、进程被强杀都可能诱发;清除
+ * 浏览数据即恢复。自愈按连续失败次数分级:1=重载,2=清浏览数据后重载,
+ * ≥3=放弃并显示诊断信息交人工处理。前端启动成功后调用 report_boot_success 清零,
+ * 因此正常使用不会累积计数;失败详情落盘 boot-failures.log 供远程排障。 */
+
+const BOOT_STATE_FILE: &str = "boot-state.json";
+const BOOT_LOG_FILE: &str = "boot-failures.log";
+/// 保留的失败日志行数上限
+const BOOT_LOG_KEEP: usize = 20;
+/// detail 截断长度,防止超长堆栈撑爆状态文件
+const BOOT_DETAIL_MAX: usize = 2000;
+
+#[derive(Serialize, Deserialize, Default, Clone)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct BootState {
+    #[serde(default)]
+    failures: u32,
+    #[serde(default)]
+    last_stage: String,
+    #[serde(default)]
+    last_detail: String,
+    #[serde(default)]
+    last_at: u64,
+}
+
+pub(crate) fn read_boot_state(state: &AppState) -> BootState {
+    let file = state.app_data().join(BOOT_STATE_FILE);
+    std::fs::read_to_string(file)
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default()
+}
+
+pub(crate) fn reset_boot_state(state: &AppState) {
+    let _ = write_boot_state(state, &BootState::default());
+}
+
+fn write_boot_state(state: &AppState, data: &BootState) -> Result<(), String> {
+    let dir = state.app_data();
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let json = serde_json::to_string_pretty(data).map_err(|e| e.to_string())?;
+    std::fs::write(dir.join(BOOT_STATE_FILE), json).map_err(|e| e.to_string())
+}
+
+/// 追加一条失败记录到 boot-failures.log,只保留最近 BOOT_LOG_KEEP 行
+fn append_boot_log(state: &AppState, entry: &BootState) {
+    let dir = state.app_data();
+    if std::fs::create_dir_all(&dir).is_err() {
+        return;
+    }
+    let file = dir.join(BOOT_LOG_FILE);
+    let detail = entry.last_detail.replace(['\n', '\r'], " ");
+    let line = format!(
+        "[{}] #{} {} {}\n",
+        now_millis(),
+        entry.failures,
+        entry.last_stage,
+        detail
+    );
+    let mut lines: Vec<String> = std::fs::read_to_string(&file)
+        .map(|s| s.lines().map(String::from).collect())
+        .unwrap_or_default();
+    lines.push(line);
+    let start = lines.len().saturating_sub(BOOT_LOG_KEEP);
+    let _ = std::fs::write(&file, lines[start..].concat());
+}
+
+/// 清除 WebView 全部浏览数据(缓存、存储、Cookie)。Windows 的 ClearBrowsingDataAll
+/// 为异步完成,留出短暂等待再返回,降低前端随即重载撞上半清理状态的概率。
+fn clear_webview_data(window: &tauri::WebviewWindow) -> Result<(), String> {
+    window.clear_all_browsing_data().map_err(|e| e.to_string())?;
+    std::thread::sleep(std::time::Duration::from_millis(500));
+    Ok(())
+}
+
+/// 前端启动失败时上报:计数 +1、落盘日志,返回本轮应执行的自愈动作。
+/// 动作 "clear-data" 返回时浏览数据已清理完毕,前端直接重载即可。
+#[tauri::command]
+pub fn report_boot_failure(
+    state: State<'_, AppState>,
+    window: tauri::WebviewWindow,
+    stage: String,
+    detail: String,
+) -> Result<String, String> {
+    ensure_main(&window)?;
+    let mut bs = read_boot_state(&state);
+    bs.failures += 1;
+    bs.last_stage = stage.chars().take(120).collect();
+    bs.last_detail = detail.chars().take(BOOT_DETAIL_MAX).collect();
+    bs.last_at = now_millis();
+    let _ = write_boot_state(&state, &bs);
+    append_boot_log(&state, &bs);
+    println!("[boot] 启动失败 #{}: {}", bs.failures, bs.last_stage);
+    let action = if bs.failures == 1 {
+        "reload"
+    } else if bs.failures == 2 {
+        if let Err(e) = clear_webview_data(&window) {
+            println!("[boot] 清理浏览数据失败: {e}");
+        } else {
+            println!("[boot] 已清理 WebView 浏览数据,指示前端重载");
+        }
+        "clear-data"
+    } else {
+        "give-up"
+    };
+    Ok(action.into())
+}
+
+/// 前端启动成功(完成初始化、界面可用):连续失败计数清零
+#[tauri::command]
+pub fn report_boot_success(state: State<'_, AppState>, window: tauri::WebviewWindow) -> Result<(), String> {
+    ensure_main(&window)?;
+    if read_boot_state(&state).failures != 0 {
+        println!("[boot] 启动成功,失败计数清零");
+        reset_boot_state(&state);
+    }
+    Ok(())
+}
+
+/// 手动急救:清除 WebView 浏览数据(设置页「清除浏览器缓存」)。应用数据
+/// (app.json、站点)独立于 WebView 用户数据,不受影响;完成后由前端重载。
+#[tauri::command]
+pub fn repair_webview_data(window: tauri::WebviewWindow) -> Result<(), String> {
+    ensure_main(&window)?;
+    clear_webview_data(&window)
+}
+
 /// 更改数据存储位置:None 恢复默认,Some(path) 迁移到自定义目录。
 ///
 /// 数据本体始终存于「当前数据目录」的 app.json;默认目录的 app.json 额外承担

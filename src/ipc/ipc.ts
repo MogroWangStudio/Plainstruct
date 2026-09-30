@@ -44,6 +44,20 @@ export const ipc = {
   logFrontend(msg: string): Promise<void> {
     return inTauri ? invoke<void>("log_frontend", { msg }) : mock.logFrontend(msg);
   },
+  /** 启动失败上报:返回本轮自愈动作(reload=重载 clear-data=已清浏览数据请重载 give-up=放弃) */
+  reportBootFailure(stage: string, detail: string): Promise<"reload" | "clear-data" | "give-up"> {
+    return inTauri
+      ? invoke<"reload" | "clear-data" | "give-up">("report_boot_failure", { stage, detail })
+      : Promise.resolve("give-up");
+  },
+  /** 启动成功:连续失败计数清零(非 Tauri 环境空操作) */
+  reportBootSuccess(): Promise<void> {
+    return inTauri ? invoke<void>("report_boot_success") : Promise.resolve();
+  },
+  /** 手动急救:清除 WebView 浏览数据(缓存/存储损坏导致的白屏修复) */
+  repairWebviewData(): Promise<void> {
+    return inTauri ? invoke<void>("repair_webview_data") : Promise.resolve();
+  },
   checkUpdate(): Promise<UpdateInfo> {
     return inTauri ? invoke<UpdateInfo>("check_update") : mock.checkUpdate();
   },

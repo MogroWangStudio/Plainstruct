@@ -128,6 +128,9 @@ pub fn run() {
             commands::get_bootstrap,
             commands::save_settings,
             commands::log_frontend,
+            commands::report_boot_failure,
+            commands::report_boot_success,
+            commands::repair_webview_data,
             commands::check_update,
             commands::set_data_dir,
             commands::update_download,
@@ -186,6 +189,19 @@ pub fn run() {
             // 仍有待安装任务则保留,前端在设置页显示「重启并更新」。
             // 更新向导改由用户点击按钮显式拉起,退出应用不再自动执行更新。
             commands::github::cleanup_update_task(env!("CARGO_PKG_VERSION"));
+            // 启动自愈预防:上一轮已连续失败 ≥2 次(自动修复档已用尽)时,本轮在
+            // 页面加载前先清一次 WebView 浏览数据,给应用一个干净环境,随后重置
+            // 计数重新观察;若仍失败,前端上报会重新走分级自愈
+            let boot = commands::app::read_boot_state(&state);
+            if boot.failures >= 2 {
+                if let Some(win) = app.get_webview_window("main") {
+                    match win.clear_all_browsing_data() {
+                        Ok(()) => println!("[boot] 检测到连续启动失败,已预清理 WebView 浏览数据"),
+                        Err(e) => println!("[boot] 预清理浏览数据失败: {e}"),
+                    }
+                }
+                commands::app::reset_boot_state(&state);
+            }
             // 便携版策略:默认数据目录为可执行文件所在根目录下的 data/,数据随程序
             // 一起迁移;exe 所在目录不可写(如安装进 Program Files)时回退系统 AppData
             let portable = std::env::current_exe().ok().and_then(|exe| {

@@ -447,6 +447,11 @@ export default {
     moveDataHint: "选择新目录后,现有数据会复制过去并立即生效,原目录保留一份备份;重启后仍使用新位置。",
     resetDataDir: "恢复默认位置",
     pickDataDir: "选择目录…",
+    repairWebview: "清除浏览器缓存",
+    repairWebviewHint: "启动白屏或界面异常时的急救操作:清除界面层的缓存与本地存储后自动重新加载,站点与设置数据不受影响。",
+    repairWebviewConfirmTitle: "清除浏览器缓存？",
+    repairWebviewConfirmBody: "将清除界面层的缓存与本地存储(如独立预览窗口的位置记录),随后自动重新加载;站点内容与设置不受影响。",
+    repairWebviewFailed: "清除失败:{msg}",
   },
   ui: {
     confirm: "确认",

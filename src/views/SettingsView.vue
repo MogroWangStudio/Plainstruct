@@ -2,6 +2,7 @@
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useAppStore } from "@/stores/app";
+import { useUiStore } from "@/stores/ui";
 import { ipc } from "@/ipc/ipc";
 import type { ConfettiLevel, EditorBreakKey, EditorFontMode, EditorIndentKey, Locale, UiFontMode } from "@/ipc/types";
 import { APP_THEMES, type AppThemeSwatch } from "@/lib/app-themes";
@@ -11,6 +12,7 @@ import SelectMenu from "@/components/SelectMenu.vue";
 
 const { t } = useI18n();
 const app = useAppStore();
+const ui = useUiStore();
 
 const localeOptions: { value: Locale; label: string }[] = [
   { value: "zh-CN", label: "简体中文" },
@@ -163,6 +165,28 @@ async function resetDataDir() {
 
 function openDataDir() {
   void ipc.openDataDir();
+}
+
+/* ---------- 启动白屏急救:清除 WebView 浏览数据后重载 ---------- */
+
+const repairing = ref(false);
+
+async function repairWebview() {
+  const ok = await ui.confirmDialog({
+    title: t("settings.repairWebviewConfirmTitle"),
+    body: t("settings.repairWebviewConfirmBody"),
+    confirmText: t("settings.repairWebview"),
+  });
+  if (!ok) return;
+  repairing.value = true;
+  try {
+    await ipc.repairWebviewData();
+    // 清理完成后整页重载;重载本身即是反馈,不再叠 toast
+    window.location.reload();
+  } catch (e) {
+    repairing.value = false;
+    ui.toast(t("settings.repairWebviewFailed", { msg: ipc.errText(e) }), "error");
+  }
 }
 
 /* ---------- 类别分页:一次只显示一个类别,按导航次序决定滑入方向 ---------- */
@@ -523,6 +547,16 @@ function openRelease(url: string) {
                       {{ t("settings.pickDataDir") }}
                     </button>
                   </div>
+                </div>
+
+                <div class="settings-row" style="--i: 2">
+                  <div class="min-w-0">
+                    <p class="text-[13.5px] font-medium">{{ t("settings.repairWebview") }}</p>
+                    <p class="mt-0.5 text-[12px] leading-relaxed text-ink-3">{{ t("settings.repairWebviewHint") }}</p>
+                  </div>
+                  <button class="btn btn-secondary shrink-0" :disabled="repairing" @click="repairWebview">
+                    {{ t("settings.repairWebview") }}
+                  </button>
                 </div>
               </div>
             </template>

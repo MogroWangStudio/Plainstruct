@@ -447,6 +447,11 @@ export default {
     moveDataHint: "Pick a new folder — existing data is copied there and takes effect immediately, with a backup kept in the previous location. The new location persists across restarts.",
     resetDataDir: "Reset to default",
     pickDataDir: "Choose folder…",
+    repairWebview: "Clear browser cache",
+    repairWebviewHint: "First aid for a white screen at startup or a broken UI: clears the UI layer's cache and local storage, then reloads automatically. Sites and settings are not affected.",
+    repairWebviewConfirmTitle: "Clear browser cache?",
+    repairWebviewConfirmBody: "The UI layer's cache and local storage (such as the preview window position) will be cleared and the app will reload. Site content and settings are not affected.",
+    repairWebviewFailed: "Failed to clear: {msg}",
   },
   ui: {
     confirm: "Confirm",

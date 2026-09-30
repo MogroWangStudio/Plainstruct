@@ -140,6 +140,8 @@ export const useAppStore = defineStore("app", {
         this.updateName = pending.assetName;
       }
       this.ready = true;
+      // 启动自愈链路的成功终点:清零连续失败计数
+      void ipc.reportBootSuccess();
     },
 
     /** 监听更新包下载进度事件:驱动进度、速度与包名展示 */
