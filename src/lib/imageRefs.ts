@@ -1,6 +1,6 @@
 /** 站点图片引用查找 -- 与渲染管线同一套路径换算,供资产页展示与重命名联动 */
 import { decodeHref, splitHash } from "./markdown";
-import { dirname, joinPosix } from "./paths";
+import { dirname, encodePath, joinPosix, relPosix } from "./paths";
 
 export interface ImageRef {
   /** 引用方文档(content/ 相对) */
@@ -69,6 +69,22 @@ export function replaceImageRefs(content: string, refs: ImageRef[], newName: str
   for (const { raw } of refs) {
     const i = raw.lastIndexOf("/");
     const newRaw = (i === -1 ? "" : raw.slice(0, i + 1)) + encodeURIComponent(newName);
+    if (newRaw !== raw) out = out.split(raw).join(newRaw);
+  }
+  return out;
+}
+
+/** 文档内容中把图片引用整体改写到新的 content/ 相对路径(跨目录移动用):
+ *  与渲染管线同一换算 —— 新写法 = 新路径相对引用方文档目录,逐段 URL 编码 */
+export function moveImageRefs(
+  content: string,
+  refs: ImageRef[],
+  newPath: string,
+  docPath: string,
+): string {
+  let out = content;
+  const newRaw = encodePath(relPosix(dirname(docPath), newPath));
+  for (const { raw } of refs) {
     if (newRaw !== raw) out = out.split(raw).join(newRaw);
   }
   return out;

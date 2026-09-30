@@ -50,6 +50,24 @@ export const useSiteStore = defineStore("site", {
         (d.children ?? []).filter((n) => n.type === "file" && isImageFile(n.name)),
       );
     },
+
+    /** 资产分组:每个资产目录的根层与各子文件夹各成一组(资产页分组展示与移动目标) */
+    assetGroups(state): { dir: string; label: string; images: TreeNode[] }[] {
+      const groups: { dir: string; label: string; images: TreeNode[] }[] = [];
+      const walk = (node: TreeNode, base: string) => {
+        const images = (node.children ?? []).filter((n) => n.type === "file" && isImageFile(n.name));
+        if (images.length) {
+          groups.push({ dir: node.path, label: node.path.slice(base.length + 1), images });
+        }
+        for (const c of node.children ?? []) if (c.type === "dir") walk(c, base);
+      };
+      for (const d of state.tree.filter((n) => n.type === "dir" && isAssetDirName(n.name))) {
+        const top = (d.children ?? []).filter((n) => n.type === "file" && isImageFile(n.name));
+        if (top.length) groups.push({ dir: d.path, label: "", images: top });
+        for (const c of d.children ?? []) if (c.type === "dir") walk(c, d.path);
+      }
+      return groups;
+    },
   },
 
   actions: {
