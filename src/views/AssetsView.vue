@@ -1,5 +1,6 @@
 <script setup lang="ts">
-/** 资产页 -- 管理站点 asset 文件夹(兼容旧 images)中的图片:预览、重命名(联动更新引用)、删除、查找引用 */
+/** 资产页 -- 管理站点 asset 文件夹(兼容旧 images)中的图片:预览、多选(框选/修饰键)、
+ *  拖放到文件夹、重命名(联动更新引用)、删除、查找引用 */
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { collectDocPaths } from "@/lib/builder";
@@ -16,6 +17,7 @@ import { useSiteStore } from "@/stores/site";
 import { useUiStore } from "@/stores/ui";
 import AppIcon from "@/components/AppIcon.vue";
 import PromptModal from "@/components/PromptModal.vue";
+import SelectMenu from "@/components/SelectMenu.vue";
 
 const { t } = useI18n();
 const app = useAppStore();
@@ -26,11 +28,15 @@ const ui = useUiStore();
 /** 站点资产(asset,兼容旧 images)下的全部图片文件(含子文件夹,与分组同源) */
 const images = computed<TreeNode[]>(() => site.assetGroups.flatMap((g) => g.images));
 
-/* ---------- 双视图:卡片(分组)/ 列表 ---------- */
+/* ---------- 双视图:卡片(分组)/ 列表(分组) ---------- */
 
 const viewMode = ref<"card" | "list">("card");
 
-/** 新建文件夹:建在主资产目录(asset,兼容旧 images)根层 */
+/** 按视图顺序排列的图片路径(Shift 范围选择与框选都按这个顺序) */
+const orderedPaths = computed(() => images.value.map((n) => n.path));
+
+/** 新建文件夹:建在主资产目录(asset,兼容旧 images)根层;
+ *  建完刷新树,空文件夹也会作为分组出现(可直接往里拖图) */
 async function newFolder() {
   const base = site.assetDirs[0]?.path;
   if (!base) return;
@@ -49,44 +55,189 @@ async function newFolder() {
   }
 }
 
-/* ---------- 移动到文件夹(引用自动重定向) ---------- */
+/* ---------- 选择:单选 / Ctrl(⌘)加选 / Shift 范围 / 空白处框选 ---------- */
 
+const selected = ref<string[]>([]);
+const selectionSet = computed(() => new Set(selected.value));
+/** 每次点击后记录的锚点,供 Shift 范围选择 */
+const anchorPath = ref<string | null>(null);
+
+const onlyOne = computed(() => (selected.value.length === 1 ? selected.value[0] : null));
+/** 多选汇总:文件数以外的信息用于右栏摘要 */
+const selectedNodes = computed(() => images.value.filter((n) => selectionSet.value.has(n.path)));
+const selectedSize = computed(() =>
+  selectedNodes.value.reduce((sum, n) => sum + (n.size ?? 0), 0),
+);
+
+function onItemClick(path: string, e: MouseEvent) {
+  if (e.shiftKey && anchorPath.value) {
+    const list = orderedPaths.value;
+    const a = list.indexOf(anchorPath.value);
+    const b = list.indexOf(path);
+    if (a >= 0 && b >= 0) {
+      const [lo, hi] = a < b ? [a, b] : [b, a];
+      selected.value = list.slice(lo, hi + 1);
+      return;
+    }
+  }
+  if (e.metaKey || e.ctrlKey) {
+    selected.value = selectionSet.value.has(path)
+      ? selected.value.filter((p) => p !== path)
+      : [...selected.value, path];
+  } else {
+    selected.value = [path];
+  }
+  anchorPath.value = path;
+}
+
+/* ---------- 框选:在空白处按住拖动,划定区域内的图片一并选中 ---------- */
+
+const listHost = ref<HTMLElement>();
+const marquee = ref<{ x: number; y: number; w: number; h: number } | null>(null);
+let marqueeStart: { x: number; y: number } | null = null;
+/** 框选起始时的已有选择:按住修饰键框选是追加而非替换 */
+let marqueeBase: string[] = [];
+
+/** 指针位置换算为容器内容坐标(减外框、加滚动偏移) */
+function hostPoint(e: PointerEvent): { x: number; y: number } {
+  const host = listHost.value!;
+  const rect = host.getBoundingClientRect();
+  return {
+    x: e.clientX - rect.left + host.scrollLeft,
+    y: e.clientY - rect.top + host.scrollTop,
+  };
+}
+
+function onHostPointerDown(e: PointerEvent) {
+  if (e.button !== 0) return;
+  const el = e.target as HTMLElement;
+  // 从卡片上按下交给点击/拖拽;按钮等控件同样不启动框选
+  if (el.closest("[data-asset-item]") || el.closest("button,input")) return;
+  const host = listHost.value;
+  if (!host) return;
+  const p = hostPoint(e);
+  marqueeStart = p;
+  marqueeBase = e.shiftKey || e.metaKey || e.ctrlKey ? [...selected.value] : [];
+  if (!marqueeBase.length) selected.value = [];
+  marquee.value = { x: p.x, y: p.y, w: 0, h: 0 };
+  host.setPointerCapture(e.pointerId);
+  e.preventDefault();
+}
+
+function onHostPointerMove(e: PointerEvent) {
+  const host = listHost.value;
+  if (!marqueeStart || !host) return;
+  const p = hostPoint(e);
+  const box = {
+    x: Math.min(marqueeStart.x, p.x),
+    y: Math.min(marqueeStart.y, p.y),
+    w: Math.abs(p.x - marqueeStart.x),
+    h: Math.abs(p.y - marqueeStart.y),
+  };
+  marquee.value = box;
+  const rect = host.getBoundingClientRect();
+  const hit = new Set(marqueeBase);
+  host.querySelectorAll<HTMLElement>("[data-asset-item]").forEach((el) => {
+    const path = el.dataset.assetPath;
+    if (!path) return;
+    const r = el.getBoundingClientRect();
+    const left = r.left - rect.left + host.scrollLeft;
+    const top = r.top - rect.top + host.scrollTop;
+    const right = r.right - rect.left + host.scrollLeft;
+    const bottom = r.bottom - rect.top + host.scrollTop;
+    if (left < box.x + box.w && right > box.x && top < box.y + box.h && bottom > box.y) hit.add(path);
+  });
+  selected.value = [...hit];
+  e.preventDefault();
+}
+
+function onHostPointerUp(e: PointerEvent) {
+  if (!marqueeStart) return;
+  marqueeStart = null;
+  marquee.value = null;
+  listHost.value?.releasePointerCapture(e.pointerId);
+}
+
+/* ---------- 拖放到文件夹(引用自动重定向) ---------- */
+
+const dragPaths = ref<string[]>([]);
+const dropTarget = ref<string | null>(null);
+
+function onItemDragStart(path: string, e: DragEvent) {
+  // 拖动未选中的项时先把选择收敛到它,避免"看着拖 A 实际拖走一片"
+  if (!selectionSet.value.has(path)) selected.value = [path];
+  dragPaths.value = [...selected.value];
+  anchorPath.value = path;
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", dragPaths.value.join("\n"));
+  }
+}
+
+function onItemDragEnd() {
+  dragPaths.value = [];
+  dropTarget.value = null;
+}
+
+function onGroupDragOver(dir: string, e: DragEvent) {
+  if (!dragPaths.value.length) return;
+  e.preventDefault();
+  if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+  dropTarget.value = dir;
+}
+
+function onGroupDragLeave(dir: string, e: DragEvent) {
+  // 子元素之间移动时不熄灭指示,避免闪烁
+  const related = e.relatedTarget as Node | null;
+  const host = e.currentTarget as HTMLElement | null;
+  if (related && host?.contains(related)) return;
+  if (dropTarget.value === dir) dropTarget.value = null;
+}
+
+function onGroupDrop(dir: string, e: DragEvent) {
+  e.preventDefault();
+  const paths = dragPaths.value;
+  dragPaths.value = [];
+  dropTarget.value = null;
+  if (paths.length) void movePaths(paths, dir);
+}
+
+/** 拖放与弹窗共用的移动到…入口 */
 const moveOpen = ref(false);
-const moveImg = ref<TreeNode | null>(null);
+const movePathsOpen = ref<string[]>([]);
 const moveTarget = ref("");
 const moving = ref(false);
 const moveTargetOptions = ref<{ value: string; label: string }[]>([]);
 
-function openMove(img: TreeNode) {
-  moveImg.value = img;
-  const base = img.path.split("/")[0];
-  const dirs: { value: string; label: string }[] = [
-    { value: base, label: t("assets.folderRootLabel") },
-  ];
-  const rootNode = site.tree.find((n) => n.path === base);
-  const collect = (nodes: TreeNode[]) => {
-    for (const n of nodes) {
-      if (n.type !== "dir") continue;
-      dirs.push({ value: n.path, label: n.path.slice(base.length + 1) });
-      collect(n.children ?? []);
-    }
-  };
-  if (rootNode) collect(rootNode.children ?? []);
-  // 排除图片当前所在目录(移到原处无意义)
-  moveTargetOptions.value = dirs.filter((d) => d.value !== dirname(img.path));
-  moveTarget.value = moveTargetOptions.value[0]?.value ?? base;
+function openMove(paths: string[]) {
+  const targets = paths.filter(Boolean);
+  if (!targets.length) return;
+  movePathsOpen.value = targets;
+  // 目标:资产根目录与全部子文件夹(含空文件夹);单个文件时排除它当前所在的目录
+  const from = new Set(targets.map((p) => dirname(p)));
+  const options = site.assetGroups
+    .filter((g) => from.size > 1 || !from.has(g.dir))
+    .map((g) => ({ value: g.dir, label: g.label || t("assets.folderRootLabel") }));
+  if (!options.length) {
+    ui.toast(t("assets.moveNoTarget"), "info");
+    return;
+  }
+  moveTargetOptions.value = options;
+  moveTarget.value = options[0].value;
   moveOpen.value = true;
 }
 
 async function confirmMove() {
-  const img = moveImg.value;
-  if (!img || moving.value) return;
-  const dest = moveTarget.value;
-  if (!dest || dirname(img.path) === dest) {
-    moveOpen.value = false;
-    return;
-  }
-  const refs = findImageRefs(img.path, Object.keys(docs.value), docs.value);
+  if (moving.value) return;
+  moveOpen.value = false;
+  await movePaths(movePathsOpen.value, moveTarget.value);
+}
+
+/** 把一批图片移动到目标目录,并同步更新文档中的引用写法 */
+async function movePaths(paths: string[], dest: string) {
+  const targets = paths.filter((p) => dirname(p) !== dest);
+  if (!targets.length) return;
+  const refs = targets.flatMap((p) => findImageRefs(p, Object.keys(docs.value), docs.value));
   const dirtyOpen = refs.some((r) => r.docPath === editor.activePath && editor.dirty);
   if (refs.length) {
     const ok = await ui.confirmDialog({
@@ -98,13 +249,33 @@ async function confirmMove() {
   }
   moving.value = true;
   try {
-    const newPath = await site.moveItem(img.path, dest);
+    const moved = await site.moveItems(targets, dest);
+    await rewriteRefs(moved);
+    await loadDocs();
+    selected.value = moved.map((m) => m.to);
+    ui.toast(
+      moved.length > 1
+        ? t("assets.movedCount", { n: moved.length, folder: dest })
+        : t("assets.moved", { folder: dest }),
+      "success",
+    );
+  } catch (e) {
+    ui.toast(t("ui.operationFailed", { msg: ipc.errText(e) }), "error");
+  } finally {
+    moving.value = false;
+  }
+}
+
+/** 移动落盘后,把引用这些图片的文档写法改写到新路径 */
+async function rewriteRefs(moved: { from: string; to: string }[]) {
+  for (const m of moved) {
+    const refs = findImageRefs(m.from, Object.keys(docs.value), docs.value);
     for (const r of refs) {
       const isOpen = r.docPath === editor.activePath;
       if (isOpen && editor.dirty) continue;
       const content = isOpen ? editor.content : docs.value[r.docPath];
       if (content === undefined) continue;
-      const updated = moveImageRefs(content, [r], newPath, r.docPath);
+      const updated = moveImageRefs(content, [r], m.to, r.docPath);
       if (updated === content) continue;
       await ipc.saveDoc(r.docPath, updated);
       if (isOpen) {
@@ -116,14 +287,6 @@ async function confirmMove() {
       }
       docs.value = { ...docs.value, [r.docPath]: updated };
     }
-    if (selected.value === img.path) selected.value = newPath;
-    await loadDocs();
-    moveOpen.value = false;
-    ui.toast(t("assets.moved", { folder: dest }), "success");
-  } catch (e) {
-    ui.toast(t("ui.operationFailed", { msg: ipc.errText(e) }), "error");
-  } finally {
-    moving.value = false;
   }
 }
 
@@ -157,10 +320,6 @@ const refCounts = computed(() =>
   countImageRefs(images.value.map((n) => n.path), Object.keys(docs.value), docs.value),
 );
 
-/* ---------- 选中与引用详情 ---------- */
-
-const selected = ref<string | null>(null);
-
 /* ---------- 详情窗宽度可拖拽(右侧面板) ---------- */
 const splitHost = ref<HTMLElement>();
 const detailW = ref(300);
@@ -175,17 +334,13 @@ function onDividerMove(e: PointerEvent) {
   // 界面缩放档位下指针与 rect 均为视觉像素,宽度声明值经 toCssPx 还原
   detailW.value = Math.min(520, Math.max(220, toCssPx(rect.right - e.clientX)));
 }
+
 const selectedRefs = computed<ImageRef[]>(() =>
-  selected.value ? findImageRefs(selected.value, Object.keys(docs.value), docs.value) : [],
+  onlyOne.value ? findImageRefs(onlyOne.value, Object.keys(docs.value), docs.value) : [],
 );
 
-const selectedNode = computed(() => images.value.find((i) => i.path === selected.value));
-/** 选中文件的字节数(TreeNode.size,目录/未知为 undefined) */
-const selectedSize = computed(() => selectedNode.value?.size);
-
-function select(path: string) {
-  selected.value = selected.value === path ? null : path;
-}
+const selectedNode = computed(() => images.value.find((i) => i.path === onlyOne.value));
+const selectedNodeSize = computed(() => selectedNode.value?.size);
 
 /** 打开引用方文档(从内容树定位节点) */
 function openDoc(docPath: string) {
@@ -273,7 +428,7 @@ async function rename(img: TreeNode) {
       }
       docs.value = { ...docs.value, [r.docPath]: updated };
     }
-    if (selected.value === img.path) selected.value = newPath;
+    if (onlyOne.value === img.path) selected.value = [newPath];
     // 替换全部落盘后重读一次,保证引用计数与磁盘一致(树刷新触发的读取可能早于保存)
     await loadDocs();
     ui.toast(t("assets.renamed", { name: newName }), "success");
@@ -282,23 +437,34 @@ async function rename(img: TreeNode) {
   }
 }
 
-/* ---------- 删除(二级确认) ---------- */
+/* ---------- 删除(二级确认,支持多选批量) ---------- */
 
-async function remove(img: TreeNode) {
-  const n = refCounts.value.get(img.path) ?? 0;
+async function remove(paths: string[]) {
+  const targets = paths.filter((p) => p);
+  if (!targets.length) return;
+  const n = targets.reduce((sum, p) => sum + (refCounts.value.get(p) ?? 0), 0);
+  const name = targets.length === 1 ? targets[0] : "";
   const ok = await ui.confirmDialog({
-    title: t("assets.deleteTitle"),
-    body: n
-      ? t("assets.deleteBodyReferenced", { name: img.name, n })
-      : t("assets.deleteBody", { name: img.name }),
+    title: targets.length > 1 ? t("assets.deleteManyTitle", { n: targets.length }) : t("assets.deleteTitle"),
+    body:
+      targets.length > 1
+        ? t("assets.deleteManyBody", { n: targets.length, refs: n })
+        : n
+          ? t("assets.deleteBodyReferenced", { name: basename(name), n })
+          : t("assets.deleteBody", { name: basename(name) }),
     danger: true,
     confirmText: t("common.delete"),
   });
   if (!ok) return;
   try {
-    await site.deleteItem(img.path);
-    if (selected.value === img.path) selected.value = null;
-    ui.toast(t("assets.deleted", { name: img.name }), "success");
+    await site.deleteItems(targets);
+    selected.value = [];
+    ui.toast(
+      targets.length > 1
+        ? t("assets.deletedCount", { n: targets.length })
+        : t("assets.deleted", { name: basename(name) }),
+      "success",
+    );
   } catch (e) {
     ui.toast(t("ui.operationFailed", { msg: ipc.errText(e) }), "error");
   }
@@ -325,10 +491,20 @@ function thumbUrl(path: string): string {
 
     <!-- 左:图片网格 | 右:详情窗(宽度可拖拽) -->
     <div ref="splitHost" class="flex min-h-0 flex-1">
-    <div class="min-w-0 flex-1 overflow-y-auto p-5">
+    <div
+      ref="listHost"
+      class="relative min-w-0 flex-1 overflow-y-auto p-5"
+      @pointerdown="onHostPointerDown"
+      @pointermove="onHostPointerMove"
+      @pointerup="onHostPointerUp"
+      @pointercancel="onHostPointerUp"
+    >
       <!-- 工具行:双视图切换单按钮 + 新建文件夹 -->
       <div class="flex items-center justify-between">
-        <span class="field-label">{{ t("tree.assets") }} · {{ images.length }}</span>
+        <span class="field-label">
+          {{ t("tree.assets") }} · {{ images.length }}
+          <span v-if="selected.length" class="ml-2 text-ink-3">{{ t("assets.selectedCount", { n: selected.length }) }}</span>
+        </span>
         <div class="flex items-center gap-1">
           <button
             class="btn-icon !h-7 !w-7"
@@ -343,137 +519,217 @@ function thumbUrl(path: string): string {
         </div>
       </div>
 
-      <p v-if="!images.length" class="mt-3 rounded-lg border border-dashed border-line px-4 py-10 text-center text-[calc(13px*var(--ui-font-scale))] leading-relaxed text-ink-3">
+      <p v-if="!images.length && site.assetGroups.length <= 1" class="mt-3 rounded-lg border border-dashed border-line px-4 py-10 text-center text-[calc(13px*var(--ui-font-scale))] leading-relaxed text-ink-3">
         {{ t("assets.empty") }}
       </p>
 
-      <!-- 列表视图:缩略图 + 路径 + 大小 + 引用数 -->
-      <div v-else-if="viewMode === 'list'" class="mt-3 flex flex-col gap-1.5">
-        <div
-          v-for="img in images"
-          :key="img.path"
-          class="asset-row"
-          :class="{ selected: selected === img.path }"
-          @click="select(img.path)"
-        >
-          <span class="row-thumb">
-            <img
-              v-if="thumbUrl(img.path) && !brokenThumbs.has(img.path)"
-              :src="thumbUrl(img.path)"
-              :alt="img.name"
-              loading="lazy"
-              @error="brokenThumbs.add(img.path)"
-            />
-            <span v-else class="thumb-fallback">{{ img.name }}</span>
-          </span>
-          <span class="min-w-0 flex-1">
-            <span class="block truncate text-[calc(12.5px*var(--ui-font-scale))] text-ink">{{ img.name }}</span>
-            <span class="mono block truncate text-[calc(10.5px*var(--ui-font-scale))] text-ink-3">{{ img.path }}</span>
-          </span>
-          <span class="mono shrink-0 text-[calc(11px*var(--ui-font-scale))] text-ink-3">
-            {{ img.size ? formatSize(img.size) : "" }}
-          </span>
-          <span class="ref-count shrink-0" :class="{ zero: !(refCounts.get(img.path) ?? 0) }">
-            {{ t("assets.refCount", { n: refCounts.get(img.path) ?? 0 }) }}
-          </span>
-          <span class="actions flex shrink-0 items-center gap-0.5">
-            <button class="btn-icon !h-6 !w-6" :title="t('assets.rename')" @click.stop="rename(img)">
-              <AppIcon name="pencil" :size="13" />
-            </button>
-            <button class="btn-icon !h-6 !w-6 hover:!text-danger" :title="t('common.delete')" @click.stop="remove(img)">
-              <AppIcon name="trash" :size="13" />
-            </button>
-          </span>
-        </div>
-      </div>
-
-      <!-- 卡片视图:按子文件夹分组 -->
       <template v-else>
+        <p class="mt-2 text-[calc(11.5px*var(--ui-font-scale))] text-ink-3">{{ t("assets.selectHint") }}</p>
+
+        <!-- 按文件夹分组:组标题即投放目标(拖图到标题上移动),空文件夹同样列出 -->
         <template v-for="g in site.assetGroups" :key="g.dir">
-          <h3 v-if="g.label" class="field-label mt-5">{{ g.label }}</h3>
-          <div class="mt-3 grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3">
-        <div
-          v-for="img in images"
-          :key="img.path"
-          class="asset-card"
-          :class="{ selected: selected === img.path }"
-          @click="select(img.path)"
-        >
-          <div class="thumb">
-            <img
-              v-if="thumbUrl(img.path) && !brokenThumbs.has(img.path)"
-              :src="thumbUrl(img.path)"
-              :alt="img.name"
-              loading="lazy"
-              @error="brokenThumbs.add(img.path)"
-            />
-            <span v-else class="thumb-fallback">{{ img.name }}</span>
-          </div>
-          <p
-            class="truncate px-2 pt-1.5 text-[calc(12px*var(--ui-font-scale))]"
-            :title="img.size != null ? `${img.name} · ${formatSize(img.size)}` : img.name"
+          <div
+            class="asset-group"
+            :class="{ 'is-drop': dropTarget === g.dir, 'is-empty': !g.images.length }"
+            @dragover="onGroupDragOver(g.dir, $event)"
+            @dragleave="onGroupDragLeave(g.dir, $event)"
+            @drop="onGroupDrop(g.dir, $event)"
           >
-            {{ img.name }}
-          </p>
-          <div class="px-2 pb-2 pt-0.5">
-            <div class="flex items-center justify-between">
-              <span class="ref-count" :class="{ zero: !(refCounts.get(img.path) ?? 0) }">
+            <AppIcon name="folder" :size="13" class="shrink-0" />
+            <span class="truncate">{{ g.label || t("assets.folderRootLabel") }}</span>
+            <span class="mono shrink-0 text-ink-3">{{ g.images.length }}</span>
+          </div>
+
+          <p v-if="!g.images.length" class="asset-group-empty">{{ t("assets.emptyFolder") }}</p>
+
+          <!-- 列表视图:缩略图 + 路径 + 大小 + 引用数 -->
+          <div v-else-if="viewMode === 'list'" class="flex flex-col gap-1.5">
+            <div
+              v-for="img in g.images"
+              :key="img.path"
+              class="asset-row"
+              :class="{ selected: selectionSet.has(img.path), dragging: dragPaths.includes(img.path) }"
+              data-asset-item
+              :data-asset-path="img.path"
+              draggable="true"
+              @click="onItemClick(img.path, $event)"
+              @dragstart="onItemDragStart(img.path, $event)"
+              @dragend="onItemDragEnd"
+            >
+              <span class="row-thumb">
+                <img
+                  v-if="thumbUrl(img.path) && !brokenThumbs.has(img.path)"
+                  :src="thumbUrl(img.path)"
+                  :alt="img.name"
+                  loading="lazy"
+                  @error="brokenThumbs.add(img.path)"
+                />
+                <span v-else class="thumb-fallback">{{ img.name }}</span>
+              </span>
+              <span class="min-w-0 flex-1">
+                <span class="block truncate text-[calc(12.5px*var(--ui-font-scale))] text-ink">{{ img.name }}</span>
+                <span class="mono block truncate text-[calc(10.5px*var(--ui-font-scale))] text-ink-3">{{ img.path }}</span>
+              </span>
+              <span class="mono shrink-0 text-[calc(11px*var(--ui-font-scale))] text-ink-3">
+                {{ img.size ? formatSize(img.size) : "" }}
+              </span>
+              <span class="ref-count shrink-0" :class="{ zero: !(refCounts.get(img.path) ?? 0) }">
                 {{ t("assets.refCount", { n: refCounts.get(img.path) ?? 0 }) }}
               </span>
-              <div class="actions flex items-center gap-0.5">
+              <span class="actions flex shrink-0 items-center gap-0.5">
                 <button class="btn-icon !h-6 !w-6" :title="t('assets.rename')" @click.stop="rename(img)">
                   <AppIcon name="pencil" :size="13" />
                 </button>
-                <button class="btn-icon !h-6 !w-6 hover:!text-danger" :title="t('common.delete')" @click.stop="remove(img)">
+                <button class="btn-icon !h-6 !w-6 hover:!text-danger" :title="t('common.delete')" @click.stop="remove([img.path])">
                   <AppIcon name="trash" :size="13" />
                 </button>
+              </span>
+            </div>
+          </div>
+
+          <!-- 卡片视图 -->
+          <div v-else class="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3">
+            <div
+              v-for="img in g.images"
+              :key="img.path"
+              class="asset-card"
+              :class="{ selected: selectionSet.has(img.path), dragging: dragPaths.includes(img.path) }"
+              data-asset-item
+              :data-asset-path="img.path"
+              draggable="true"
+              @click="onItemClick(img.path, $event)"
+              @dragstart="onItemDragStart(img.path, $event)"
+              @dragend="onItemDragEnd"
+            >
+              <div class="thumb">
+                <img
+                  v-if="thumbUrl(img.path) && !brokenThumbs.has(img.path)"
+                  :src="thumbUrl(img.path)"
+                  :alt="img.name"
+                  loading="lazy"
+                  @error="brokenThumbs.add(img.path)"
+                />
+                <span v-else class="thumb-fallback">{{ img.name }}</span>
+              </div>
+              <p
+                class="truncate px-2 pt-1.5 text-[calc(12px*var(--ui-font-scale))]"
+                :title="img.size != null ? `${img.name} · ${formatSize(img.size)}` : img.name"
+              >
+                {{ img.name }}
+              </p>
+              <div class="px-2 pb-2 pt-0.5">
+                <div class="flex items-center justify-between">
+                  <span class="ref-count" :class="{ zero: !(refCounts.get(img.path) ?? 0) }">
+                    {{ t("assets.refCount", { n: refCounts.get(img.path) ?? 0 }) }}
+                  </span>
+                  <div class="actions flex items-center gap-0.5">
+                    <button class="btn-icon !h-6 !w-6" :title="t('assets.rename')" @click.stop="rename(img)">
+                      <AppIcon name="pencil" :size="13" />
+                    </button>
+                    <button class="btn-icon !h-6 !w-6 hover:!text-danger" :title="t('common.delete')" @click.stop="remove([img.path])">
+                      <AppIcon name="trash" :size="13" />
+                    </button>
+                  </div>
+                </div>
+                <!-- 文件大小:默认显示在引用计数下一行 -->
+                <p v-if="img.size" class="mono pt-0.5 text-[calc(11px*var(--ui-font-scale))] text-ink-3">
+                  {{ formatSize(img.size) }}
+                </p>
               </div>
             </div>
-            <!-- 文件大小:默认显示在引用计数下一行 -->
-            <p v-if="img.size" class="mono pt-0.5 text-[calc(11px*var(--ui-font-scale))] text-ink-3">
-              {{ formatSize(img.size) }}
-            </p>
           </div>
-        </div>
-      </div>
         </template>
       </template>
+
+      <!-- 框选矩形:跟随指针划定区域 -->
+      <div
+        v-if="marquee"
+        class="marquee"
+        :style="{ left: `${marquee.x}px`, top: `${marquee.y}px`, width: `${marquee.w}px`, height: `${marquee.h}px` }"
+        aria-hidden="true"
+      />
     </div>
 
-    <!-- 右:详情窗(引用位置以列表呈现) -->
-    <template v-if="selected">
+    <!-- 右:详情(单选)/ 批量操作(多选) -->
+    <template v-if="selected.length">
       <div class="divider w-px shrink-0 cursor-col-resize bg-line" @pointerdown="onDividerDown" @pointermove="onDividerMove" />
-      <aside class="shrink-0 overflow-y-auto border-l border-line bg-surface px-4 py-4" :style="{ width: detailW + 'px' }">
+
+      <!-- 多选:摘要 + 批量动作 -->
+      <aside
+        v-if="selected.length > 1"
+        class="shrink-0 overflow-y-auto border-l border-line bg-surface px-4 py-4"
+        :style="{ width: detailW + 'px' }"
+      >
         <div class="flex items-center gap-1">
-          <span class="min-w-0 flex-1 truncate text-[calc(13.5px*var(--ui-font-scale))] font-semibold" :title="basename(selected)">{{ basename(selected) }}</span>
-          <button v-if="selectedNode" class="btn-icon !h-7 !w-7" :title="t('assets.rename')" @click="rename(selectedNode)">
+          <span class="min-w-0 flex-1 truncate text-[calc(13.5px*var(--ui-font-scale))] font-semibold">
+            {{ t("assets.selectedCount", { n: selected.length }) }}
+          </span>
+          <button class="btn-icon !h-7 !w-7" :title="t('assets.clearSelection')" @click="selected = []">
+            <AppIcon name="x" :size="14" />
+          </button>
+        </div>
+        <p v-if="selectedSize" class="mono mt-1 text-[calc(11px*var(--ui-font-scale))] text-ink-3">
+          {{ t("assets.totalSize", { size: formatSize(selectedSize) }) }}
+        </p>
+        <div class="mt-3 flex flex-col gap-2">
+          <button class="btn btn-secondary justify-start" @click="openMove(selected)">
+            <AppIcon name="folderMove" :size="14" />
+            {{ t("assets.moveSelected") }}
+          </button>
+          <button class="btn btn-secondary justify-start hover:!text-danger" @click="remove(selected)">
+            <AppIcon name="trash" :size="14" />
+            {{ t("assets.deleteSelected") }}
+          </button>
+        </div>
+        <h3 class="field-label mt-4">{{ t("assets.selectedListHeading") }}</h3>
+        <ul class="mt-1 flex flex-col">
+          <li
+            v-for="n in selectedNodes"
+            :key="n.path"
+            class="mono truncate py-0.5 text-[calc(11px*var(--ui-font-scale))] text-ink-2"
+            :title="n.path"
+          >
+            {{ n.path }}
+          </li>
+        </ul>
+      </aside>
+
+      <!-- 单选:预览 + 引用位置 -->
+      <aside
+        v-else-if="selectedNode"
+        class="shrink-0 overflow-y-auto border-l border-line bg-surface px-4 py-4"
+        :style="{ width: detailW + 'px' }"
+      >
+        <div class="flex items-center gap-1">
+          <span class="min-w-0 flex-1 truncate text-[calc(13.5px*var(--ui-font-scale))] font-semibold" :title="selectedNode.path">{{ selectedNode.name }}</span>
+          <button class="btn-icon !h-7 !w-7" :title="t('assets.rename')" @click="rename(selectedNode)">
             <AppIcon name="pencil" :size="14" />
           </button>
-          <button v-if="selectedNode" class="btn-icon !h-7 !w-7" :title="t('assets.moveTo')" @click="openMove(selectedNode)">
-            <AppIcon name="folder" :size="14" />
+          <button class="btn-icon !h-7 !w-7" :title="t('assets.moveTo')" @click="openMove([selectedNode.path])">
+            <AppIcon name="folderMove" :size="14" />
           </button>
-          <button v-if="selectedNode" class="btn-icon !h-7 !w-7 hover:!text-danger" :title="t('common.delete')" @click="remove(selectedNode)">
+          <button class="btn-icon !h-7 !w-7 hover:!text-danger" :title="t('common.delete')" @click="remove([selectedNode.path])">
             <AppIcon name="trash" :size="14" />
           </button>
-          <button class="btn-icon !h-7 !w-7" :title="t('common.close')" @click="selected = null">
+          <button class="btn-icon !h-7 !w-7" :title="t('common.close')" @click="selected = []">
             <AppIcon name="x" :size="14" />
           </button>
         </div>
 
         <div class="detail-preview mt-3">
           <img
-            v-if="thumbUrl(selected) && !brokenThumbs.has(selected)"
-            :key="selected"
-            :src="thumbUrl(selected)"
-            :alt="basename(selected)"
-            @error="brokenThumbs.add(selected)"
+            v-if="thumbUrl(selectedNode.path) && !brokenThumbs.has(selectedNode.path)"
+            :key="selectedNode.path"
+            :src="thumbUrl(selectedNode.path)"
+            :alt="selectedNode.name"
+            @error="brokenThumbs.add(selectedNode.path)"
           />
-          <span v-else class="thumb-fallback h-full w-full">{{ basename(selected) }}</span>
+          <span v-else class="thumb-fallback h-full w-full">{{ selectedNode.name }}</span>
         </div>
-        <p class="mono mt-2 break-all text-[calc(11px*var(--ui-font-scale))] text-ink-3">{{ selected }}</p>
+        <p class="mono mt-2 break-all text-[calc(11px*var(--ui-font-scale))] text-ink-3">{{ selectedNode.path }}</p>
         <!-- 详细大小:人类可读 + 精确字节 -->
-        <p v-if="selectedSize != null" class="mono mt-1 text-[calc(11px*var(--ui-font-scale))] text-ink-3">
-          {{ formatSize(selectedSize) }} · {{ selectedSize.toLocaleString("en-US") }} B
+        <p v-if="selectedNodeSize != null" class="mono mt-1 text-[calc(11px*var(--ui-font-scale))] text-ink-3">
+          {{ formatSize(selectedNodeSize) }} · {{ selectedNodeSize.toLocaleString("en-US") }} B
         </p>
 
         <h3 class="field-label mt-4">{{ t("assets.refsHeading") }}</h3>
@@ -500,7 +756,9 @@ function thumbUrl(path: string): string {
           <div class="modal-card panel relative w-full max-w-[400px] shadow-window">
             <header class="px-6 pb-2 pt-5">
               <h2 class="text-[calc(16px*var(--ui-font-scale))] font-semibold">
-                {{ t("assets.moveTitle", { name: moveImg ? basename(moveImg.path) : "" }) }}
+                {{ movePathsOpen.length > 1
+                  ? t("assets.moveManyTitle", { n: movePathsOpen.length })
+                  : t("assets.moveTitle", { name: movePathsOpen[0] ? basename(movePathsOpen[0]) : "" }) }}
               </h2>
             </header>
             <div class="px-6 pb-2">
@@ -532,6 +790,49 @@ function thumbUrl(path: string): string {
 </template>
 
 <style scoped>
+/* 分组标题:同时是拖放目标 —— 悬停拖拽时整行给出明确的落点反馈 */
+.asset-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 18px;
+  padding: 5px 8px;
+  border: 1px dashed transparent;
+  border-radius: 7px;
+  color: var(--color-ink-2);
+  font-size: calc(12px * var(--ui-font-scale));
+  transition:
+    border-color var(--duration-base) var(--ease-plain),
+    background-color var(--duration-base) var(--ease-plain),
+    color var(--duration-base) var(--ease-plain);
+}
+.asset-group.is-empty {
+  border-color: var(--color-line);
+  border-style: dashed;
+}
+.asset-group.is-drop {
+  border-color: var(--color-accent);
+  border-style: dashed;
+  background: var(--color-surface-2);
+  color: var(--color-ink);
+}
+.asset-group-empty {
+  margin-top: 6px;
+  padding: 6px 8px;
+  color: var(--color-ink-3);
+  font-size: calc(11.5px * var(--ui-font-scale));
+}
+
+/* 框选矩形:细描边 + 极淡填充,不遮盖下方内容 */
+.marquee {
+  position: absolute;
+  z-index: 5;
+  border: 1px solid var(--color-accent);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+  pointer-events: none;
+}
+
 .asset-card {
   cursor: pointer;
   border-radius: 10px;
@@ -547,6 +848,11 @@ function thumbUrl(path: string): string {
 }
 .asset-card.selected {
   border-color: var(--color-accent);
+}
+/* 拖拽中的卡片半透明,让落点与拖动的对象都看得清 */
+.asset-card.dragging,
+.asset-row.dragging {
+  opacity: 0.45;
 }
 .asset-card .thumb {
   aspect-ratio: 4 / 3;

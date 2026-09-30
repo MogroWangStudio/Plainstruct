@@ -45,7 +45,14 @@ export interface PaginationInfo {
 }
 
 export interface PageContext {
-  site: { name: string; description?: string; logo?: string; locale?: string };
+  site: {
+    name: string;
+    description?: string;
+    logo?: string;
+    /** 浏览器标签页图标;未单独设置时回退为站点内 logo */
+    favicon?: string;
+    locale?: string;
+  };
   page: {
     title: string;
     description?: string;

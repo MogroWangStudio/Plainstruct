@@ -22,13 +22,15 @@ function fieldValue(field: ThemeField): string | number | boolean {
   return theme.configValues[field.key] ?? field.default ?? "";
 }
 
-/** visibleIf:仅当依赖字段(含默认值兜底)等于指定值时渲染该字段 */
+/** visibleIf:仅当依赖字段(含默认值兜底)命中 equals 或 oneOf 时渲染该字段 */
 function isVisible(field: ThemeField): boolean {
   const cond = field.visibleIf;
   if (!cond) return true;
   const dep = theme.activeMeta?.config.find((f) => f.key === cond.key);
   if (!dep) return true;
-  return String(fieldValue(dep)) === String(cond.equals);
+  const current = String(fieldValue(dep));
+  if (cond.oneOf) return cond.oneOf.some((v) => String(v) === current);
+  return current === String(cond.equals);
 }
 
 /** 数值滑块的进度填充比例(0–100%),驱动自绘轨道的已填充段 */

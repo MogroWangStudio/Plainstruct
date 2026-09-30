@@ -366,6 +366,17 @@ async readSiteConfig(): Promise<SiteConfig> {
     return cfg;
   },
 
+  async setSiteFavicon(_srcPath: string): Promise<string> {
+    return "favicon.png";
+  },
+
+  async removeSiteFavicon(): Promise<SiteConfig> {
+    const cfg = readJson<SiteConfig>(siteJsonPath(currentRoot!))!;
+    delete cfg.favicon;
+    writeConfig(currentRoot!, cfg);
+    return cfg;
+  },
+
   async listTree(): Promise<TreeNode[]> {
     await delay();
     return buildTree(currentRoot!);

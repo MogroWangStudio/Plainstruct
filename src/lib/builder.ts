@@ -283,8 +283,8 @@ function renderOnePage(
   doc: DocMeta,
   warnings: BuildWarning[],
   resolveAsset?: MdEnv["resolveAsset"],
-  /** 预览模式:logo 的绝对地址(构建时留空,使用相对路径) */
-  logoUrl?: string,
+  /** 预览模式:logo / favicon 的绝对地址(构建时留空,使用相对路径) */
+  siteImages?: { logo?: string; favicon?: string },
   /** 预览模式:文章封面的绝对地址(构建时留空,使用相对路径) */
   coverUrl?: (cover: string) => string,
   /** 站点类型与博客文章流(extras.posts 为当前页应展示的切片,extras.pagination 仅首页系列传入) */
@@ -328,11 +328,15 @@ function renderOnePage(
     };
   }
 
+  const cfgLogo = site.logo;
+  // 站点外图标未单独设置时沿用站点内 logo(旧站点行为不变)
+  const cfgFavicon = site.favicon || site.logo;
   const ctx: PageContext = {
     site: {
       name: site.name,
       description: site.description,
-      logo: logoUrl ?? (site.logo ? prefix + "assets/" + encodePath(site.logo) : undefined),
+      logo: siteImages?.logo ?? (cfgLogo ? prefix + "assets/" + encodePath(cfgLogo) : undefined),
+      favicon: siteImages?.favicon ?? (cfgFavicon ? prefix + "assets/" + encodePath(cfgFavicon) : undefined),
       locale: site.locale || "zh-CN",
     },
     page: {
@@ -429,6 +433,10 @@ export function renderPreview(
   const logoUrl = site.logo
     ? siteUrl(platform, `.plainstruct/assets/${site.logo}`)
     : undefined;
+  const faviconName = site.favicon || site.logo;
+  const faviconUrl = faviconName
+    ? siteUrl(platform, `.plainstruct/assets/${faviconName}`)
+    : undefined;
   const { html } = renderOnePage(
     site,
     config,
@@ -439,7 +447,7 @@ export function renderPreview(
     doc,
     [],
     (resolved) => siteUrl(platform, "content/" + resolved),
-    logoUrl,
+    { logo: logoUrl, favicon: faviconUrl },
     (cover) => siteUrl(platform, "content/" + cover),
     extras,
   );
@@ -487,9 +495,12 @@ export async function buildSite(site: SiteConfig, theme: ThemeBundle, root: stri
     if (path.startsWith("assets/")) outputs.push({ path, content });
   }
 
-  // 站点 logo
+  // 站点图片(站点内 logo 与站点外 favicon):统一落在 build/assets 下供页面引用
   if (site.logo) {
     assetCopies.push({ src: `.plainstruct/assets/${site.logo}`, dest: `assets/${site.logo}` });
+  }
+  if (site.favicon && site.favicon !== site.logo) {
+    assetCopies.push({ src: `.plainstruct/assets/${site.favicon}`, dest: `assets/${site.favicon}` });
   }
 
   for (const doc of metas.values()) {

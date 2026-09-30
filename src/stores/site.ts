@@ -2,7 +2,7 @@ import { defineStore } from "pinia";
 import { ipc } from "@/ipc/ipc";
 import type { SiteConfig, TreeNode } from "@/ipc/types";
 import { collectDocPaths, type DocsCache } from "@/lib/builder";
-import { isAssetDirName, isImageFile } from "@/lib/paths";
+import { dirname, isAssetDirName, isImageFile } from "@/lib/paths";
 import { useEditorStore } from "./editor";
 import { useBuilderStore } from "./builder";
 import { useThemeStore } from "./theme";
@@ -51,20 +51,22 @@ export const useSiteStore = defineStore("site", {
       );
     },
 
-    /** 资产分组:每个资产目录的根层与各子文件夹各成一组(资产页分组展示与移动目标) */
+    /** 资产分组:每个资产目录的根层与各子文件夹各成一组(资产页分组展示与移动目标)。
+     *  空文件夹也列入(新建文件夹后立即可见、可作为拖放目标),images 可能为空数组。 */
     assetGroups(state): { dir: string; label: string; images: TreeNode[] }[] {
       const groups: { dir: string; label: string; images: TreeNode[] }[] = [];
+      const imagesIn = (node: TreeNode) =>
+        (node.children ?? []).filter((n) => n.type === "file" && isImageFile(n.name));
       const walk = (node: TreeNode, base: string) => {
-        const images = (node.children ?? []).filter((n) => n.type === "file" && isImageFile(n.name));
-        if (images.length) {
-          groups.push({ dir: node.path, label: node.path.slice(base.length + 1), images });
+        for (const c of node.children ?? []) {
+          if (c.type !== "dir") continue;
+          groups.push({ dir: c.path, label: c.path.slice(base.length + 1), images: imagesIn(c) });
+          walk(c, base);
         }
-        for (const c of node.children ?? []) if (c.type === "dir") walk(c, base);
       };
       for (const d of state.tree.filter((n) => n.type === "dir" && isAssetDirName(n.name))) {
-        const top = (d.children ?? []).filter((n) => n.type === "file" && isImageFile(n.name));
-        if (top.length) groups.push({ dir: d.path, label: "", images: top });
-        for (const c of d.children ?? []) if (c.type === "dir") walk(c, d.path);
+        groups.push({ dir: d.path, label: "", images: imagesIn(d) });
+        walk(d, d.path);
       }
       return groups;
     },
@@ -188,6 +190,15 @@ export const useSiteStore = defineStore("site", {
       this.config = await ipc.removeSiteLogo();
     },
 
+    async setFavicon(srcPath: string) {
+      const stored = await ipc.setSiteFavicon(srcPath);
+      this.config = await ipc.saveSiteConfig({ favicon: stored });
+    },
+
+    async removeFavicon() {
+      this.config = await ipc.removeSiteFavicon();
+    },
+
     /* ---------- 内容操作 ---------- */
 
     async createDoc(dir: string, name: string, title?: string, description?: string) {
@@ -223,6 +234,33 @@ export const useSiteStore = defineStore("site", {
         editor.activePath = newPath + active.slice(src.length);
       }
       return newPath;
+    },
+
+    /** 批量移动(资产页多选拖放):逐个落盘后只刷新一次树,返回旧新路径对 */
+    async moveItems(srcs: string[], destDir: string): Promise<{ from: string; to: string }[]> {
+      const moved: { from: string; to: string }[] = [];
+      for (const src of srcs) {
+        if (dirname(src) === destDir) continue;
+        moved.push({ from: src, to: await ipc.moveItem(src, destDir) });
+      }
+      if (!moved.length) return moved;
+      await this.refreshTree();
+      const editor = useEditorStore();
+      const active = editor.activePath;
+      if (active) {
+        const hit = moved.find((m) => active === m.from || active.startsWith(`${m.from}/`));
+        if (hit) editor.activePath = hit.to + active.slice(hit.from.length);
+      }
+      return moved;
+    },
+
+    /** 批量删除(资产页多选):同样只刷新一次树 */
+    async deleteItems(paths: string[]) {
+      const editor = useEditorStore();
+      const active = editor.activePath;
+      if (active && paths.some((p) => active === p || active.startsWith(`${p}/`))) editor.reset();
+      for (const p of paths) await ipc.deleteItem(p);
+      await this.refreshTree();
     },
 
     async deleteItem(path: string) {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, reactive, ref, watch } from "vue";
+import { computed, nextTick, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useSiteStore } from "@/stores/site";
 import { useThemeStore } from "@/stores/theme";
@@ -41,6 +41,7 @@ const form = reactive({
 });
 const saving = ref(false);
 const pickingLogo = ref(false);
+const pickingFavicon = ref(false);
 
 /** 浏览器标题格式输入框:令牌按钮把占位符插入光标处 */
 const titleFormatInput = ref<HTMLInputElement | null>(null);
@@ -78,11 +79,20 @@ watch(
 );
 
 const logoUrl = () => (site.config?.logo ? siteUrl(app.platform, `.plainstruct/assets/${site.config.logo}`) : "");
+/** 站点外图标未单独设置时回退站点内 Logo(与构建时的回退一致) */
+const effectiveFavicon = computed(() => site.config?.favicon ?? site.config?.logo ?? "");
+const effectiveFaviconUrl = () =>
+  effectiveFavicon.value ? siteUrl(app.platform, `.plainstruct/assets/${effectiveFavicon.value}`) : "";
 /** Logo 加载失败时显示占位图标,不渲染 Chromium 的失败占位 */
 const logoFailed = ref(false);
 watch(
   () => site.config?.logo,
   () => (logoFailed.value = false),
+);
+const faviconFailed = ref(false);
+watch(
+  () => [site.config?.favicon, site.config?.logo],
+  () => (faviconFailed.value = false),
 );
 
 async function save() {
@@ -124,6 +134,28 @@ async function removeLogo() {
   try {
     await site.removeLogo();
     ui.toast(t("site.logoRemoved"), "success");
+  } catch (e) {
+    ui.toast(t("ui.operationFailed", { msg: ipc.errText(e) }), "error");
+  }
+}
+
+async function chooseFavicon() {
+  const src = await ipc.pickLogo();
+  if (!src) return;
+  pickingFavicon.value = true;
+  try {
+    await site.setFavicon(src);
+  } catch (e) {
+    ui.toast(t("ui.operationFailed", { msg: ipc.errText(e) }), "error");
+  } finally {
+    pickingFavicon.value = false;
+  }
+}
+
+async function removeFavicon() {
+  try {
+    await site.removeFavicon();
+    ui.toast(t("site.faviconRemoved"), "success");
   } catch (e) {
     ui.toast(t("ui.operationFailed", { msg: ipc.errText(e) }), "error");
   }
@@ -217,6 +249,39 @@ function openFolder() {
               </div>
             </div>
             <p class="field-hint">{{ t("site.logoHint") }}</p>
+          </div>
+          <div>
+            <label class="field-label">{{ t("site.favicon") }}</label>
+            <div class="flex items-center gap-4">
+              <img
+                v-if="effectiveFavicon && !faviconFailed"
+                :src="effectiveFaviconUrl()"
+                alt="favicon"
+                class="h-12 w-12 rounded-lg border border-line object-contain p-1"
+                @error="faviconFailed = true"
+              />
+              <div
+                v-else
+                class="flex h-12 w-12 items-center justify-center rounded-lg border border-line bg-surface-2"
+                :class="{ 'border-dashed': !effectiveFavicon }"
+              >
+                <AppIcon name="globe" :size="18" class="text-ink-3" />
+              </div>
+              <div class="flex gap-2">
+                <button class="btn btn-secondary" :disabled="pickingFavicon" @click="chooseFavicon">
+                  {{ t("site.chooseFavicon") }}
+                </button>
+                <button v-if="site.config?.favicon" class="btn btn-ghost" @click="removeFavicon">
+                  {{ t("site.removeFavicon") }}
+                </button>
+              </div>
+            </div>
+            <p class="field-hint">
+              {{ t("site.faviconHint") }}
+              <span v-if="!site.config?.favicon && site.config?.logo" class="text-ink-3">
+                {{ t("site.faviconFallback") }}
+              </span>
+            </p>
           </div>
           <div class="flex justify-end">
             <button class="btn btn-primary" :disabled="saving || !form.name.trim()" @click="save">

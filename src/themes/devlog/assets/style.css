@@ -1243,6 +1243,7 @@ body[data-loading="进度条"] .ps-loader-spin {
 /* ---------- 顶栏滚动形态(顶栏滚动形态:固定不动 / 药丸 / 圆角矩形) ---------- */
 .blog-topbar {
   transition:
+    max-width 220ms cubic-bezier(0.23, 1, 0.32, 1), /* deslop-ignore 26: 顶栏变形过渡的就是宽度本身 */
     top 220ms cubic-bezier(0.23, 1, 0.32, 1),
     height 220ms cubic-bezier(0.23, 1, 0.32, 1),
     border-radius 220ms cubic-bezier(0.23, 1, 0.32, 1),
@@ -1269,5 +1270,176 @@ body[data-topbar-shape="圆角矩形"] .blog-topbar.is-scrolled {
 @media (prefers-reduced-motion: reduce) {
   .blog-topbar {
     transition: none;
+  }
+}
+/* ---------- 封面图宽度(封面图宽度%:100 保持满宽出血,收窄则居中留白) ---------- */
+
+body:not([data-cover-w="100"]) .blog-entry-cover,
+body:not([data-cover-w="100"]) .blog-entry-cover-empty {
+  width: calc(var(--ps-cover-w, 100) * 1%);
+  margin-right: auto;
+  margin-left: auto;
+  border-radius: 8px;
+}
+
+/* ---------- 顶栏变形后宽度(药丸 / 圆角矩形浮起时收窄到指定宽度) ---------- */
+
+body[data-topbar-shape="药丸"] .blog-topbar.is-scrolled,
+body[data-topbar-shape="圆角矩形"] .blog-topbar.is-scrolled {
+  max-width: var(--ps-topbar-deform-w, 916px);
+}
+
+/* ---------- 文章目录:锚点落点、树风格与悬停动画 ---------- */
+
+/* 点按目录后标题停在吸顶顶栏之下,不再被遮住 */
+.blog-post-body h1[id],
+.blog-post-body h2[id],
+.blog-post-body h3[id],
+.blog-post-body h4[id],
+.blog-post-body h5[id],
+.blog-post-body h6[id] {
+  scroll-margin-top: calc(var(--ps-topbar-h) + 28px);
+}
+
+/* 树形分支:通栏竖线换成按层级收进的 ├─ 折线 */
+body[data-toc-style="树形分支"] .blog-toc-list {
+  border-left: none;
+}
+
+body[data-toc-style="树形分支"] .blog-toc-item {
+  --toc-branch-x: 4px;
+  position: relative;
+}
+
+body[data-toc-style="树形分支"] .blog-toc-item.is-l3 {
+  --toc-branch-x: 18px;
+}
+
+body[data-toc-style="树形分支"] .blog-toc-item.is-l4 {
+  --toc-branch-x: 32px;
+}
+
+body[data-toc-style="树形分支"] .blog-toc-item.is-l5 {
+  --toc-branch-x: 46px;
+}
+
+body[data-toc-style="树形分支"] .blog-toc-item a {
+  margin-left: 0;
+  padding-left: calc(var(--toc-branch-x) + 14px);
+  border-left-color: transparent;
+}
+
+body[data-toc-style="树形分支"] .blog-toc-item::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--toc-branch-x);
+  width: 1px;
+  background: var(--ps-line);
+  content: "";
+  pointer-events: none;
+}
+
+/* 末项竖线止于中线,与横线合成 └─ */
+body[data-toc-style="树形分支"] .blog-toc-item:last-child::before {
+  bottom: 50%;
+}
+
+body[data-toc-style="树形分支"] .blog-toc-item::after {
+  position: absolute;
+  top: 50%;
+  left: var(--toc-branch-x);
+  width: 8px;
+  height: 1px;
+  background: var(--ps-line);
+  content: "";
+  pointer-events: none;
+}
+
+/* 极简:去掉所有导线,只留层级缩进与强调色 */
+body[data-toc-style="极简"] .blog-toc-list {
+  border-left: none;
+}
+
+body[data-toc-style="极简"] .blog-toc-item a {
+  margin-left: 0;
+  padding-left: 0;
+  border-left: none;
+}
+
+body[data-toc-style="极简"] .blog-toc-item.is-l3 a {
+  padding-left: 16px;
+}
+
+body[data-toc-style="极简"] .blog-toc-item.is-l4 a {
+  padding-left: 32px;
+}
+
+body[data-toc-style="极简"] .blog-toc-item a.current {
+  border-left: none;
+  color: var(--ps-accent);
+  font-weight: 600;
+}
+
+/* 悬停动画预设(无 = 各主题原生反馈,不改动) */
+body[data-toc-hover="滑入"] .blog-toc-item a {
+  position: relative;
+  transition: color 180ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+body[data-toc-hover="滑入"] .blog-toc-item a::after {
+  position: absolute;
+  top: 20%;
+  bottom: 20%;
+  left: 0;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--ps-accent);
+  content: "";
+  transform: scaleY(0);
+  transform-origin: 50% 50%;
+  transition: transform 180ms cubic-bezier(0.23, 1, 0.32, 1);
+  pointer-events: none;
+}
+
+body[data-toc-hover="滑入"] .blog-toc-item a:hover::after,
+body[data-toc-hover="滑入"] .blog-toc-item a:focus-visible::after {
+  transform: scaleY(1);
+}
+
+body[data-toc-hover="微移"] .blog-toc-item a {
+  transition:
+    color 180ms cubic-bezier(0.23, 1, 0.32, 1),
+    transform 180ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+body[data-toc-hover="微移"] .blog-toc-item a:hover,
+body[data-toc-hover="微移"] .blog-toc-item a:focus-visible {
+  transform: translateX(3px);
+}
+
+body[data-toc-hover="底色"] .blog-toc-item a {
+  border-radius: 5px;
+  transition:
+    color 180ms cubic-bezier(0.23, 1, 0.32, 1),
+    background-color 180ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+body[data-toc-hover="底色"] .blog-toc-item a:hover,
+body[data-toc-hover="底色"] .blog-toc-item a:focus-visible {
+  background: color-mix(in srgb, var(--ps-accent) 12%, transparent);
+  color: var(--ps-ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body[data-toc-hover="滑入"] .blog-toc-item a,
+  body[data-toc-hover="滑入"] .blog-toc-item a::after,
+  body[data-toc-hover="微移"] .blog-toc-item a,
+  body[data-toc-hover="底色"] .blog-toc-item a {
+    transition: none;
+  }
+
+  body[data-toc-hover="微移"] .blog-toc-item a:hover {
+    transform: none;
   }
 }

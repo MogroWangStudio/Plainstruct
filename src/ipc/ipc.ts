@@ -120,6 +120,12 @@ export const ipc = {
   removeSiteLogo(): Promise<SiteConfig> {
     return inTauri ? invoke<SiteConfig>("remove_site_logo") : mock.removeSiteLogo();
   },
+  setSiteFavicon(srcPath: string): Promise<string> {
+    return inTauri ? invoke<string>("set_site_favicon", { srcPath }) : mock.setSiteFavicon(srcPath);
+  },
+  removeSiteFavicon(): Promise<SiteConfig> {
+    return inTauri ? invoke<SiteConfig>("remove_site_favicon") : mock.removeSiteFavicon();
+  },
 
   /* ---------- 内容 ---------- */
   listTree(): Promise<TreeNode[]> {

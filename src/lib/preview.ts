@@ -22,3 +22,20 @@ export function siteUrl(platform: Platform, relPath: string): string {
 export function buildIndexUrl(platform: Platform): string {
   return siteUrl(platform, "build/index.html");
 }
+
+/** 预览 iframe 内的页内锚点跳转。预览 iframe 的 sandbox 只保留同源、关闭其中脚本,
+ *  主题自带的目录跳转脚本不会执行,由宿主代为滚动;标题的 scroll-margin-top
+ *  仍生效,落点不会被吸顶顶栏遮住。返回是否命中目标。 */
+export function scrollToAnchor(doc: Document, hash: string): boolean {
+  let id = hash.startsWith("#") ? hash.slice(1) : hash;
+  try {
+    id = decodeURIComponent(id);
+  } catch {
+    /* 非 UTF-8 百分号序列时按原样查找 */
+  }
+  const target = id ? doc.getElementById(id) : null;
+  if (!target) return false;
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  target.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+  return true;
+}

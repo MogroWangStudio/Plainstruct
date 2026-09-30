@@ -9,6 +9,7 @@ import { useUiStore } from "@/stores/ui";
 import { useAppStore } from "@/stores/app";
 import { ipc } from "@/ipc/ipc";
 import { renderPreview } from "@/lib/builder";
+import { scrollToAnchor } from "@/lib/preview";
 import { joinPosix, stripExt } from "@/lib/paths";
 
 const { t } = useI18n();
@@ -49,6 +50,7 @@ function applyHtml(next: string) {
   doc.close();
   win.scrollTo(0, savedScroll);
   attachClickHandlers();
+  attachScrollBehavior();
 }
 
 function schedule() {
@@ -105,7 +107,12 @@ function attachClickHandlers() {
       void ipc.openExternal(href);
       return;
     }
-    if (href.startsWith("#")) return; // 锚点跳转交给 iframe 自身
+    if (href.startsWith("#")) {
+      // 目录/页内锚点:预览 iframe 不执行其中脚本,由宿主代为滚动到标题
+      e.preventDefault();
+      scrollToAnchor(doc, href);
+      return;
+    }
     e.preventDefault();
     const target = anchor.getAttribute("data-doc") ?? resolveInternal(href);
     const node = target ? site.findDoc(target) : null;
@@ -116,6 +123,19 @@ function attachClickHandlers() {
     // 站内链接但预览无法呈现(如分页页 page/N)
     ui.toast(t("build.previewOnly"), "info");
   });
+}
+
+/** 预览 iframe 不执行主题脚本,这里补上「滚动后顶栏变形」的等效行为,
+ *  使顶栏形态与变形后宽度在编辑器预览里也能看到 */
+function attachScrollBehavior() {
+  const win = frame.value?.contentWindow;
+  const doc = frame.value?.contentDocument;
+  if (!win || !doc) return;
+  const bar = doc.querySelector(".blog-topbar");
+  if (!bar) return;
+  const sync = () => bar.classList.toggle("is-scrolled", (win.scrollY || 0) > 24);
+  win.addEventListener("scroll", sync, { passive: true });
+  sync();
 }
 
 /** 无 data-doc 的相对链接(主题模板生成的 .html 链接/文件夹链接)解析为文档路径 */

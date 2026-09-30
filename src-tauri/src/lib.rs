@@ -156,6 +156,8 @@ pub fn run() {
             commands::save_site_config,
             commands::set_site_logo,
             commands::remove_site_logo,
+            commands::set_site_favicon,
+            commands::remove_site_favicon,
             // 内容
             commands::list_tree,
             commands::save_doc_order,

@@ -21,8 +21,12 @@ pub struct SiteConfig {
     pub name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    /// 站点内 logo:主题页头/侧栏展示,受主题的尺寸与圆角配置影响
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub logo: Option<String>,
+    /// 站点外图标(favicon):只用于浏览器标签页,不影响主题内的 logo
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub favicon: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub locale: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -39,6 +43,7 @@ impl Default for SiteConfig {
             name: "未命名站点".into(),
             description: None,
             logo: None,
+            favicon: None,
             locale: None,
             title_format: None,
             site_type: None,
@@ -180,6 +185,8 @@ pub struct SiteConfigPatch {
     #[serde(default)]
     pub logo: Option<String>,
     #[serde(default)]
+    pub favicon: Option<String>,
+    #[serde(default)]
     pub locale: Option<String>,
     #[serde(default)]
     pub title_format: Option<String>,
@@ -202,6 +209,7 @@ pub fn save_site_config(window: tauri::WebviewWindow, state: State<'_, AppState>
             None => existing.description,
         },
         logo: patch.logo.or(existing.logo),
+        favicon: patch.favicon.or(existing.favicon),
         locale: match patch.locale {
             Some(l) if l.trim().is_empty() => None,
             Some(l) => Some(l),
@@ -224,43 +232,74 @@ pub fn save_site_config(window: tauri::WebviewWindow, state: State<'_, AppState>
     Ok(cfg)
 }
 
-#[tauri::command]
-pub fn set_site_logo(window: tauri::WebviewWindow, state: State<'_, AppState>, src_path: String) -> Result<String, String> {
-    ensure_main(&window)?;
-    let root = state.site_root()?;
-    let src = PathBuf::from(&src_path);
+/// 站点图片(logo / favicon)统一落盘:按固定前缀命名,换图时清掉同前缀的旧文件
+fn store_site_image(root: &PathBuf, src_path: &str, stem: &str) -> Result<String, String> {
+    let src = PathBuf::from(src_path);
     let ext = src
         .extension()
         .and_then(|e| e.to_str())
         .map(|e| e.to_ascii_lowercase())
         .filter(|e| matches!(e.as_str(), "png" | "svg" | "jpg" | "jpeg" | "webp" | "ico" | "gif"))
         .ok_or("不支持的图片格式")?;
-    let assets = plainstruct_dir(&root).join("assets");
+    let assets = plainstruct_dir(root).join("assets");
     std::fs::create_dir_all(&assets).map_err(|e| e.to_string())?;
-    let stored = format!("logo.{ext}");
+    let stored = format!("{stem}.{ext}");
     std::fs::copy(&src, assets.join(&stored)).map_err(|e| e.to_string())?;
-    // 替换 logo 时清理旧的(扩展名不同的)文件,避免残留
-    let cfg = read_site_config_file(&root)?;
-    if let Some(old) = cfg.logo {
-        if old != stored {
-            let _ = std::fs::remove_file(assets.join(&old));
+    // 同前缀但扩展名不同的旧图(如 logo.png 换成 logo.svg)一并清理,避免残留
+    let prefix = format!("{stem}.");
+    if let Ok(entries) = std::fs::read_dir(&assets) {
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name != stored && name.starts_with(&prefix) {
+                let _ = std::fs::remove_file(entry.path());
+            }
         }
     }
     Ok(stored)
+}
+
+/// 清空配置中的图片引用并删除文件(引用不清会"复活")
+fn clear_site_image(root: &PathBuf, stem: &str) -> Result<SiteConfig, String> {
+    let mut cfg = read_site_config_file(root)?;
+    let current = if stem == "favicon" { cfg.favicon.clone() } else { cfg.logo.clone() };
+    if let Some(name) = current {
+        let _ = std::fs::remove_file(plainstruct_dir(root).join("assets").join(&name));
+    }
+    if stem == "favicon" {
+        cfg.favicon = None;
+    } else {
+        cfg.logo = None;
+    }
+    write_site_config_file(root, &cfg)?;
+    Ok(cfg)
+}
+
+#[tauri::command]
+pub fn set_site_logo(window: tauri::WebviewWindow, state: State<'_, AppState>, src_path: String) -> Result<String, String> {
+    ensure_main(&window)?;
+    let root = state.site_root()?;
+    store_site_image(&root, &src_path, "logo")
 }
 
 #[tauri::command]
 pub fn remove_site_logo(window: tauri::WebviewWindow, state: State<'_, AppState>) -> Result<SiteConfig, String> {
     ensure_main(&window)?;
     let root = state.site_root()?;
-    let mut cfg = read_site_config_file(&root)?;
-    if let Some(logo) = cfg.logo.clone() {
-        let _ = std::fs::remove_file(plainstruct_dir(&root).join("assets").join(&logo));
-    }
-    // 从配置中清除引用,否则重开站点后 logo 会"复活"
-    cfg.logo = None;
-    write_site_config_file(&root, &cfg)?;
-    Ok(cfg)
+    clear_site_image(&root, "logo")
+}
+
+#[tauri::command]
+pub fn set_site_favicon(window: tauri::WebviewWindow, state: State<'_, AppState>, src_path: String) -> Result<String, String> {
+    ensure_main(&window)?;
+    let root = state.site_root()?;
+    store_site_image(&root, &src_path, "favicon")
+}
+
+#[tauri::command]
+pub fn remove_site_favicon(window: tauri::WebviewWindow, state: State<'_, AppState>) -> Result<SiteConfig, String> {
+    ensure_main(&window)?;
+    let root = state.site_root()?;
+    clear_site_image(&root, "favicon")
 }
 
 /// 最近打开列表的站点摘要:类型与文件夹大小(只读;非素构站点目录报错)

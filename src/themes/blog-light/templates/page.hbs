@@ -46,6 +46,7 @@
   </header>
   <div class="blog-post-cols">
     <div class="blog-post-body">{{{page.content}}}</div>
+    {{#if config.tocEnabled}}
     {{#if page.toc}}
       <aside class="blog-toc" aria-label="目录">
         <p class="blog-toc-title">目录</p>
@@ -55,6 +56,7 @@
           {{/each}}
         </ul>
       </aside>
+    {{/if}}
     {{/if}}
   </div>
   <nav class="blog-pager">

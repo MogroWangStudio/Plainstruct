@@ -105,7 +105,10 @@ export interface SiteThemeRef {
 export interface SiteConfig {
   name: string;
   description?: string;
-  logo?: string; // .plainstruct/assets/ 内的文件名
+  /** 站点内 logo:.plainstruct/assets/ 内的文件名,受主题展示配置影响 */
+  logo?: string;
+  /** 站点外图标(favicon):浏览器标签页使用;未设置时回退站点内 logo */
+  favicon?: string;
   locale?: string; // 站点语言:生成页面的 <html lang>
   titleFormat?: string; // 浏览器标题格式,如 "{page} · {site}"
   siteType?: SiteType; // 站点类型,缺省 docs(兼容旧站点)
@@ -132,8 +135,13 @@ export interface ThemeField {
   max?: number;
   step?: number;
   options?: string[];
-  /** 可选:仅当另一字段等于指定值时显示(如自定义字体依赖 bodyFont=custom) */
-  visibleIf?: { key: string; equals: string | number | boolean };
+  /** 可选:仅当另一字段等于 equals,或落在 oneOf 之一时显示
+   *  (如自定义字体依赖 bodyFont=custom;顶栏变形宽度对「药丸 / 圆角矩形」两种形态都可见) */
+  visibleIf?: {
+    key: string;
+    equals?: string | number | boolean;
+    oneOf?: (string | number | boolean)[];
+  };
 }
 
 export interface ThemeMeta {

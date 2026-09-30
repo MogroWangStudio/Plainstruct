@@ -69,6 +69,15 @@
       "step": 20
     },
     {
+      "key": "coverWidth",
+      "label": "封面图宽度(%)",
+      "type": "number",
+      "default": 100,
+      "min": 40,
+      "max": 100,
+      "step": 5
+    },
+    {
       "key": "topbarWidth",
       "label": "顶栏宽度(px)",
       "type": "number",
@@ -87,6 +96,22 @@
         "药丸",
         "圆角矩形"
       ]
+    },
+    {
+      "key": "topbarShapeWidth",
+      "label": "顶栏变形后宽度(px)",
+      "type": "number",
+      "default": 720,
+      "min": 360,
+      "max": 1600,
+      "step": 20,
+      "visibleIf": {
+        "key": "topbarShape",
+        "oneOf": [
+          "药丸",
+          "圆角矩形"
+        ]
+      }
     },
     {
       "key": "postsPerPage",
@@ -410,6 +435,43 @@
         "点点",
         "进度条"
       ]
+    },
+    {
+      "key": "tocEnabled",
+      "label": "启用文章目录",
+      "type": "boolean",
+      "default": true
+    },
+    {
+      "key": "tocStyle",
+      "label": "目录树风格",
+      "type": "select",
+      "default": "缩进线",
+      "options": [
+        "缩进线",
+        "树形分支",
+        "极简"
+      ],
+      "visibleIf": {
+        "key": "tocEnabled",
+        "equals": true
+      }
+    },
+    {
+      "key": "tocHover",
+      "label": "目录悬停动画",
+      "type": "select",
+      "default": "无",
+      "options": [
+        "无",
+        "滑入",
+        "微移",
+        "底色"
+      ],
+      "visibleIf": {
+        "key": "tocEnabled",
+        "equals": true
+      }
     },
     {
       "key": "showDate",
