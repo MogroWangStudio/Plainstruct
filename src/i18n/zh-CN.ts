@@ -199,6 +199,8 @@ export default {
     titleFormat: "浏览器标题格式",
     titleFormatPlaceholder: "{'{'}page{'}'} · {'{'}site{'}'}",
     titleFormatHint: "用 {'{'}page{'}'} 表示页面标题、{'{'}site{'}'} 表示站点名称,例如 {'{'}page{'}'} · {'{'}site{'}'}、{'{'}page{'}'} - {'{'}site{'}'}。留空使用默认连接符「·」。",
+    insertPageToken: "插入页面标题占位符 {'{'}page{'}'}",
+    insertSiteToken: "插入站点名占位符 {'{'}site{'}'}",
     chooseLogo: "选择图片",
     removeLogo: "移除",
     logoRemoved: "站点 Logo 已移除",

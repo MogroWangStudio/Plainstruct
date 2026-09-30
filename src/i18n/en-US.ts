@@ -199,6 +199,8 @@ export default {
     titleFormat: "Browser title format",
     titleFormatPlaceholder: "{'{'}page{'}'} · {'{'}site{'}'}",
     titleFormatHint: "Use {'{'}page{'}'} for the page title and {'{'}site{'}'} for the site name, e.g. {'{'}page{'}'} · {'{'}site{'}'} or {'{'}page{'}'} - {'{'}site{'}'}. Leave empty for the default “·”.",
+    insertPageToken: "Insert the page title token {'{'}page{'}'}",
+    insertSiteToken: "Insert the site name token {'{'}site{'}'}",
     chooseLogo: "Choose image",
     removeLogo: "Remove",
     logoRemoved: "Site logo removed",

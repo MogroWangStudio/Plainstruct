@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref, watch } from "vue";
+import { nextTick, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useSiteStore } from "@/stores/site";
 import { useThemeStore } from "@/stores/theme";
@@ -41,6 +41,24 @@ const form = reactive({
 });
 const saving = ref(false);
 const pickingLogo = ref(false);
+
+/** 浏览器标题格式输入框:令牌按钮把占位符插入光标处 */
+const titleFormatInput = ref<HTMLInputElement | null>(null);
+
+async function insertTitleToken(token: string) {
+  const el = titleFormatInput.value;
+  if (!el) {
+    form.titleFormat += token;
+    return;
+  }
+  const value = form.titleFormat;
+  const start = el.selectionStart ?? value.length;
+  const end = el.selectionEnd ?? value.length;
+  form.titleFormat = value.slice(0, start) + token + value.slice(end);
+  await nextTick();
+  el.focus();
+  el.setSelectionRange(start + token.length, start + token.length);
+}
 
 watch(
   () => site.config,
@@ -142,12 +160,21 @@ function openFolder() {
           <div>
             <label class="field-label">{{ t("site.titleFormat") }}</label>
             <input
+              ref="titleFormatInput"
               v-model="form.titleFormat"
               class="input"
               type="text"
               :placeholder="t('site.titleFormatPlaceholder')"
               spellcheck="false"
             />
+            <div class="mt-2 flex gap-1.5">
+              <button type="button" class="token-chip" :title="t('site.insertPageToken')" @click="insertTitleToken('{page}')">
+                {page}
+              </button>
+              <button type="button" class="token-chip" :title="t('site.insertSiteToken')" @click="insertTitleToken('{site}')">
+                {site}
+              </button>
+            </div>
             <p class="field-hint">{{ t("site.titleFormatHint") }}</p>
           </div>
           <div>
@@ -212,3 +239,35 @@ function openFolder() {
     </div>
   </div>
 </template>
+
+<style scoped>
+/* 标题格式令牌按钮:等宽小徽章,点击把占位符插入输入框光标处 */
+.token-chip {
+  padding: 3px 8px;
+  border: 1px solid var(--color-line);
+  border-radius: 6px;
+  background: var(--color-surface);
+  color: var(--color-ink-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.4;
+  cursor: pointer;
+  transition:
+    border-color var(--duration-base) var(--ease-plain),
+    background-color var(--duration-base) var(--ease-plain),
+    color var(--duration-base) var(--ease-plain),
+    transform var(--duration-fast) ease-out;
+}
+.token-chip:hover {
+  border-color: var(--color-line-strong);
+  background: var(--color-surface-2);
+  color: var(--color-ink);
+}
+.token-chip:active {
+  transform: scale(0.95);
+}
+.token-chip:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+</style>
