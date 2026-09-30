@@ -68,6 +68,9 @@ export const useEditorStore = defineStore("editor", {
       const [text] = await ipc.readDocs([node.path]);
       // 等待期间用户已打开其他文档或重置:丢弃过期结果,避免内容错乱
       if (seq !== openSeq) return;
+      // 等待期间用户又输入过:先把当前内容补存回旧文档再切换,否则这些输入
+      // 会随 content 被整块覆盖且从未落盘
+      if (this.activePath && this.dirty) await this.save();
       this.activeImage = null;
       this.activePath = node.path;
       this.content = text ?? "";

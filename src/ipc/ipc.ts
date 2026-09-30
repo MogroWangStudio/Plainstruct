@@ -168,16 +168,18 @@ export const ipc = {
   },
 
   /* ---------- 构建 ---------- */
-  clearBuild(): Promise<void> {
-    return inTauri ? invoke<void>("clear_build") : mock.clearBuild();
+  /** 构建三命令均需传发起构建时的站点根:后端校验与当前站点根一致才执行,
+   *  构建期间切换站点时旧构建会被拒绝,产物不会写入新站点目录 */
+  clearBuild(root: string): Promise<void> {
+    return inTauri ? invoke<void>("clear_build", { root }) : mock.clearBuild(root);
   },
-  writeBuildFiles(files: OutputFile[]): Promise<void> {
+  writeBuildFiles(root: string, files: OutputFile[]): Promise<void> {
     return inTauri
-      ? invoke<void>("write_build_files", { files })
-      : mock.writeBuildFiles(files);
+      ? invoke<void>("write_build_files", { root, files })
+      : mock.writeBuildFiles(root, files);
   },
-  copyPaths(items: CopyItem[]): Promise<number> {
-    return inTauri ? invoke<number>("copy_paths", { items }) : mock.copyPaths(items);
+  copyPaths(root: string, items: CopyItem[]): Promise<number> {
+    return inTauri ? invoke<number>("copy_paths", { root, items }) : mock.copyPaths(root, items);
   },
 
   /* ---------- 主题 ---------- */

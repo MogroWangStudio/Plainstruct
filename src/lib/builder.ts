@@ -74,9 +74,10 @@ function buildMetas(paths: string[], cache: DocsCache): Map<string, DocMeta> {
   return metas;
 }
 
-/** 站点资产目录(asset,兼容旧 images),只作为资源,不进入导航与目录页 */
+/** 是否位于站点资产子树内(asset,兼容旧 images):任意层级命中即整棵排除,
+ *  只作为资源,不进入导航与目录页 */
 export function isAssetDir(path: string): boolean {
-  return isAssetDirName(basename(path));
+  return path.split("/").some(isAssetDirName);
 }
 
 /** 封面图统一为 content/ 相对路径(外链 URL 原样保留),供文章流与预览换算页面地址 */
@@ -85,6 +86,13 @@ function coverOf(meta: DocMeta): string | undefined {
   if (!raw) return undefined;
   if (/^(https?:|data:)/i.test(raw)) return raw;
   return joinPosix(dirname(meta.path), decodeHref(splitHash(raw)[0]));
+}
+
+/** 日期排序键:解析 Y-M-D 为可比较元组;非日期文本回退字符串比较。
+ *  front-matter 的 date 原样保留,不保证零填充,字符串比较会把 2026-9-1 排到 2026-10-1 之后 */
+function dateKey(date: string): { y: number; m: number; d: number; raw: string } {
+  const g = date.trim().match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  return g ? { y: +g[1], m: +g[2], d: +g[3], raw: "" } : { y: 0, m: 0, d: 0, raw: date };
 }
 
 /** 博客文章流:排除各级 index.md,有 date 的按日期倒序在前,无 date 的按标题排在后 */
@@ -100,7 +108,14 @@ function buildPosts(metas: Map<string, DocMeta>): PostSummary[] {
     }));
   const withDate = posts
     .filter((p) => p.date)
-    .sort((a, b) => (a.date! < b.date! ? 1 : a.date! > b.date! ? -1 : 0));
+    .sort((a, b) => {
+      const ka = dateKey(a.date!);
+      const kb = dateKey(b.date!);
+      if (ka.y !== kb.y) return kb.y - ka.y;
+      if (ka.m !== kb.m) return kb.m - ka.m;
+      if (ka.d !== kb.d) return kb.d - ka.d;
+      return kb.raw < ka.raw ? -1 : kb.raw > ka.raw ? 1 : 0;
+    });
   const withoutDate = posts
     .filter((p) => !p.date)
     .sort((a, b) => a.title.localeCompare(b.title, "zh-Hans-CN"));
@@ -431,7 +446,9 @@ export function renderPreview(
   return inlineThemeAssets(html, theme.files);
 }
 
-export async function buildSite(site: SiteConfig, theme: ThemeBundle): Promise<BuildReport> {
+/** 构建站点。root 为发起构建时的站点根:落盘三命令携 root 交后端校验,
+ *  构建期间切换站点时旧构建被拒绝,产物不会写入新站点目录 */
+export async function buildSite(site: SiteConfig, theme: ThemeBundle, root: string): Promise<BuildReport> {
   const t0 = performance.now();
   const tree = await ipc.listTree();
 
@@ -556,9 +573,9 @@ export async function buildSite(site: SiteConfig, theme: ThemeBundle): Promise<B
     outputs.push({ path: mdToHtml(page.path), content: html });
   }
 
-  await ipc.clearBuild();
-  await ipc.writeBuildFiles(outputs);
-  const totalSize = await ipc.copyPaths(assetCopies);
+  await ipc.clearBuild(root);
+  await ipc.writeBuildFiles(root, outputs);
+  const totalSize = await ipc.copyPaths(root, assetCopies);
 
   return {
     pages: outputs.filter((o) => o.path.endsWith(".html")).length,

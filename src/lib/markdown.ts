@@ -48,28 +48,29 @@ function resolveLink(raw: string, env: MdEnv): { href: string; docPath?: string 
 
   if (isMarkdown(resolved)) {
     const canonical = env.docMap.get(resolved.toLowerCase());
-    const href = relPosix(currentOutDir, mdToHtml(canonical ?? resolved)) + hash;
+    // hash 锚点在路径编码之外原样拼接:编码会把 # 变成 %23,链接将指向文件名而非锚点
+    const href = encodePath(relPosix(currentOutDir, mdToHtml(canonical ?? resolved))) + hash;
     if (!canonical) {
       env.warnings.push({ source: env.currentMdPath, link: raw, message: "missing" });
-      return { href: encodePath(href) };
+      return { href };
     }
-    return { href: encodePath(href), docPath: canonical };
+    return { href, docPath: canonical };
   }
 
   if (decoded.endsWith("/")) {
     // 文件夹链接:指向目录(index.html 由服务器解析)
     const dir = resolved.replace(/\/$/, "");
     if (env.dirSet.has(dir.toLowerCase())) {
-      const href = (relPosix(currentOutDir, dir) || ".") + "/" + hash;
-      return { href: encodePath(href) };
+      const href = encodePath(relPosix(currentOutDir, dir) || ".") + "/" + hash;
+      return { href };
     }
     env.warnings.push({ source: env.currentMdPath, link: raw, message: "missing" });
     return null;
   }
 
   if (env.dirSet.has(resolved.toLowerCase()) && env.docMap.has(`${resolved.toLowerCase()}/index.md`)) {
-    const href = (relPosix(currentOutDir, resolved) || ".") + "/" + hash;
-    return { href: encodePath(href) };
+    const href = encodePath(relPosix(currentOutDir, resolved) || ".") + "/" + hash;
+    return { href };
   }
 
   // 其余(图片/附件等资源)按原相对路径引用,构建时 1:1 拷贝

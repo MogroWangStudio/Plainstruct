@@ -213,10 +213,12 @@ export const useThemeStore = defineStore("theme", {
       if (!this.editing) return;
       const meta = this.customMetas.find((m) => m.id === this.editing!.id);
       if (!meta) return;
-      await ipc.saveThemeFiles(this.editing.id, this.editing.files);
-      // theme.json 可能被编辑,重新读取元数据
+      const id = this.editing.id;
+      await ipc.saveThemeFiles(id, this.editing.files);
+      // theme.json 可能被编辑,重新读取元数据;等待期间制作器可能被退出
       await this.loadAll();
-      await this.startEditing(this.editing.id, "custom");
+      if (!this.editing || this.editing.id !== id) return;
+      await this.startEditing(id, "custom");
       useBuilderStore().onSiteChanged();
     },
 

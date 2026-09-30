@@ -213,6 +213,11 @@ pub fn import_theme_zip(window: tauri::WebviewWindow, state: State<'_, AppState>
         if path.is_absolute() || name.split('/').any(|seg| seg == "..") {
             return Err(format!("压缩包内含非法路径: {name}"));
         }
+        // 单条目按 zip 头声明的解压后大小先预检再读取:畸形包(解压炸弹)在
+        // read_to_end 把巨量字节读进内存之前即被拒绝
+        if entry.size() > IMPORT_MAX_TOTAL_BYTES as u64 {
+            return Err("压缩包含超大条目(单条上限 20MB)".into());
+        }
         let mut bytes = Vec::new();
         entry.read_to_end(&mut bytes).map_err(|e| e.to_string())?;
         total_bytes += bytes.len();

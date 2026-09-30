@@ -501,16 +501,16 @@ export const mock = {
     return names;
   },
 
-  async clearBuild(): Promise<void> {
+  async clearBuild(_root: string): Promise<void> {
     buildFiles = new Map();
   },
 
-  async writeBuildFiles(out: OutputFile[]): Promise<void> {
+  async writeBuildFiles(_root: string, out: OutputFile[]): Promise<void> {
     await delay(60);
     for (const f of out) buildFiles.set(f.path, f.content);
   },
 
-  async copyPaths(_items: CopyItem[]): Promise<number> {
+  async copyPaths(_root: string, _items: CopyItem[]): Promise<number> {
     return 0;
   },
 

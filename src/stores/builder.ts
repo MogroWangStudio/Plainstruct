@@ -45,15 +45,23 @@ export const useBuilderStore = defineStore("builder", {
       const theme = useThemeStore();
       const ui = useUiStore();
       if (!site.config || this.building) return;
+      // 钉死发起构建时的站点根:落盘命令携 root 交后端校验,构建期间切站时
+      // 旧构建被拒绝,产物不会写入新站点目录
+      const root = site.root;
       this.building = true;
       this.error = null;
       try {
         const bundle = await theme.ensureActiveBundle();
-        this.report = await buildSite(site.config, bundle);
+        const report = await buildSite(site.config, bundle, root);
+        // 构建期间已切换/关闭站点:丢弃过期结果,不污染新会话
+        if (site.root !== root) return;
+        this.report = report;
         this.previewNonce++;
         // 独立预览窗口若开着,同步加载最新构建产物
         void this.refreshPreviewWindow();
       } catch (e) {
+        // 站点已切换:旧构建被后端拒绝属预期,静默即可
+        if (site.root !== root) return;
         this.error = ipcErr(e);
         ui.toast(this.error, "error");
       } finally {
@@ -106,12 +114,15 @@ export const useBuilderStore = defineStore("builder", {
 
     /** 文档保存或主题/站点配置变更后:已构建过则防抖重建,保持构建预览与产物同步 */
     onSiteChanged() {
-      if (!this.autoRebuild || !this.report) return;
-      // 构建进行中先记待办,构建结束后自动补一次
+      if (!this.autoRebuild) return;
+      // 构建进行中先记待办,构建结束后自动补一次(首次构建同样适用:
+      // 否则首建飞行期间的保存会被丢弃,产物停留在旧内容)
       if (this.building) {
         this.pendingRebuild = true;
         return;
       }
+      // 从未手动构建过时不自动生成产物(产品语义),仅构建中的补建例外
+      if (!this.report) return;
       if (rebuildTimer) clearTimeout(rebuildTimer);
       rebuildTimer = setTimeout(() => {
         void this.build();

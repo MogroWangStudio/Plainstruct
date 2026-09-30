@@ -23,10 +23,21 @@ fn build_root(root: &PathBuf) -> PathBuf {
     root.join("build")
 }
 
+/// 构建调用必须钉死发起时的站点根:请求中的 root 与当前站点根不一致说明
+/// 构建期间已切换/关闭站点,拒绝执行,避免旧站点的构建产物写入新站点目录
+fn pinned_root(state: &AppState, root: &str) -> Result<PathBuf, String> {
+    let current = state.site_root()?;
+    if PathBuf::from(root) == current {
+        Ok(current)
+    } else {
+        Err("site-changed".into())
+    }
+}
+
 #[tauri::command]
-pub fn clear_build(window: tauri::WebviewWindow, state: State<'_, AppState>) -> Result<(), String> {
+pub fn clear_build(window: tauri::WebviewWindow, state: State<'_, AppState>, root: String) -> Result<(), String> {
     ensure_main(&window)?;
-    let root = state.site_root()?;
+    let root = pinned_root(&state, &root)?;
     let build = build_root(&root);
     if build.exists() {
         std::fs::remove_dir_all(&build).map_err(|e| e.to_string())?;
@@ -35,9 +46,9 @@ pub fn clear_build(window: tauri::WebviewWindow, state: State<'_, AppState>) -> 
 }
 
 #[tauri::command]
-pub fn write_build_files(window: tauri::WebviewWindow, state: State<'_, AppState>, files: Vec<OutputFile>) -> Result<(), String> {
+pub fn write_build_files(window: tauri::WebviewWindow, state: State<'_, AppState>, root: String, files: Vec<OutputFile>) -> Result<(), String> {
     ensure_main(&window)?;
-    let root = state.site_root()?;
+    let root = pinned_root(&state, &root)?;
     let build = build_root(&root);
     std::fs::create_dir_all(&build).map_err(|e| e.to_string())?;
     for file in &files {
@@ -73,9 +84,9 @@ fn copy_recursive(src: &PathBuf, dest: &PathBuf) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn copy_paths(window: tauri::WebviewWindow, state: State<'_, AppState>, items: Vec<CopyItem>) -> Result<u64, String> {
+pub fn copy_paths(window: tauri::WebviewWindow, state: State<'_, AppState>, root: String, items: Vec<CopyItem>) -> Result<u64, String> {
     ensure_main(&window)?;
-    let root = state.site_root()?;
+    let root = pinned_root(&state, &root)?;
     // dest 相对 build/ 落盘:构建出的页面以 build/ 为根引用资源(图片、站点 logo 等)
     let build = build_root(&root);
     for item in &items {

@@ -208,11 +208,11 @@ export const useSiteStore = defineStore("site", {
     },
 
     async deleteItem(path: string) {
-      await ipc.deleteItem(path);
+      // 先重置编辑器再删除:等待删除期间 autosave 可能把已删文件按旧内容复活
       const editor = useEditorStore();
       const active = editor.activePath;
-      // 删除的目录包含当前文档时重置编辑器,避免幽灵路径被 autosave 复活
       if (active && (active === path || active.startsWith(`${path}/`))) editor.reset();
+      await ipc.deleteItem(path);
       await this.refreshTree();
     },
 
