@@ -6,6 +6,7 @@ import { useAppStore } from "@/stores/app";
 import { useEditorStore, type EditorMode } from "@/stores/editor";
 import { basename } from "@/lib/paths";
 import { siteUrl } from "@/lib/preview";
+import { toCssPx } from "@/lib/scale";
 import FileTree from "@/components/FileTree.vue";
 import MarkdownEditor from "@/components/MarkdownEditor.vue";
 import DocPreview from "@/components/DocPreview.vue";
@@ -51,6 +52,19 @@ function onDividerMove(e: PointerEvent) {
   ratio.value = Math.min(0.8, Math.max(0.2, next));
 }
 
+/* ---------- 文件树宽度可拖(右缘分隔线;缩放档位下指针坐标经 toCssPx 还原) ---------- */
+
+const treeW = ref(240);
+
+function onTreeDividerDown(e: PointerEvent) {
+  (e.target as HTMLElement).setPointerCapture(e.pointerId);
+}
+
+function onTreeDividerMove(e: PointerEvent) {
+  if (!(e.buttons & 1)) return;
+  treeW.value = Math.min(360, Math.max(180, toCssPx(e.clientX)));
+}
+
 /* ---------- 比例滚动同步(编辑器 -> 预览) ---------- */
 
 function onEditorScroll() {
@@ -76,9 +90,15 @@ onBeforeUnmount(() => {
 <template>
   <div class="flex h-full min-h-0">
     <!-- 文件树侧栏 -->
-    <aside class="w-[240px] shrink-0 border-r border-line bg-surface">
+    <!-- 文件树侧栏:宽度可拖(右缘分隔线,180–360px) -->
+    <aside class="shrink-0 bg-surface" :style="{ width: treeW + 'px' }">
       <FileTree />
     </aside>
+    <div
+      class="relative w-px shrink-0 cursor-col-resize bg-line after:absolute after:-left-1 after:-right-1 after:inset-y-0 after:content-['']"
+      @pointerdown="onTreeDividerDown"
+      @pointermove="onTreeDividerMove"
+    />
 
     <!-- 主区 -->
     <section class="flex min-w-0 flex-1 flex-col bg-bg">

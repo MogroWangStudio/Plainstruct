@@ -7,6 +7,7 @@ import { formatSize } from "@/lib/format";
 import { countImageRefs, findImageRefs, replaceImageRefs, type ImageRef } from "@/lib/imageRefs";
 import { basename } from "@/lib/paths";
 import { siteUrl } from "@/lib/preview";
+import { toCssPx } from "@/lib/scale";
 import { ipc } from "@/ipc/ipc";
 import type { TreeNode } from "@/ipc/types";
 import { useAppStore } from "@/stores/app";
@@ -70,7 +71,8 @@ function onDividerDown(e: PointerEvent) {
 function onDividerMove(e: PointerEvent) {
   if (!(e.buttons & 1) || !splitHost.value) return;
   const rect = splitHost.value.getBoundingClientRect();
-  detailW.value = Math.min(520, Math.max(220, rect.right - e.clientX));
+  // 界面缩放档位下指针与 rect 均为视觉像素,宽度声明值经 toCssPx 还原
+  detailW.value = Math.min(520, Math.max(220, toCssPx(rect.right - e.clientX)));
 }
 const selectedRefs = computed<ImageRef[]>(() =>
   selected.value ? findImageRefs(selected.value, Object.keys(docs.value), docs.value) : [],

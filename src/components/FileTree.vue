@@ -14,6 +14,7 @@ import NewDocModal from "@/components/NewDocModal.vue";
 import FrontMatterModal, { type FrontMatterForm } from "@/components/FrontMatterModal.vue";
 import { ASSET_MIME, basename, dirname, isImageFile, safeName, stripExt } from "@/lib/paths";
 import { siteUrl } from "@/lib/preview";
+import { toCssPx } from "@/lib/scale";
 import AppIcon from "./AppIcon.vue";
 import FileTreeNode, { type DropMark, type SelectClick } from "./FileTreeNode.vue";
 import PromptModal from "./PromptModal.vue";
@@ -42,6 +43,20 @@ const displayTree = computed(() =>
 );
 
 /* ---------- 资产栏:站点图片资源区(卡片/列表视图),图片可拖入正文 ---------- */
+
+/** 资产栏高度(顶缘分隔线可拖,120–420px);界面缩放档位下指针坐标经 toCssPx 还原 */
+const assetH = ref(218);
+const treeHost = ref<HTMLElement | null>(null);
+
+function onAssetDividerDown(e: PointerEvent) {
+  (e.target as HTMLElement).setPointerCapture(e.pointerId);
+}
+
+function onAssetDividerMove(e: PointerEvent) {
+  if (!(e.buttons & 1) || !treeHost.value) return;
+  const host = treeHost.value.getBoundingClientRect();
+  assetH.value = Math.min(420, Math.max(120, toCssPx(host.bottom - e.clientY)));
+}
 
 const assetView = ref<"card" | "list">("card");
 const brokenThumbs = ref(new Set<string>());
@@ -632,7 +647,7 @@ async function onTreeDrop(e: DragEvent) {
 </script>
 
 <template>
-  <div class="flex h-full flex-col" @contextmenu="openTreeMenu">
+  <div ref="treeHost" class="flex h-full flex-col" @contextmenu="openTreeMenu">
     <div class="flex items-center justify-between px-3 pb-1 pt-3">
       <span class="text-[12px] font-semibold tracking-wide text-ink-3">
         {{ t("nav.editor") }} · {{ site.docCount }}
@@ -719,8 +734,15 @@ async function onTreeDrop(e: DragEvent) {
       </template>
     </div>
 
+    <!-- 顶缘分隔线:上下拖动调整资产栏高度(伪元素扩展命中区,视觉仍为 1px) -->
+    <div
+      class="relative h-px shrink-0 cursor-row-resize bg-line after:absolute after:inset-x-0 after:-bottom-1 after:-top-1 after:content-['']"
+      @pointerdown="onAssetDividerDown"
+      @pointermove="onAssetDividerMove"
+    />
+
     <!-- 底部资产栏:站点图片资源区,支持卡片/列表视图,按住图片拖入正文即插入引用 -->
-    <div class="flex h-[218px] shrink-0 flex-col border-t border-line">
+    <div class="flex shrink-0 flex-col" :style="{ height: assetH + 'px' }">
       <div class="flex items-center justify-between px-3 pb-1 pt-2">
         <span class="text-[12px] font-semibold tracking-wide text-ink-3">
           {{ t("tree.assets") }} · {{ site.assetFiles.length }}
