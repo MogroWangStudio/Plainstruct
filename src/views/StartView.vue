@@ -135,10 +135,20 @@ async function openRecent(path: string) {
                     :class="{ active: wizard.siteType === 'docs' }"
                     @click="wizard.siteType = 'docs'"
                   >
-                    <AppIcon name="doc" :size="17" class="shrink-0" />
-                    <span class="min-w-0">
-                      <span class="block text-[13px] font-medium">{{ t("wizard.typeDocs") }}</span>
-                      <span class="block text-[11.5px] leading-snug text-ink-3">{{ t("wizard.typeDocsHint") }}</span>
+                    <span class="type-preview" aria-hidden="true">
+                      <span class="tp-side">
+                        <i /><i /><i /><i />
+                      </span>
+                      <span class="tp-main">
+                        <i class="tp-title" /><i /><i /><i class="tp-short" />
+                      </span>
+                    </span>
+                    <span class="type-card-body">
+                      <AppIcon name="doc" :size="17" class="shrink-0" />
+                      <span class="min-w-0">
+                        <span class="block text-[13px] font-medium">{{ t("wizard.typeDocs") }}</span>
+                        <span class="block text-[11.5px] leading-snug text-ink-3">{{ t("wizard.typeDocsHint") }}</span>
+                      </span>
                     </span>
                   </button>
                   <button
@@ -147,10 +157,18 @@ async function openRecent(path: string) {
                     :class="{ active: wizard.siteType === 'blog' }"
                     @click="wizard.siteType = 'blog'"
                   >
-                    <AppIcon name="pencil" :size="17" class="shrink-0" />
-                    <span class="min-w-0">
-                      <span class="block text-[13px] font-medium">{{ t("wizard.typeBlog") }}</span>
-                      <span class="block text-[11.5px] leading-snug text-ink-3">{{ t("wizard.typeBlogHint") }}</span>
+                    <span class="type-preview" aria-hidden="true">
+                      <span class="tp-nav"><i /></span>
+                      <span class="tp-feed">
+                        <i /><i /><i />
+                      </span>
+                    </span>
+                    <span class="type-card-body">
+                      <AppIcon name="pencil" :size="17" class="shrink-0" />
+                      <span class="min-w-0">
+                        <span class="block text-[13px] font-medium">{{ t("wizard.typeBlog") }}</span>
+                        <span class="block text-[11.5px] leading-snug text-ink-3">{{ t("wizard.typeBlogHint") }}</span>
+                      </span>
                     </span>
                   </button>
                 </div>
@@ -220,7 +238,9 @@ async function openRecent(path: string) {
   opacity: 0.8;
 }
 
-/* 站点类型选择:两枚等宽卡片,选中态用强调色描边,不用底色堆叠 */
+/* 站点类型选择:两枚等宽卡片,顶部各带对应站点类型的迷你界面示意(常显)。
+   来回切换时选中态以非线性缓动平滑过渡(缩放/透明度/描边/阴影,可随时反向),
+   预览框随选中态同步提亮 */
 .type-cards {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -228,29 +248,125 @@ async function openRecent(path: string) {
 }
 .type-card {
   display: flex;
-  align-items: flex-start;
+  flex-direction: column;
   gap: 9px;
-  padding: 10px 12px;
+  padding: 10px;
   border: 1px solid var(--color-line);
   border-radius: 10px;
   background: var(--color-surface);
   color: var(--color-ink-2);
   text-align: left;
   cursor: pointer;
+  transform: scale(0.97);
+  opacity: 0.72;
   transition:
+    transform var(--duration-slow) var(--ease-plain),
+    opacity var(--duration-slow) var(--ease-plain),
     border-color var(--duration-base) var(--ease-plain),
     background-color var(--duration-base) var(--ease-plain),
-    color var(--duration-base) var(--ease-plain);
+    color var(--duration-base) var(--ease-plain),
+    box-shadow var(--duration-slow) var(--ease-plain);
 }
 .type-card:hover {
-  background: var(--color-surface-2);
+  transform: scale(0.985);
+  opacity: 0.88;
 }
 .type-card:active {
-  transform: scale(0.98);
+  transform: scale(0.955);
 }
 .type-card.active {
+  transform: scale(1);
+  opacity: 1;
   border-color: var(--color-accent);
   background: var(--color-surface-2);
   color: var(--color-ink);
+  box-shadow: var(--shadow-popover);
 }
+.type-card:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+.type-card-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 0 2px 2px;
+}
+
+/* 迷你界面示意(常显):文档站 = 侧栏目录 + 正文;博客站 = 顶栏导航 + 文章流 */
+.type-preview {
+  display: flex;
+  gap: 6px;
+  height: 72px;
+  padding: 8px;
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  background: var(--color-bg);
+  overflow: hidden;
+  transition: border-color var(--duration-base) var(--ease-plain);
+}
+.type-card.active .type-preview {
+  border-color: var(--color-line-strong);
+}
+.type-preview i {
+  display: block;
+  border-radius: 3px;
+  background: var(--color-surface-3);
+}
+/* 文档站:侧栏目录 + 标题与正文行 */
+.tp-side {
+  width: 24%;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.tp-side i {
+  height: 6px;
+}
+.tp-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.tp-main i {
+  height: 6px;
+}
+.tp-main .tp-title {
+  height: 10px;
+  background: var(--color-line-strong);
+}
+.tp-main .tp-short {
+  width: 62%;
+}
+/* 博客站:顶栏导航 + 文章卡片流 */
+.tp-nav {
+  height: 10px;
+}
+.tp-nav i {
+  width: 55%;
+  height: 100%;
+  background: var(--color-line-strong);
+}
+.tp-feed {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.tp-feed i {
+  flex: 1;
+  min-height: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .type-card,
+  .type-card:hover,
+  .type-card:active,
+  .type-card.active {
+    transform: none;
+    transition: none;
+  }
+}
+
 </style>
