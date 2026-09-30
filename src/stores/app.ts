@@ -14,9 +14,7 @@ import type {
   Platform,
   RecentSite,
   StartAnim,
-  UiFontSize,
   UiFontMode,
-  UiFontWeight,
   UpdateProgress,
 } from "@/ipc/types";
 import { i18n, type Locale as I18nLocale } from "@/i18n";
@@ -39,8 +37,8 @@ export interface AppearanceSettings {
   theme?: AppTheme;
   uiFont?: UiFontMode;
   uiFontCustom?: string;
-  uiFontSize?: UiFontSize;
-  uiFontWeight?: UiFontWeight;
+  uiFontSize?: number;
+  uiFontWeight?: number;
   startAnim?: StartAnim;
   editorFont?: EditorFontMode;
   editorFontCustom?: string;
@@ -76,20 +74,30 @@ const FONT_STACKS: Record<"serif" | "mono", string> = {
   mono: `ui-monospace, SFMono-Regular, Menlo, Consolas, "PingFang SC", "Microsoft YaHei", monospace`,
 };
 
-/** 界面字号档位 -> 文字缩放系数(只缩放文字,布局随内容自适应) */
-const UI_SIZE_SCALE: Record<UiFontSize, string> = {
-  small: "0.9",
-  default: "1",
-  large: "1.1",
-  xlarge: "1.25",
-};
+/** 界面字号缩放边界(滑块范围):只缩放文字,布局随内容自适应 */
+export const UI_FONT_SCALE_MIN = 0.85;
+export const UI_FONT_SCALE_MAX = 1.3;
+/** 界面字重边界(滑块范围):作用于未显式指定字重的界面文本 */
+export const UI_FONT_WEIGHT_MIN = 400;
+export const UI_FONT_WEIGHT_MAX = 600;
 
-/** 界面字重档位 -> 基础文本字重(显式加重的标题/按钮不受影响) */
-const UI_WEIGHT_VALUE: Record<UiFontWeight, string> = {
-  normal: "400",
-  medium: "500",
-  semibold: "600",
-};
+/** 界面字号归一:数值 clamp 到滑块范围;旧版本档位枚举映射为缩放系数 */
+export function normalizeUiFontSize(v: unknown): number {
+  if (typeof v === "number" && Number.isFinite(v)) {
+    return Math.min(UI_FONT_SCALE_MAX, Math.max(UI_FONT_SCALE_MIN, v));
+  }
+  const legacy: Record<string, number> = { small: 0.9, default: 1, large: 1.1, xlarge: 1.25 };
+  return legacy[String(v)] ?? 1;
+}
+
+/** 界面字重归一:数值取整并 clamp;旧版本档位枚举映射为字重值 */
+export function normalizeUiFontWeight(v: unknown): number {
+  if (typeof v === "number" && Number.isFinite(v)) {
+    return Math.min(UI_FONT_WEIGHT_MAX, Math.max(UI_FONT_WEIGHT_MIN, Math.round(v)));
+  }
+  const legacy: Record<string, number> = { normal: 400, medium: 500, semibold: 600 };
+  return legacy[String(v)] ?? 400;
+}
 
 interface State {
   ready: boolean;
@@ -141,8 +149,8 @@ export const useAppStore = defineStore("app", {
           autosave: true,
           theme: "system",
           uiFont: "system",
-          uiFontSize: "default",
-          uiFontWeight: "normal",
+          uiFontSize: 1,
+          uiFontWeight: 400,
           startAnim: "fade",
           editorFont: "default",
           editorWhitespace: true,
@@ -353,8 +361,8 @@ export const useAppStore = defineStore("app", {
       await ipc.saveSettings({ confetti: level });
     },
 
-    /** 保存个性化外观并立即应用;启动动画预设同时镜像到 localStorage 供下次启动同步读取 */
-    async setAppearance(patch: AppearanceSettings) {
+    /** 即时应用外观(不落盘):滑块拖动中调用,松手后再 setAppearance 持久化 */
+    previewAppearance(patch: AppearanceSettings) {
       this.bootstrap = {
         ...this.bootstrap!,
         settings: { ...this.settings, ...patch },
@@ -368,6 +376,11 @@ export const useAppStore = defineStore("app", {
         }
       }
       this.applyAppearance();
+    },
+
+    /** 保存个性化外观并立即应用;启动动画预设同时镜像到 localStorage 供下次启动同步读取 */
+    async setAppearance(patch: AppearanceSettings) {
+      this.previewAppearance(patch);
       await ipc.saveSettings(patch);
     },
 
@@ -391,10 +404,10 @@ export const useAppStore = defineStore("app", {
       root.dataset.theme = resolved === "system" ? (preferDark ? "dark" : "light") : resolved;
 
       // 界面字号:只缩放文字(--ui-font-scale 乘算所有界面字号),布局随内容自适应
-      root.style.setProperty("--ui-font-scale", UI_SIZE_SCALE[uiFontSize ?? "default"]);
+      root.style.setProperty("--ui-font-scale", String(normalizeUiFontSize(uiFontSize)));
 
       // 界面字重:落到基础字重变量,标题/按钮等显式加重的元素不受影响
-      root.style.setProperty("--font-weight-ui", UI_WEIGHT_VALUE[uiFontWeight ?? "normal"]);
+      root.style.setProperty("--font-weight-ui", String(normalizeUiFontWeight(uiFontWeight)));
 
       let ui: string | undefined;
       if (uiFont === "custom") ui = (uiFontCustom ?? "").trim() || undefined;

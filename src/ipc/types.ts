@@ -9,10 +9,6 @@ export type SiteType = "docs" | "blog";
 export type AppTheme = "light" | "dark" | "sepia" | "mint" | "ocean" | "plum" | "system";
 /** 界面字体模式:系统默认 / 衬线 / 等宽 / 自定义 font-family */
 export type UiFontMode = "system" | "serif" | "mono" | "custom";
-/** 界面字号档位:整页等比缩放(等效浏览器缩放) */
-export type UiFontSize = "small" | "default" | "large" | "xlarge";
-/** 界面字重档位:作用于未显式指定字重的界面文本 */
-export type UiFontWeight = "normal" | "medium" | "semibold";
 /** 启动动画预设:浮现 / 呼吸 / 进度线 / 关闭 */
 export type StartAnim = "fade" | "pulse" | "progress" | "off";
 /** 编辑器字体模式:默认等宽 / 跟随界面 / 衬线 / 自定义 font-family */
@@ -31,10 +27,10 @@ export interface AppSettings {
   theme?: AppTheme;
   uiFont?: UiFontMode;
   uiFontCustom?: string;
-  /** 界面字号档位,默认 default(100%) */
-  uiFontSize?: UiFontSize;
-  /** 界面字重档位,默认 normal(400) */
-  uiFontWeight?: UiFontWeight;
+  /** 界面字号缩放系数(0.85–1.3,默认 1);旧版本为档位枚举,读取时归一 */
+  uiFontSize?: number;
+  /** 界面基础字重(400–600,默认 400);旧版本为档位枚举,读取时归一 */
+  uiFontWeight?: number;
   /** 启动动画预设,默认 fade(浮现) */
   startAnim?: StartAnim;
   editorFont?: EditorFontMode;

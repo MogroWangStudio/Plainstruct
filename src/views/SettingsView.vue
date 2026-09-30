@@ -1,10 +1,18 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { useAppStore } from "@/stores/app";
+import {
+  normalizeUiFontSize,
+  normalizeUiFontWeight,
+  UI_FONT_SCALE_MAX,
+  UI_FONT_SCALE_MIN,
+  UI_FONT_WEIGHT_MAX,
+  UI_FONT_WEIGHT_MIN,
+  useAppStore,
+} from "@/stores/app";
 import { useUiStore } from "@/stores/ui";
 import { ipc } from "@/ipc/ipc";
-import type { ConfettiLevel, EditorBreakKey, EditorFontMode, EditorIndentKey, Locale, StartAnim, UiFontSize, UiFontMode, UiFontWeight } from "@/ipc/types";
+import type { ConfettiLevel, EditorBreakKey, EditorFontMode, EditorIndentKey, Locale, StartAnim, UiFontMode } from "@/ipc/types";
 import { APP_THEMES, type AppThemeSwatch } from "@/lib/app-themes";
 import { formatSize } from "@/lib/format";
 import AppIcon from "@/components/AppIcon.vue";
@@ -111,18 +119,32 @@ const confettiOptions = computed<{ value: ConfettiLevel; label: string }[]>(() =
   { value: "grand", label: t("settings.confettiGrand") },
 ]);
 
-const uiFontSizeOptions = computed<{ value: UiFontSize; label: string }[]>(() => [
-  { value: "small", label: t("settings.uiFontSizeSmall") },
-  { value: "default", label: t("settings.uiFontSizeDefault") },
-  { value: "large", label: t("settings.uiFontSizeLarge") },
-  { value: "xlarge", label: t("settings.uiFontSizeXLarge") },
-]);
+/* ---------- 界面字号/字重滑块:拖动即时预览,松手保存 ---------- */
 
-const uiFontWeightOptions = computed<{ value: UiFontWeight; label: string }[]>(() => [
-  { value: "normal", label: t("settings.uiFontWeightNormal") },
-  { value: "medium", label: t("settings.uiFontWeightMedium") },
-  { value: "semibold", label: t("settings.uiFontWeightSemibold") },
-]);
+const uiFontSizeValue = computed(() => normalizeUiFontSize(app.settings.uiFontSize));
+const uiFontSizeLabel = computed(() => `${Math.round(uiFontSizeValue.value * 100)}%`);
+const uiFontSizeFill = computed(
+  () => `${((uiFontSizeValue.value - UI_FONT_SCALE_MIN) / (UI_FONT_SCALE_MAX - UI_FONT_SCALE_MIN)) * 100}%`,
+);
+
+function onUiFontSizeInput(e: Event) {
+  app.previewAppearance({ uiFontSize: Number((e.target as HTMLInputElement).value) });
+}
+function onUiFontSizeChange(e: Event) {
+  void app.setAppearance({ uiFontSize: Number((e.target as HTMLInputElement).value) });
+}
+
+const uiFontWeightValue = computed(() => normalizeUiFontWeight(app.settings.uiFontWeight));
+const uiFontWeightFill = computed(
+  () => `${((uiFontWeightValue.value - UI_FONT_WEIGHT_MIN) / (UI_FONT_WEIGHT_MAX - UI_FONT_WEIGHT_MIN)) * 100}%`,
+);
+
+function onUiFontWeightInput(e: Event) {
+  app.previewAppearance({ uiFontWeight: Number((e.target as HTMLInputElement).value) });
+}
+function onUiFontWeightChange(e: Event) {
+  void app.setAppearance({ uiFontWeight: Number((e.target as HTMLInputElement).value) });
+}
 
 const startAnimOptions = computed<{ value: StartAnim; label: string }[]>(() => [
   { value: "fade", label: t("settings.startAnimFade") },
@@ -141,14 +163,6 @@ const editorFontOptions = computed<{ value: EditorFontMode; label: string }[]>((
 const uiFontModel = computed({
   get: () => app.settings.uiFont ?? "system",
   set: (v: UiFontMode) => void app.setAppearance({ uiFont: v }),
-});
-const uiFontSizeModel = computed({
-  get: () => app.settings.uiFontSize ?? "default",
-  set: (v: UiFontSize) => void app.setAppearance({ uiFontSize: v }),
-});
-const uiFontWeightModel = computed({
-  get: () => app.settings.uiFontWeight ?? "normal",
-  set: (v: UiFontWeight) => void app.setAppearance({ uiFontWeight: v }),
 });
 const editorFontModel = computed({
   get: () => app.settings.editorFont ?? "default",
@@ -500,7 +514,29 @@ function openRelease(url: string) {
                     <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.uiFontSize") }}</p>
                     <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.uiFontSizeHint") }}</p>
                   </div>
-                  <SelectMenu v-model="uiFontSizeModel" :options="uiFontSizeOptions" align="right" class="shrink-0" />
+                  <div class="flex shrink-0 items-center gap-2.5">
+                    <input
+                      type="range"
+                      class="range-input w-[140px]"
+                      min="0.85"
+                      max="1.3"
+                      step="0.05"
+                      :value="uiFontSizeValue"
+                      :style="{ '--range-fill': uiFontSizeFill }"
+                      @input="onUiFontSizeInput"
+                      @change="onUiFontSizeChange"
+                    />
+                    <span class="mono w-[44px] text-right text-[calc(11px*var(--ui-font-scale))] text-ink-2">{{ uiFontSizeLabel }}</span>
+                    <button
+                      v-if="uiFontSizeValue !== 1"
+                      type="button"
+                      class="btn-icon h-6 w-6 shrink-0"
+                      :title="t('theme.resetValue')"
+                      @click="app.setAppearance({ uiFontSize: 1 })"
+                    >
+                      <AppIcon name="refresh" :size="12" />
+                    </button>
+                  </div>
                 </div>
 
                 <!-- 界面字重 -->
@@ -509,7 +545,29 @@ function openRelease(url: string) {
                     <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.uiFontWeight") }}</p>
                     <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.uiFontWeightHint") }}</p>
                   </div>
-                  <SelectMenu v-model="uiFontWeightModel" :options="uiFontWeightOptions" align="right" class="shrink-0" />
+                  <div class="flex shrink-0 items-center gap-2.5">
+                    <input
+                      type="range"
+                      class="range-input w-[140px]"
+                      min="400"
+                      max="600"
+                      step="100"
+                      :value="uiFontWeightValue"
+                      :style="{ '--range-fill': uiFontWeightFill }"
+                      @input="onUiFontWeightInput"
+                      @change="onUiFontWeightChange"
+                    />
+                    <span class="mono w-[44px] text-right text-[calc(11px*var(--ui-font-scale))] text-ink-2">{{ uiFontWeightValue }}</span>
+                    <button
+                      v-if="uiFontWeightValue !== 400"
+                      type="button"
+                      class="btn-icon h-6 w-6 shrink-0"
+                      :title="t('theme.resetValue')"
+                      @click="app.setAppearance({ uiFontWeight: 400 })"
+                    >
+                      <AppIcon name="refresh" :size="12" />
+                    </button>
+                  </div>
                 </div>
 
                 <!-- 编辑器字体 -->
