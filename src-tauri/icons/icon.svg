@@ -2,7 +2,9 @@
   <!-- 应用图标源文件:npm run icons(tauri icon src-tauri/icons/icon.svg)
        图形原样取自「Plainstruct Logo only-graphic.svg」(viewBox 251x243),按 63% 居中:
        642.56x622.08,偏移 (190.72, 200.96)。
-       白底全出血:macOS 26+ 由系统统一裁切圆角并加投影,Windows 直接使用方形图标 -->
+       白底全出血:macOS 26+ 由系统统一裁切圆角并加投影,本源图保持方形;
+       Windows 用圆角版本 —— 以 rx=230 圆角背景的临时源图经 tauri icon 生成,
+       替换 icon.ico 与全部 Windows 侧 png(icns/android/ios 不动) -->
   <rect width="1024" height="1024" fill="#ffffff"/>
   <g transform="translate(190.72 200.96) scale(2.56)">
     <g transform="matrix(1,0,0,1,-592.339322,-2678.930414)">
