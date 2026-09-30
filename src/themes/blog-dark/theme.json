@@ -1,7 +1,7 @@
 {
   "id": "blog-dark",
   "name": "手记 · 深色",
-  "version": "3.2.0",
+  "version": "3.3.0",
   "author": "MogroWang Studio",
   "type": "blog",
   "description": "博客·深色:暖炭夜纸,文章为流,日期为记。",
@@ -76,6 +76,17 @@
       "min": 600,
       "max": 1600,
       "step": 20
+    },
+    {
+      "key": "topbarShape",
+      "label": "顶栏滚动形态",
+      "type": "select",
+      "default": "固定不动",
+      "options": [
+        "固定不动",
+        "药丸",
+        "圆角矩形"
+      ]
     },
     {
       "key": "postsPerPage",

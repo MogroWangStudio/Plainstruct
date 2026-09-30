@@ -1,7 +1,7 @@
 {
   "id": "magazine",
   "name": "专栏",
-  "version": "3.2.0",
+  "version": "3.3.0",
   "author": "MogroWang Studio",
   "type": "blog",
   "description": "杂志编辑部风:衬线报头,双线分章,栏目气度。",
@@ -76,6 +76,17 @@
       "min": 600,
       "max": 1600,
       "step": 20
+    },
+    {
+      "key": "topbarShape",
+      "label": "顶栏滚动形态",
+      "type": "select",
+      "default": "固定不动",
+      "options": [
+        "固定不动",
+        "药丸",
+        "圆角矩形"
+      ]
     },
     {
       "key": "postsPerPage",
