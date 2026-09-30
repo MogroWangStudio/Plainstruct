@@ -110,7 +110,7 @@ pub fn copy_paths(window: tauri::WebviewWindow, state: State<'_, AppState>, root
 }
 
 /// 递归统计目录内全部文件的字节总数(目录不存在按 0)
-fn dir_size(dir: &std::path::Path) -> u64 {
+pub(crate) fn dir_size(dir: &std::path::Path) -> u64 {
     walkdir::WalkDir::new(dir)
         .into_iter()
         .filter_map(|e| e.ok())

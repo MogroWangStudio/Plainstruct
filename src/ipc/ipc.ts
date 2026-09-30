@@ -103,6 +103,12 @@ export const ipc = {
   readSiteConfig(): Promise<SiteConfig> {
     return inTauri ? invoke<SiteConfig>("read_site_config") : mock.readSiteConfig();
   },
+  /** 最近打开列表的站点摘要:类型与文件夹大小(非站点目录 reject) */
+  getSiteInfo(path: string): Promise<{ siteType: string; sizeBytes: number }> {
+    return inTauri
+      ? invoke<{ siteType: string; sizeBytes: number }>("get_site_info", { path })
+      : mock.getSiteInfo(path);
+  },
   saveSiteConfig(patch: Partial<SiteConfig>): Promise<SiteConfig> {
     return inTauri
       ? invoke<SiteConfig>("save_site_config", { patch })

@@ -340,7 +340,12 @@ export const mock = {
     currentRoot = null;
   },
 
-  async readSiteConfig(): Promise<SiteConfig> {
+    async getSiteInfo(path: string): Promise<{ siteType: string; sizeBytes: number }> {
+    void path;
+    return { siteType: "docs", sizeBytes: 123456 };
+  },
+
+async readSiteConfig(): Promise<SiteConfig> {
     return readJson<SiteConfig>(siteJsonPath(currentRoot!))!;
   },
 

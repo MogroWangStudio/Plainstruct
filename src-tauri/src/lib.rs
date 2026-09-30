@@ -152,6 +152,7 @@ pub fn run() {
             commands::close_site,
             commands::get_site_root,
             commands::read_site_config,
+            commands::get_site_info,
             commands::save_site_config,
             commands::set_site_logo,
             commands::remove_site_logo,

@@ -1,18 +1,45 @@
 <script setup lang="ts">
-import { reactive, ref } from "vue";
+import { onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useAppStore } from "@/stores/app";
 import { useSiteStore } from "@/stores/site";
 import { useUiStore } from "@/stores/ui";
 import { ipc } from "@/ipc/ipc";
 import type { SiteType } from "@/ipc/types";
-import { formatTime } from "@/lib/format";
+import { formatSize, formatTime } from "@/lib/format";
 import AppIcon from "@/components/AppIcon.vue";
 
 const { t } = useI18n();
 const app = useAppStore();
 const site = useSiteStore();
 const ui = useUiStore();
+
+/** 最近打开条目的站点摘要(类型与大小,异步获取;null = 获取失败) */
+const siteInfos = ref<Record<string, { siteType: string; sizeBytes: number } | null>>({});
+
+onMounted(() => {
+  void loadSiteInfos();
+});
+
+async function loadSiteInfos() {
+  await Promise.all(
+    app.recentSites.map(async (r) => {
+      try {
+        const info = await ipc.getSiteInfo(r.path);
+        siteInfos.value = { ...siteInfos.value, [r.path]: info };
+      } catch {
+        siteInfos.value = { ...siteInfos.value, [r.path]: null };
+      }
+    }),
+  );
+}
+
+function siteMetaText(path: string): string {
+  const info = siteInfos.value[path];
+  if (!info) return "";
+  const type = info.siteType === "blog" ? t("wizard.typeBlog") : t("wizard.typeDocs");
+  return `${type} · ${formatSize(info.sizeBytes) || "0 B"}`;
+}
 
 const showWizard = ref(false);
 const wizard = reactive({ name: "", description: "", folder: "", siteType: "docs" as SiteType });
@@ -99,6 +126,10 @@ async function openRecent(path: string) {
             <span class="min-w-0 flex-1 text-left">
               <span class="block truncate text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ item.name }}</span>
               <span class="block truncate text-[calc(11.5px*var(--ui-font-scale))] text-ink-3">{{ item.path }}</span>
+              <span class="block pt-0.5 text-[calc(10.5px*var(--ui-font-scale))] text-ink-3">
+                <template v-if="siteMetaText(item.path)">{{ siteMetaText(item.path) }}</template>
+                <span v-else class="inline-block h-2 w-24 rounded bg-surface-3 align-middle"></span>
+              </span>
             </span>
             <span class="shrink-0 text-[calc(11.5px*var(--ui-font-scale))] text-ink-3">{{ formatTime(item.openedAt) }}</span>
           </button>

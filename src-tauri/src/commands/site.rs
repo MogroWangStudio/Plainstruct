@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use tauri::State;
 
 use crate::commands::app::touch_recent;
+use crate::commands::build::dir_size;
 use crate::state::{ensure_main, AppState};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -260,4 +261,23 @@ pub fn remove_site_logo(window: tauri::WebviewWindow, state: State<'_, AppState>
     cfg.logo = None;
     write_site_config_file(&root, &cfg)?;
     Ok(cfg)
+}
+
+/// 最近打开列表的站点摘要:类型与文件夹大小(只读;非素构站点目录报错)
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SiteBrief {
+    pub site_type: String,
+    pub size_bytes: u64,
+}
+
+#[tauri::command]
+pub fn get_site_info(window: tauri::WebviewWindow, path: String) -> Result<SiteBrief, String> {
+    ensure_main(&window)?;
+    let root = PathBuf::from(&path);
+    let cfg = read_site_config_file(&root)?;
+    Ok(SiteBrief {
+        site_type: cfg.site_type.unwrap_or_else(|| "docs".into()),
+        size_bytes: dir_size(&root),
+    })
 }
