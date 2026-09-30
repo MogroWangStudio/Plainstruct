@@ -32,27 +32,39 @@ function openStudioSite() {
       </div>
       <p class="mt-3 text-center text-[14px] leading-relaxed text-ink-2">{{ t("app.tagline") }}</p>
 
-      <div class="mt-10 w-full rounded-xl border border-line bg-surface p-6">
-        <p class="whitespace-pre-line text-[13.5px] leading-relaxed text-ink-2">{{ t("about.description") }}</p>
+      <!-- 三个板块:简介 / 架构 / 工作室 -->
+      <div class="mt-10 w-full">
+        <!-- 简介 -->
+        <div class="rounded-xl border border-line bg-surface p-6">
+          <h2 class="field-label">{{ t("about.sectionIntro") }}</h2>
+          <p class="whitespace-pre-line text-[13.5px] leading-relaxed text-ink-2">{{ t("about.description") }}</p>
+        </div>
 
-        <!-- 工作室署名字标(固定双色):悬停模糊并浮现官网引导文字,点击前往官网 -->
-        <a
-          href="https://www.mogrowangstudio.top"
-          class="studio-link group relative mx-auto mt-7 block"
-          @click.prevent="openStudioSite"
-        >
-          <img
-            src="/studio-logo.svg"
-            alt="MogroWang Studio"
-            class="h-6 select-none transition-[filter,opacity] duration-200 ease-(--ease-plain) group-hover:opacity-70 group-hover:blur-[3px] group-focus-visible:opacity-70 group-focus-visible:blur-[3px]"
-            draggable="false"
-          />
-          <span class="studio-hint">{{ t("about.studioHint") }}</span>
-        </a>
+        <!-- 架构 -->
+        <div class="mt-3 rounded-xl border border-line bg-surface p-6">
+          <h2 class="field-label">{{ t("about.sectionArchitecture") }}</h2>
+          <p class="text-[13px] leading-relaxed text-ink-2">Vue 3 · TypeScript · Tauri 2</p>
+        </div>
 
-        <div class="mt-6 flex flex-wrap gap-x-6 gap-y-1 border-t border-line pt-5 text-[12.5px] text-ink-3">
-          <span>Vue 3 · TypeScript · Tauri 2</span>
-          <span>© 2026 MogroWang Studio</span>
+        <!-- 工作室:署名字标可点击前往官网 + 版权 -->
+        <div class="mt-3 rounded-xl border border-line bg-surface p-6">
+          <h2 class="field-label">{{ t("about.sectionStudio") }}</h2>
+          <a
+            href="https://www.mogrowangstudio.top"
+            class="studio-link group relative mx-auto mt-5 block w-fit"
+            @click.prevent="openStudioSite"
+          >
+            <img
+              src="/studio-logo.svg"
+              alt="MogroWang Studio"
+              class="h-6 select-none transition-[filter,opacity] duration-200 ease-(--ease-plain) group-hover:opacity-70 group-hover:blur-[3px] group-focus-visible:opacity-70 group-focus-visible:blur-[3px]"
+              draggable="false"
+            />
+            <span class="studio-hint">{{ t("about.studioHint") }}</span>
+          </a>
+          <p class="mt-5 border-t border-line pt-4 text-center text-[12.5px] text-ink-3">
+            © 2026 MogroWang Studio
+          </p>
         </div>
       </div>
 

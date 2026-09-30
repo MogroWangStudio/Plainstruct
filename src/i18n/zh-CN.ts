@@ -359,6 +359,9 @@ export default {
     title: "关于素构",
     description:
       "可视化一站式搞定你自己的本地静态站点。\n支持文档与博客两类站点，可为软件或项目做介绍网站，内置多套可定制主题，并支持发布到 GitHub Pages。",
+    sectionIntro: "简介",
+    sectionArchitecture: "架构",
+    sectionStudio: "工作室",
     studioHint: "点击前往 MogroWang Studio 官方网站",
   },
   settings: {
