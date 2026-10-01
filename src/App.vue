@@ -4,6 +4,7 @@ import { useAppStore } from "@/stores/app";
 import { useSiteStore } from "@/stores/site";
 import { useEditorStore } from "@/stores/editor";
 import { ipc } from "@/ipc/ipc";
+import { Events, listen } from "@/ipc/events";
 import { useI18n } from "vue-i18n";
 import { installContextMenu } from "@/lib/contextMenu";
 import TitleBar from "@/components/TitleBar.vue";
@@ -27,17 +28,19 @@ const editor = useEditorStore();
 const { t } = useI18n();
 
 /* ---------- 关窗守卫:有未保存修改时先询问(保存并关闭 / 不保存 / 取消) ----------
- * 监听 Tauri 的 CloseRequested:自绘标题栏关闭按钮与任务栏关闭都会走到这里。
- * macOS 不拦截 —— 关窗按惯例只是隐藏窗口(Rust 侧处理),不销毁界面,没有数据丢失 */
+ * 非 macOS 下,Rust 侧拦截 CloseRequested 后转发本事件;无未保存修改时直接销毁窗口,
+ * 有则弹确认。macOS 关窗只是隐藏窗口(无数据丢失),Rust 侧不转发。 */
 const closeAskOpen = ref(false);
 let closeAsked = false;
 
 async function installCloseGuard() {
   if (!ipc.inTauri) return;
-  const { getCurrentWindow } = await import("@tauri-apps/api/window");
-  await getCurrentWindow().onCloseRequested((event) => {
-    if (app.platform === "macos" || closeAsked || !editor.dirty) return;
-    event.preventDefault();
+  await listen<void>(Events.CloseRequested, () => {
+    if (app.platform === "macos" || closeAsked) return;
+    if (!editor.dirty) {
+      void destroyWindow();
+      return;
+    }
     closeAsked = true;
     closeAskOpen.value = true;
   });

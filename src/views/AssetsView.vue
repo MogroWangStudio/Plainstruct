@@ -534,7 +534,7 @@ async function removeFolder(g: { dir: string; label: string; images: TreeNode[] 
     </header>
 
     <!-- 左:图片网格 | 右:详情窗(宽度可拖拽) -->
-    <div ref="splitHost" class="flex min-h-0 flex-1">
+    <div ref="splitHost" class="relative flex min-h-0 flex-1">
     <div
       ref="listHost"
       class="relative min-w-0 flex-1 overflow-y-auto p-5"
@@ -703,21 +703,21 @@ async function removeFolder(g: { dir: string; label: string; images: TreeNode[] 
       />
     </div>
 
-    <!-- 右:详情/批量操作面板:宽度平滑展开,选中时不再挤压抖动 -->
-    <div
-      class="detail-dock shrink-0 overflow-hidden"
-      :style="{ width: selected.length ? detailW + 1 + 'px' : '0px' }"
-      :aria-hidden="!selected.length"
-    >
-      <div class="flex h-full" :style="{ width: detailW + 1 + 'px' }">
-      <div class="divider w-px shrink-0 cursor-col-resize bg-line" @pointerdown="onDividerDown" @pointermove="onDividerMove" @pointerup="onDividerUp" @pointercancel="onDividerUp" @lostpointercapture="onDividerUp" />
+    <!-- 右:详情/批量操作面板:悬浮于列表之上,滑入/滑出只动 transform,
+         列表与网格的布局宽度永不变化 —— 选中零位移 -->
+    <Transition name="detail-slide">
+      <aside v-if="selected.length" class="detail-panel" :style="{ width: detailW + 'px' }">
+        <div
+          class="detail-handle"
+          @pointerdown="onDividerDown"
+          @pointermove="onDividerMove"
+          @pointerup="onDividerUp"
+          @pointercancel="onDividerUp"
+          @lostpointercapture="onDividerUp"
+        />
 
-      <!-- 多选:摘要 + 批量动作 -->
-      <aside
-        v-if="selected.length > 1"
-        class="shrink-0 overflow-y-auto border-l border-line bg-surface px-4 py-4"
-        :style="{ width: detailW + 'px' }"
-      >
+        <!-- 多选:摘要 + 批量动作 -->
+        <div v-if="selected.length > 1" class="detail-body">
         <div class="flex items-center gap-1">
           <span class="min-w-0 flex-1 truncate text-[calc(13.5px*var(--ui-font-scale))] font-semibold">
             {{ t("assets.selectedCount", { n: selected.length }) }}
@@ -753,11 +753,7 @@ async function removeFolder(g: { dir: string; label: string; images: TreeNode[] 
       </aside>
 
       <!-- 单选:预览 + 引用位置 -->
-      <aside
-        v-else-if="selectedNode"
-        class="shrink-0 overflow-y-auto border-l border-line bg-surface px-4 py-4"
-        :style="{ width: detailW + 'px' }"
-      >
+      <div v-else-if="selectedNode" class="detail-body">
         <div class="flex items-center gap-1">
           <span class="min-w-0 flex-1 truncate text-[calc(13.5px*var(--ui-font-scale))] font-semibold" :title="selectedNode.path">{{ selectedNode.name }}</span>
           <button class="btn-icon !h-7 !w-7" :title="t('assets.rename')" @click="rename(selectedNode)">
@@ -801,9 +797,9 @@ async function removeFolder(g: { dir: string; label: string; images: TreeNode[] 
           </li>
         </ul>
         <p v-else class="mt-1 text-[calc(12px*var(--ui-font-scale))] text-ink-3">{{ t("assets.noRefs") }}</p>
-      </aside>
       </div>
-    </div>
+      </aside>
+    </Transition>
 
     </div>
 
@@ -849,9 +845,54 @@ async function removeFolder(g: { dir: string; label: string; images: TreeNode[] 
 </template>
 
 <style scoped>
-/* 详情面板伸展:宽度非线性过渡,展开/收起时网格平滑让位而不是突然跳动 */
-.detail-dock {
-  transition: width 220ms var(--ease-plain);
+/* 详情面板:悬浮层 —— 滑入/滑出只动 transform,不触发任何重排(零位移);
+   拖拽把手调宽只影响面板自身,列表与网格布局不变 */
+.detail-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-left: 1px solid var(--color-line);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-popover);
+}
+.detail-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px;
+}
+/* 左缘拖拽把手:伪元素语义改为真实元素,加宽命中区,视觉仍是面板边线 */
+.detail-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  width: 8px;
+  cursor: col-resize;
+  z-index: 1;
+}
+.detail-slide-enter-active,
+.detail-slide-leave-active {
+  transition: transform 220ms var(--ease-plain);
+}
+.detail-slide-enter-from,
+.detail-slide-leave-to {
+  transform: translateX(105%);
+}
+@media (prefers-reduced-motion: reduce) {
+  .detail-slide-enter-active,
+  .detail-slide-leave-active {
+    transition: none;
+  }
+  .detail-slide-enter-from,
+  .detail-slide-leave-to {
+    transform: none;
+  }
 }
 
 /* 分组标题:同时是拖放目标 —— 悬停拖拽时整行给出明确的落点反馈 */

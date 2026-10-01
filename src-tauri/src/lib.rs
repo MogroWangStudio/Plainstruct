@@ -205,8 +205,17 @@ pub fn run() {
                     api.prevent_close();
                     let _ = window.hide();
                 }
+                // 非 macOS:关窗决策交给前端 —— 有未保存修改时弹确认,
+                // 否则前端调用 destroy 直接关闭。自绘标题栏按钮与任务栏关闭
+                // 都会走到这里,行为一致。
+                #[cfg(not(target_os = "macos"))]
+                if window.label() == "main" {
+                    api.prevent_close();
+                    use tauri::Emitter;
+                    let _ = window.emit(crate::events::CLOSE_REQUESTED, ());
+                }
             }
-            let _ = window; // 非 macOS 下不拦截,保持关窗即销毁的默认行为
+            let _ = window; // 其余事件不处理
         })
         .setup(|app| {
             let state = app.state::<AppState>();
