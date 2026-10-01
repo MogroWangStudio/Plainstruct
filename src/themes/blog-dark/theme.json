@@ -1,7 +1,7 @@
 {
   "id": "blog-dark",
   "name": "素记 · 深色",
-  "version": "3.4.0",
+  "version": "3.4.1",
   "author": "MogroWang Studio",
   "type": "blog",
   "description": "博客·深色:暖炭夜纸,文章为流,日期为记。",
@@ -309,6 +309,21 @@
       ]
     },
     {
+      "key": "cardShadowColor",
+      "label": "卡片阴影颜色",
+      "type": "color",
+      "default": "#000000",
+      "visibleIf": {
+        "key": "cardShadow",
+        "oneOf": [
+          "轻",
+          "中",
+          "深",
+          "自定义"
+        ]
+      }
+    },
+    {
       "key": "cardShadowHover",
       "label": "卡片悬停阴影",
       "type": "select",
@@ -320,6 +335,21 @@
         "深",
         "自定义"
       ]
+    },
+    {
+      "key": "cardShadowHoverColor",
+      "label": "卡片悬停阴影颜色",
+      "type": "color",
+      "default": "#000000",
+      "visibleIf": {
+        "key": "cardShadowHover",
+        "oneOf": [
+          "轻",
+          "中",
+          "深",
+          "自定义"
+        ]
+      }
     },
     {
       "key": "cardShadowX",

@@ -23,10 +23,36 @@ pub struct GithubConfig {
     pub token: String,
     #[serde(default)]
     pub auto_create: bool,
+    /// 账户类型:"user" = 个人账号,"org" = 组织。决定自动创建仓库走哪个接口
+    /// (/user/repos 或 /orgs/{org}/repos)——填组织名却走个人接口会被 GitHub
+    /// 以 403 / 404 拒绝,这正是旧配置最容易踩的坑。旧配置无此字段时按个人处理。
+    #[serde(default = "default_account_type")]
+    pub account_type: String,
 }
 
 fn default_branch() -> String {
     "gh-pages".into()
+}
+
+fn default_account_type() -> String {
+    "user".into()
+}
+
+impl GithubConfig {
+    /// 是否组织账户(空值/未知值一律按个人处理,兼容旧配置)
+    fn is_org(&self) -> bool {
+        self.account_type.eq_ignore_ascii_case("org")
+            || self.account_type.eq_ignore_ascii_case("organization")
+    }
+
+    /// 自动创建仓库的接口:组织仓库必须创建在组织下
+    fn create_repo_url(&self) -> String {
+        if self.is_org() {
+            format!("{API}/orgs/{}/repos", self.owner)
+        } else {
+            format!("{API}/user/repos")
+        }
+    }
 }
 
 #[derive(Serialize)]
@@ -39,8 +65,29 @@ pub struct VerifyResult {
     pub repo_exists: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pages_enabled: Option<bool>,
+    /// 填写的 owner 在 GitHub 上是组织(false = 个人账号);账户类型选错时前端据此提示
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub owner_is_org: Option<bool>,
+    /// 个人账户:填写的用户名是否就是令牌所属账号(个人账户只能在自己的账号下自动建仓)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub owner_matches_user: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
+}
+
+impl VerifyResult {
+    /// 只带失败原因的结果(其余诊断字段留空)
+    fn failed(message: &str) -> Self {
+        VerifyResult {
+            ok: false,
+            user: None,
+            repo_exists: None,
+            pages_enabled: None,
+            owner_is_org: None,
+            owner_matches_user: None,
+            message: Some(message.into()),
+        }
+    }
 }
 
 #[derive(Serialize, Clone)]
@@ -150,6 +197,7 @@ pub async fn github_read_config(window: tauri::WebviewWindow, state: State<'_, A
             branch: default_branch(),
             token: String::new(),
             auto_create: true,
+            account_type: default_account_type(),
         }),
     }
 }
@@ -169,29 +217,61 @@ pub async fn github_verify(window: tauri::WebviewWindow, state: State<'_, AppSta
     ensure_main(&window)?;
     let http = state.http.clone();
     if cfg.token.is_empty() {
-        return Ok(VerifyResult {
-            ok: false,
-            message: Some("invalid-token".into()),
-            user: None,
-            repo_exists: None,
-            pages_enabled: None,
-        });
+        return Ok(VerifyResult::failed("invalid-token"));
+    }
+
+    if cfg.owner.trim().is_empty() {
+        return Ok(VerifyResult::failed("owner-empty"));
     }
 
     let (status, user) = request(&http, reqwest::Method::GET, &format!("{API}/user"), &cfg.token, None).await?;
     if status == 401 || status == 403 {
-        return Ok(VerifyResult {
-            ok: false,
-            message: Some("invalid-token".into()),
-            user: None,
-            repo_exists: None,
-            pages_enabled: None,
-        });
+        return Ok(VerifyResult::failed("invalid-token"));
     }
     if status != 200 {
         return Err(format!("GitHub 返回 {status}"));
     }
     let login = user["login"].as_str().unwrap_or("").to_string();
+
+    // owner 在 GitHub 上是个人还是组织(公开接口,不需要额外权限):
+    // 账户类型选错时(如把组织名填进「个人用户」),发布必然失败,这里提前给出提示
+    let (owner_status, owner_body) = request(
+        &http,
+        reqwest::Method::GET,
+        &format!("{API}/users/{}", cfg.owner),
+        &cfg.token,
+        None,
+    )
+    .await?;
+    let owner_is_org = (owner_status == 200)
+        .then(|| owner_body["type"].as_str().map(|t| t.eq_ignore_ascii_case("organization")))
+        .flatten();
+    // 仅个人账户适用:填写的用户名是否就是令牌所属账号
+    let owner_matches_user = (!cfg.is_org()).then(|| login.eq_ignore_ascii_case(cfg.owner.trim()));
+
+    // 组织仓库:先确认令牌能访问该组织(403 = 未授权该组织,404 = 组织不存在或令牌不可见)。
+    // 这一步把旧版只能靠发布失败发现的 403 提前到「验证连接」阶段
+    if cfg.is_org() {
+        let (org_status, _) = request(
+            &http,
+            reqwest::Method::GET,
+            &format!("{API}/orgs/{}", cfg.owner),
+            &cfg.token,
+            None,
+        )
+        .await?;
+        if org_status != 200 {
+            return Ok(VerifyResult {
+                ok: false,
+                user: Some(login),
+                repo_exists: None,
+                pages_enabled: None,
+                owner_is_org,
+                owner_matches_user,
+                message: Some(if org_status == 403 { "org-forbidden".into() } else { "org-not-found".into() }),
+            });
+        }
+    }
 
     let (repo_status, _) = request(
         &http,
@@ -201,6 +281,18 @@ pub async fn github_verify(window: tauri::WebviewWindow, state: State<'_, AppSta
         None,
     )
     .await?;
+    // 403 = 令牌无权访问该仓库(组织仓库常见),与「仓库不存在」必须区分开
+    if repo_status == 403 {
+        return Ok(VerifyResult {
+            ok: false,
+            user: Some(login),
+            repo_exists: Some(false),
+            pages_enabled: None,
+            owner_is_org,
+            owner_matches_user,
+            message: Some("repo-forbidden".into()),
+        });
+    }
     let repo_exists = repo_status == 200;
 
     let (pages_status, _) = request(
@@ -218,6 +310,8 @@ pub async fn github_verify(window: tauri::WebviewWindow, state: State<'_, AppSta
         user: Some(login),
         repo_exists: Some(repo_exists),
         pages_enabled: Some(pages_enabled),
+        owner_is_org,
+        owner_matches_user,
         message: None,
     })
 }
@@ -345,7 +439,7 @@ pub async fn github_sync(
 
 async fn github_sync_inner(app: &AppHandle, state: &AppState, cfg: GithubConfig) -> Result<SyncResult, String> {
     if cfg.token.is_empty() || cfg.owner.is_empty() || cfg.repo.is_empty() {
-        return Err("请先填写用户名、仓库名与访问令牌".into());
+        return Err("请先填写用户名(或组织名)、仓库名与访问令牌".into());
     }
     let root = state.site_root()?;
     let files = collect_build_files(&root)?;
@@ -366,15 +460,37 @@ async fn github_sync_inner(app: &AppHandle, state: &AppState, cfg: GithubConfig)
     // 2. 确保仓库存在
     emit_log(app, "info", format!("检查仓库 {}/{}…", cfg.owner, cfg.repo));
     let (repo_status, _) = request(&http, reqwest::Method::GET, &repo_api(&cfg, ""), &cfg.token, None).await?;
+    if repo_status == 403 {
+        // 组织仓库的典型失败:令牌未被授权该组织(组织也可能限制了第三方访问)
+        return Err(if cfg.is_org() {
+            format!(
+                "令牌无权访问组织 {}(403)。请确认访问令牌已授权该组织:经典令牌需勾选该组织的 repo 权限,细粒度令牌需选择该组织并授予仓库读写权限。",
+                cfg.owner
+            )
+        } else {
+            format!("令牌无权访问仓库 {}/{}(403),请检查令牌权限。", cfg.owner, cfg.repo)
+        });
+    }
     if repo_status == 404 {
         if !cfg.auto_create {
             return Err(format!("仓库 {}/{} 不存在", cfg.owner, cfg.repo));
         }
-        emit_log(app, "info", "仓库不存在,正在自动创建…");
+        // 建仓接口随账户类型分流:组织仓库必须建在组织下。旧版一律用 /user/repos,
+        // 填组织名时会被 GitHub 拒绝(403 无权创建 / 仓库落到个人账号名下)
+        let org = cfg.is_org();
+        emit_log(
+            app,
+            "info",
+            if org {
+                format!("仓库不存在,正在组织 {} 下自动创建…", cfg.owner)
+            } else {
+                "仓库不存在,正在自动创建…".to_string()
+            },
+        );
         let (create_status, create_body) = request(
             &http,
             reqwest::Method::POST,
-            &format!("{API}/user/repos"),
+            &cfg.create_repo_url(),
             &cfg.token,
             // auto_init:完全空仓库无法通过 Git API 创建首个分支引用(会 409),
             // 让 GitHub 自带初始提交把仓库初始化
@@ -383,9 +499,16 @@ async fn github_sync_inner(app: &AppHandle, state: &AppState, cfg: GithubConfig)
         .await?;
         if create_status != 201 && create_status != 202 {
             let msg = create_body["message"].as_str().unwrap_or("");
-            return Err(format!("创建仓库失败({create_status}): {msg}"));
+            return Err(match (create_status, org) {
+                (403, true) => format!(
+                    "在组织 {} 下创建仓库失败(403): {msg}。请确认令牌已授权该组织,且组织允许成员创建仓库。",
+                    cfg.owner
+                ),
+                (403, false) => format!("创建仓库失败(403): {msg}。令牌需要 repo 权限。"),
+                _ => format!("创建仓库失败({create_status}): {msg}"),
+            });
         }
-        emit_log(app, "info", "仓库已创建");
+        emit_log(app, "info", if org { "组织仓库已创建" } else { "仓库已创建" });
     } else if repo_status != 200 {
         return Err(format!("访问仓库失败({repo_status})"));
     }
@@ -632,11 +755,12 @@ async fn github_sync_inner(app: &AppHandle, state: &AppState, cfg: GithubConfig)
         }
     }
 
-    // 7. 尽力开启 Pages(失败不影响发布结果)
+    // 7. 尽力开启 Pages(失败不影响发布结果,但失败原因写入日志便于定位:
+    //    组织可能禁用了 Pages,或令牌缺少 Pages 权限)
     let (pages_status, _) = request(&http, reqwest::Method::GET, &repo_api(&cfg, "/pages"), &cfg.token, None).await?;
     if pages_status == 404 {
         emit_log(app, "info", "首次发布:正在开启 GitHub Pages…");
-        let _ = request(
+        let (enable_status, enable_body) = request(
             &http,
             reqwest::Method::POST,
             &repo_api(&cfg, "/pages"),
@@ -644,9 +768,29 @@ async fn github_sync_inner(app: &AppHandle, state: &AppState, cfg: GithubConfig)
             Some(json!({ "source": { "branch": cfg.branch, "path": "/" } })),
         )
         .await?;
-        emit_log(app, "info", "GitHub Pages 已开启(指向发布分支)");
-    } else {
+        if enable_status == 201 || enable_status == 202 {
+            emit_log(app, "info", "GitHub Pages 已开启(指向发布分支)");
+        } else if enable_status == 403 {
+            emit_log(
+                app,
+                "error",
+                if cfg.is_org() {
+                    format!(
+                        "开启 GitHub Pages 被拒绝(403):组织 {} 可能禁用了 Pages。请在组织设置中允许 Pages,或手动开启(内容已发布)。",
+                        cfg.owner
+                    )
+                } else {
+                    "开启 GitHub Pages 被拒绝(403):访问令牌缺少 Pages 权限(内容已发布)".to_string()
+                },
+            );
+        } else {
+            let msg = enable_body["message"].as_str().unwrap_or("");
+            emit_log(app, "error", format!("开启 GitHub Pages 失败({enable_status}): {msg}(内容已发布)"));
+        }
+    } else if pages_status == 200 {
         emit_log(app, "info", "GitHub Pages 已开启,跳过");
+    } else {
+        emit_log(app, "info", format!("未能读取 Pages 配置(返回 {pages_status}),跳过自动开启"));
     }
 
     // 8. 记录本次发布的提交,供下次发布前检测云端是否被其他设备更新

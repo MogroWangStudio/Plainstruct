@@ -6,19 +6,69 @@ import { useBuilderStore } from "@/stores/builder";
 import { useAppStore } from "@/stores/app";
 import { fireConfetti } from "@/lib/confetti";
 import AppIcon from "@/components/AppIcon.vue";
+import type { GithubAccountType } from "@/ipc/types";
 
 const { t } = useI18n();
 const publish = usePublishStore();
 const builder = useBuilderStore();
 const app = useAppStore();
 
-// 目标仓库等配置变更后,上一次的验证结果不再可信:清空,直到重新点「验证连接」
+/** 目标仓库等配置变更后,上一次的验证结果不再可信:清空,直到重新点「验证连接」 */
 watch(
-  () => [publish.config.owner, publish.config.repo, publish.config.branch],
+  () => [publish.config.owner, publish.config.repo, publish.config.branch, publish.config.accountType],
   () => {
     publish.verifyResult = null;
   },
 );
+
+/* ---------- 账户类型 ---------- */
+
+const isOrg = computed(() => publish.config.accountType === "org");
+
+/** 切换账户类型:所有者字段的含义随之改变,立即落盘以免切页后丢失 */
+function setAccountType(type: GithubAccountType) {
+  if (publish.config.accountType === type) return;
+  publish.config.accountType = type;
+  void publish.save();
+}
+
+/** 验证结果的主行文案 */
+const verifyText = computed(() => {
+  const r = publish.verifyResult;
+  if (!r) return "";
+  if (!r.ok) {
+    if (r.message === "invalid-token") return t("publish.verifyNoToken");
+    if (r.message === "owner-empty") return t("publish.verifyNoOwner");
+    if (r.message === "org-forbidden") return t("publish.verifyOrgForbidden", { org: publish.config.owner });
+    if (r.message === "org-not-found") return t("publish.verifyOrgNotFound", { org: publish.config.owner });
+    if (r.message === "repo-forbidden") return t("publish.verifyRepoForbidden", { repo: publish.config.repo });
+    return r.message ?? "";
+  }
+  return r.repoExists
+    ? t("publish.verifyOk", { user: r.user ?? "", repo: publish.config.repo })
+    : t("publish.verifyNoRepo", { repo: publish.config.repo });
+});
+
+/**
+ * 配置与 GitHub 实际情况不符时的提醒(不阻断,但发布必然失败):
+ * 账户类型选错是旧版最容易踩的坑 —— 把组织名填进「个人用户」,自动建仓会打到
+ * /user/repos 上被 GitHub 以 403 拒绝。这里在「验证连接」阶段就点明。
+ */
+const verifyHints = computed<string[]>(() => {
+  const r = publish.verifyResult;
+  if (!r) return [];
+  const hints: string[] = [];
+  if (r.ownerIsOrg === true && !isOrg.value) {
+    hints.push(t("publish.hintSwitchToOrg", { owner: publish.config.owner }));
+  }
+  if (r.ownerIsOrg === false && isOrg.value) {
+    hints.push(t("publish.hintSwitchToUser", { owner: publish.config.owner }));
+  }
+  if (!isOrg.value && r.ownerMatchesUser === false) {
+    hints.push(t("publish.hintOwnerMismatch", { user: r.user ?? "", owner: publish.config.owner }));
+  }
+  return hints;
+});
 
 // 发布成功的一刻按设置档位撒一次纸屑(仅 result 从无到有时,回看结果不重播)
 watch(
@@ -72,10 +122,42 @@ function openPages() {
 
       <section class="panel p-6">
         <div class="flex flex-col gap-5">
+          <!-- 账户类型:决定所有者字段填的是什么,也决定自动建仓打到哪个 GitHub 接口 -->
+          <div>
+            <label class="field-label">{{ t("publish.accountType") }}</label>
+            <div class="segmented" role="group" :aria-label="t('publish.accountType')">
+              <span class="segmented-pill" :class="{ right: isOrg }" aria-hidden="true" />
+              <button
+                type="button"
+                class="segmented-item"
+                :class="{ active: !isOrg }"
+                :aria-pressed="!isOrg"
+                @click="setAccountType('user')"
+              >
+                {{ t("publish.accountUser") }}
+              </button>
+              <button
+                type="button"
+                class="segmented-item"
+                :class="{ active: isOrg }"
+                :aria-pressed="isOrg"
+                @click="setAccountType('org')"
+              >
+                {{ t("publish.accountOrg") }}
+              </button>
+            </div>
+            <p class="field-hint">{{ isOrg ? t("publish.accountOrgHint") : t("publish.accountUserHint") }}</p>
+          </div>
+
           <div class="grid grid-cols-2 gap-4">
             <div>
-              <label class="field-label">{{ t("publish.owner") }}</label>
-              <input v-model="publish.config.owner" class="input" type="text" :placeholder="t('publish.ownerPlaceholder')" />
+              <label class="field-label">{{ isOrg ? t("publish.ownerOrg") : t("publish.owner") }}</label>
+              <input
+                v-model="publish.config.owner"
+                class="input"
+                type="text"
+                :placeholder="isOrg ? t('publish.ownerOrgPlaceholder') : t('publish.ownerPlaceholder')"
+              />
             </div>
             <div>
               <label class="field-label">{{ t("publish.repo") }}</label>
@@ -99,21 +181,29 @@ function openPages() {
             {{ t("publish.autoCreate") }}
           </label>
 
-          <div class="flex items-center gap-3">
-            <button class="btn btn-secondary" :disabled="publish.verifying || !publish.config.token" @click="publish.verify()">
-              {{ publish.verifying ? t("publish.verifying") : t("publish.verify") }}
-            </button>
-            <span
-              v-if="publish.verifyResult"
-              class="flex items-center gap-1.5 text-[calc(12.5px*var(--ui-font-scale))]"
-              :class="publish.verifyResult.ok ? 'text-ink-2' : 'text-danger'"
+          <div class="flex flex-col gap-2">
+            <div class="flex items-center gap-3">
+              <button class="btn btn-secondary" :disabled="publish.verifying || !publish.config.token" @click="publish.verify()">
+                {{ publish.verifying ? t("publish.verifying") : t("publish.verify") }}
+              </button>
+              <span
+                v-if="publish.verifyResult"
+                class="flex items-start gap-1.5 text-[calc(12.5px*var(--ui-font-scale))]"
+                :class="publish.verifyResult.ok ? 'text-ink-2' : 'text-danger'"
+              >
+                <AppIcon :name="publish.verifyResult.ok ? 'check' : 'alert'" :size="14" class="mt-0.5 shrink-0" />
+                <span>{{ verifyText }}</span>
+              </span>
+            </div>
+            <!-- 配置与 GitHub 实际情况不符时的提醒(账户类型选错 / 用户名与令牌账号不符) -->
+            <p
+              v-for="(hint, i) in verifyHints"
+              :key="i"
+              class="flex items-start gap-1.5 text-[calc(12.5px*var(--ui-font-scale))] leading-relaxed text-ink-2"
             >
-              <AppIcon :name="publish.verifyResult.ok ? 'check' : 'alert'" :size="14" />
-              <template v-if="publish.verifyResult.ok">
-                {{ publish.verifyResult.repoExists ? t("publish.verifyOk", { user: publish.verifyResult.user ?? "", repo: publish.config.repo }) : t("publish.verifyNoRepo", { repo: publish.config.repo }) }}
-              </template>
-              <template v-else>{{ publish.verifyResult.message === "invalid-token" ? t("publish.verifyNoToken") : publish.verifyResult.message }}</template>
-            </span>
+              <AppIcon name="alert" :size="14" class="mt-0.5 shrink-0 text-ink-3" />
+              <span>{{ hint }}</span>
+            </p>
           </div>
         </div>
       </section>
@@ -221,6 +311,69 @@ function openPages() {
 </template>
 
 <style scoped>
+/* ---------- 账户类型分段控件 ---------- */
+/* 两段等宽的实底选中段:选中态是滑动的药丸,两段同形,一个位移即到达;
+   实底而非描边,在浅色与深色主题下都保持同样的选中对比度 */
+.segmented {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  width: 232px;
+  padding: 2px;
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  background: var(--color-bg);
+}
+.segmented-pill {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 2px;
+  width: calc(50% - 2px);
+  border-radius: 6px;
+  background: var(--color-accent);
+  transition: transform var(--duration-slow) var(--ease-plain);
+}
+.segmented-pill.right {
+  transform: translateX(100%);
+}
+.segmented-item {
+  position: relative;
+  height: 28px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-ink-2);
+  font-size: calc(13px * var(--ui-font-scale));
+  cursor: pointer;
+  transition:
+    color var(--duration-base) var(--ease-plain),
+    transform 100ms ease-out;
+}
+.segmented-item:hover {
+  color: var(--color-ink);
+}
+/* 按下即反馈,不等抬手 */
+.segmented-item:active {
+  transform: scale(0.97);
+}
+.segmented-item.active {
+  color: var(--color-on-accent);
+  font-weight: 500;
+}
+.segmented-item:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .segmented-pill {
+    transition: none;
+  }
+  .segmented-item:active {
+    transform: none;
+  }
+}
+
 /* 发布按钮:居中加宽,发布中带非线性旋转弧 */
 .publish-btn {
   min-width: 240px;

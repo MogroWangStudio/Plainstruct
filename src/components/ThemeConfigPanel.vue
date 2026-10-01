@@ -8,6 +8,7 @@ import { useSiteStore } from "@/stores/site";
 import { useThemeStore } from "@/stores/theme";
 import Modal from "@/components/Modal.vue";
 import SelectMenu from "@/components/SelectMenu.vue";
+import ColorPicker from "@/components/ColorPicker.vue";
 import AppIcon from "@/components/AppIcon.vue";
 
 const { t } = useI18n();
@@ -145,16 +146,13 @@ function confirmPicker() {
       <!-- 开关自带行内标签,不再重复渲染标题 -->
       <label v-if="field.type !== 'boolean'" class="field-label">{{ field.label }}</label>
 
-      <!-- 颜色 -->
-      <div v-if="field.type === 'color'" class="flex items-center gap-2">
-        <input
-          type="color"
-          class="color-input"
-          :value="String(fieldValue(field))"
-          @input="onField(field, ($event.target as HTMLInputElement).value)"
-        />
-        <span class="mono text-[calc(12px*var(--ui-font-scale))] text-ink-2">{{ fieldValue(field) }}</span>
-      </div>
+      <!-- 颜色:自定义取色器(色块 + 十六进制值,面板取色,不用系统原生控件) -->
+      <ColorPicker
+        v-if="field.type === 'color'"
+        :model-value="String(fieldValue(field))"
+        :label="field.label"
+        @update:model-value="(v: string) => onField(field, v)"
+      />
 
       <!-- 数值:拖动滑块;双击数字可直接输入;偏离默认值时出现一键重置 -->
       <div v-else-if="field.type === 'number'" class="flex items-center gap-3">
@@ -298,23 +296,6 @@ function confirmPicker() {
 </template>
 
 <style scoped>
-.color-input {
-  width: 32px;
-  height: 32px;
-  padding: 2px;
-  border: 1px solid var(--color-line);
-  border-radius: 8px;
-  background: var(--color-surface);
-  cursor: pointer;
-}
-.color-input::-webkit-color-swatch-wrapper {
-  padding: 0;
-}
-.color-input::-webkit-color-swatch {
-  border: none;
-  border-radius: 5px;
-}
-
 .navlist-row {
   display: flex;
   align-items: center;

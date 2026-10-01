@@ -162,12 +162,17 @@ export interface CopyItem {
   dest: string; // 相对 build/(构建页面的资源引用根)
 }
 
+/** 发布账户类型:个人账号 / 组织;决定自动创建仓库走哪个 GitHub 接口 */
+export type GithubAccountType = "user" | "org";
+
 export interface GithubConfig {
   owner: string;
   repo: string;
   branch: string;
   token: string;
   autoCreate: boolean;
+  /** 旧配置无此字段时按个人账号处理 */
+  accountType: GithubAccountType;
 }
 
 export interface VerifyResult {
@@ -175,6 +180,10 @@ export interface VerifyResult {
   user?: string;
   repoExists?: boolean;
   pagesEnabled?: boolean;
+  /** 填写的用户名在 GitHub 上是组织(false = 个人账号);账户类型选错时据此提示 */
+  ownerIsOrg?: boolean;
+  /** 仅个人账户给出:填写的用户名是否就是令牌所属账号 */
+  ownerMatchesUser?: boolean;
   message?: string;
 }
 

@@ -626,13 +626,17 @@ async readSiteConfig(): Promise<SiteConfig> {
   },
 
   async githubReadConfig(): Promise<GithubConfig> {
-    return lsGet<GithubConfig>("plainstruct.github", {
+    const stored = lsGet<Partial<GithubConfig>>("plainstruct.github", {});
+    return {
       owner: "",
       repo: "",
       branch: "gh-pages",
       token: "",
       autoCreate: true,
-    });
+      ...stored,
+      // 旧配置无账户类型字段:按个人账号处理(与后端反序列化默认值一致)
+      accountType: stored.accountType === "org" ? "org" : "user",
+    };
   },
 
   async githubSaveConfig(cfg: GithubConfig): Promise<void> {
@@ -644,7 +648,14 @@ async readSiteConfig(): Promise<SiteConfig> {
     if (!cfg.token.startsWith("ghp_") && !cfg.token.startsWith("github_pat_")) {
       return { ok: false, message: "invalid-token" };
     }
-    return { ok: true, user: cfg.owner || "you", repoExists: true, pagesEnabled: true };
+    return {
+      ok: true,
+      user: cfg.owner || "you",
+      repoExists: true,
+      pagesEnabled: true,
+      ownerIsOrg: cfg.accountType === "org",
+      ownerMatchesUser: cfg.accountType === "user",
+    };
   },
 
   async githubPreflight(_cfg: GithubConfig): Promise<PublishPreflight> {

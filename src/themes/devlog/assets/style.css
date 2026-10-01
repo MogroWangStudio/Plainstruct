@@ -1086,19 +1086,42 @@ body[data-hv-card="倾斜"] .blog-entry:hover {
   }
 }
 
-body[data-shadow="轻"] .blog-entry,
+/* 卡片阴影颜色由主题配置注入(--ps-shadow-color / --ps-shadow-hv-color,缺省黑:
+   与 3.4.0 外观一致);预设档位与自定义档位共用同一颜色,只换不透明度 */
+body[data-shadow="轻"] .blog-entry {
+  box-shadow:
+    0 1px 2px color-mix(in srgb, var(--ps-shadow-color, #000) 5%, transparent),
+    0 2px 8px color-mix(in srgb, var(--ps-shadow-color, #000) 5%, transparent);
+}
+
 body[data-shadow-hv="轻"] .blog-entry:hover {
-  box-shadow: 0 1px 2px rgb(0 0 0 / 5%), 0 2px 8px rgb(0 0 0 / 5%);
+  box-shadow:
+    0 1px 2px color-mix(in srgb, var(--ps-shadow-hv-color, #000) 5%, transparent),
+    0 2px 8px color-mix(in srgb, var(--ps-shadow-hv-color, #000) 5%, transparent);
 }
 
-body[data-shadow="中"] .blog-entry,
+body[data-shadow="中"] .blog-entry {
+  box-shadow:
+    0 2px 6px color-mix(in srgb, var(--ps-shadow-color, #000) 7%, transparent),
+    0 8px 22px color-mix(in srgb, var(--ps-shadow-color, #000) 9%, transparent);
+}
+
 body[data-shadow-hv="中"] .blog-entry:hover {
-  box-shadow: 0 2px 6px rgb(0 0 0 / 7%), 0 8px 22px rgb(0 0 0 / 9%);
+  box-shadow:
+    0 2px 6px color-mix(in srgb, var(--ps-shadow-hv-color, #000) 7%, transparent),
+    0 8px 22px color-mix(in srgb, var(--ps-shadow-hv-color, #000) 9%, transparent);
 }
 
-body[data-shadow="深"] .blog-entry,
+body[data-shadow="深"] .blog-entry {
+  box-shadow:
+    0 4px 12px color-mix(in srgb, var(--ps-shadow-color, #000) 13%, transparent),
+    0 14px 36px color-mix(in srgb, var(--ps-shadow-color, #000) 15%, transparent);
+}
+
 body[data-shadow-hv="深"] .blog-entry:hover {
-  box-shadow: 0 4px 12px rgb(0 0 0 / 13%), 0 14px 36px rgb(0 0 0 / 15%);
+  box-shadow:
+    0 4px 12px color-mix(in srgb, var(--ps-shadow-hv-color, #000) 13%, transparent),
+    0 14px 36px color-mix(in srgb, var(--ps-shadow-hv-color, #000) 15%, transparent);
 }
 
 /* 自定义阴影:数值由模板按配置注入 CSS 变量,缺省回退中等强度 */

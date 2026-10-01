@@ -136,7 +136,7 @@ pub fn create_site(
     write_site_config_file(&root, &cfg)?;
 
     // 默认 GitHub 配置
-    let gh = serde_json::json!({ "owner": "", "repo": "", "branch": "gh-pages", "token": "", "autoCreate": true });
+    let gh = serde_json::json!({ "owner": "", "repo": "", "branch": "gh-pages", "token": "", "autoCreate": true, "accountType": "user" });
     std::fs::write(plainstruct_dir(&root).join("github.json"), serde_json::to_string_pretty(&gh).unwrap())
         .map_err(|e| e.to_string())?;
 

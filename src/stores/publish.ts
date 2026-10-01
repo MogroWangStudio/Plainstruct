@@ -39,7 +39,7 @@ function ensureLogListener() {
 
 export const usePublishStore = defineStore("publish", {
   state: (): State => ({
-    config: { owner: "", repo: "", branch: "gh-pages", token: "", autoCreate: true },
+    config: { owner: "", repo: "", branch: "gh-pages", token: "", autoCreate: true, accountType: "user" },
     loaded: false,
     verifying: false,
     verifyResult: null,
@@ -68,7 +68,9 @@ export const usePublishStore = defineStore("publish", {
     },
 
     async load() {
-      this.config = await ipc.githubReadConfig();
+      const cfg = await ipc.githubReadConfig();
+      // 旧配置没有账户类型字段时按个人账号处理(与后端反序列化默认值一致)
+      this.config = { ...cfg, accountType: cfg.accountType === "org" ? "org" : "user" };
       this.loaded = true;
     },
 
