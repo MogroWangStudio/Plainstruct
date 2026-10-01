@@ -107,7 +107,6 @@ pub(crate) fn settings_defaults() -> Value {
         "uiFont": "system",
         "uiFontSize": 1,
         "uiFontWeight": 400,
-        "startAnim": "fade",
         "editorFont": "default",
         "editorWhitespace": true,
         "editorBreakKey": "enter",

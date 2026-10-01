@@ -1,7 +1,7 @@
 {
   "id": "blog-light",
-  "name": "手记 · 浅色",
-  "version": "3.3.0",
+  "name": "素记 · 浅色",
+  "version": "3.4.0",
   "author": "MogroWang Studio",
   "type": "blog",
   "description": "博客·浅色:纸面素栏,文章为流,日期为记。",
@@ -112,6 +112,81 @@
           "圆角矩形"
         ]
       }
+    },
+    {
+      "key": "topbarEase",
+      "label": "顶栏变形曲线",
+      "type": "select",
+      "default": "标准",
+      "options": [
+        "标准",
+        "缓出",
+        "缓入",
+        "线性",
+        "弹性",
+        "自定义"
+      ]
+    },
+    {
+      "key": "topbarEaseCustom",
+      "label": "自定义曲线(cubic-bezier)",
+      "type": "text",
+      "default": "0.23, 1, 0.32, 1",
+      "visibleIf": {
+        "key": "topbarEase",
+        "equals": "自定义"
+      }
+    },
+    {
+      "key": "topbarDuration",
+      "label": "顶栏变形时长(ms)",
+      "type": "number",
+      "default": 220,
+      "min": 0,
+      "max": 800,
+      "step": 20
+    },
+    {
+      "key": "topbarScrollAt",
+      "label": "变形触发滚动量(px)",
+      "type": "number",
+      "default": 24,
+      "min": 0,
+      "max": 400,
+      "step": 4
+    },
+    {
+      "key": "topbarBgColor",
+      "label": "顶栏背景颜色",
+      "type": "color",
+      "default": "#faf9f7"
+    },
+    {
+      "key": "topbarBlur",
+      "label": "顶栏背景模糊(px)",
+      "type": "number",
+      "default": 14,
+      "min": 0,
+      "max": 40,
+      "step": 1
+    },
+    {
+      "key": "topbarFill",
+      "label": "顶栏填充不透明度(%)",
+      "type": "number",
+      "default": 82,
+      "min": 0,
+      "max": 100,
+      "step": 1
+    },
+    {
+      "key": "homeWidth",
+      "label": "主页卡片流宽度(px)",
+      "type": "number",
+      "default": 916,
+      "min": 480,
+      "max": 1400,
+      "step": 20
     },
     {
       "key": "postsPerPage",

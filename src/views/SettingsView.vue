@@ -1,18 +1,14 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import {
   normalizeUiFontSize,
   normalizeUiFontWeight,
-  UI_FONT_SCALE_MAX,
-  UI_FONT_SCALE_MIN,
-  UI_FONT_WEIGHT_MAX,
-  UI_FONT_WEIGHT_MIN,
   useAppStore,
 } from "@/stores/app";
 import { useUiStore } from "@/stores/ui";
 import { ipc } from "@/ipc/ipc";
-import type { ConfettiLevel, EditorBreakKey, EditorFontMode, EditorIndentKey, Locale, StartAnim, UiFontMode } from "@/ipc/types";
+import type { ConfettiLevel, EditorBreakKey, EditorFontMode, EditorIndentKey, Locale, UiFontMode } from "@/ipc/types";
 import { APP_THEMES, type AppThemeSwatch } from "@/lib/app-themes";
 import { formatSize } from "@/lib/format";
 import AppIcon from "@/components/AppIcon.vue";
@@ -119,39 +115,64 @@ const confettiOptions = computed<{ value: ConfettiLevel; label: string }[]>(() =
   { value: "grand", label: t("settings.confettiGrand") },
 ]);
 
-/* ---------- 界面字号/字重滑块:拖动即时预览,松手保存 ---------- */
+/* ---------- 界面字号/字重:预设选择框 + 自定义数值(范围输入) ---------- */
 
-const uiFontSizeValue = computed(() => normalizeUiFontSize(app.settings.uiFontSize));
-const uiFontSizeLabel = computed(() => `${Math.round(uiFontSizeValue.value * 100)}%`);
-const uiFontSizeFill = computed(
-  () => `${((uiFontSizeValue.value - UI_FONT_SCALE_MIN) / (UI_FONT_SCALE_MAX - UI_FONT_SCALE_MIN)) * 100}%`,
-);
+const CUSTOM_SIZE = "__custom__";
+const CUSTOM_WEIGHT = "__custom__";
 
-function onUiFontSizeInput(e: Event) {
-  app.previewAppearance({ uiFontSize: Number((e.target as HTMLInputElement).value) });
-}
-function onUiFontSizeChange(e: Event) {
-  void app.setAppearance({ uiFontSize: Number((e.target as HTMLInputElement).value) });
-}
+const UI_SIZE_PRESETS = [0.85, 0.9, 0.95, 1, 1.05, 1.1, 1.15, 1.2, 1.25, 1.3];
+const UI_WEIGHT_PRESETS = [400, 500, 600];
 
-const uiFontWeightValue = computed(() => normalizeUiFontWeight(app.settings.uiFontWeight));
-const uiFontWeightFill = computed(
-  () => `${((uiFontWeightValue.value - UI_FONT_WEIGHT_MIN) / (UI_FONT_WEIGHT_MAX - UI_FONT_WEIGHT_MIN)) * 100}%`,
-);
-
-function onUiFontWeightInput(e: Event) {
-  app.previewAppearance({ uiFontWeight: Number((e.target as HTMLInputElement).value) });
-}
-function onUiFontWeightChange(e: Event) {
-  void app.setAppearance({ uiFontWeight: Number((e.target as HTMLInputElement).value) });
-}
-
-const startAnimOptions = computed<{ value: StartAnim; label: string }[]>(() => [
-  { value: "fade", label: t("settings.startAnimFade") },
-  { value: "pulse", label: t("settings.startAnimPulse") },
-  { value: "progress", label: t("settings.startAnimProgress") },
-  { value: "off", label: t("settings.startAnimOff") },
+const uiFontSizeOptions = computed(() => [
+  ...UI_SIZE_PRESETS.map((v) => ({ value: String(v), label: `${Math.round(v * 100)}%` })),
+  { value: CUSTOM_SIZE, label: t("settings.fontCustom") },
 ]);
+const uiFontWeightOptions = computed(() => [
+  ...UI_WEIGHT_PRESETS.map((v) => ({ value: String(v), label: t("settings.uiFontWeightN", { n: v }) })),
+  { value: CUSTOM_WEIGHT, label: t("settings.fontCustom") },
+]);
+
+const uiFontSizeModel = computed({
+  get: () => {
+    const v = normalizeUiFontSize(app.settings.uiFontSize);
+    return UI_SIZE_PRESETS.includes(v) ? String(v) : CUSTOM_SIZE;
+  },
+  set: (v: string) => {
+    if (v !== CUSTOM_SIZE) void app.setAppearance({ uiFontSize: Number(v) });
+  },
+});
+const uiFontWeightModel = computed({
+  get: () => {
+    const v = normalizeUiFontWeight(app.settings.uiFontWeight);
+    return UI_WEIGHT_PRESETS.includes(v) ? String(v) : CUSTOM_WEIGHT;
+  },
+  set: (v: string) => {
+    if (v !== CUSTOM_WEIGHT) void app.setAppearance({ uiFontWeight: Number(v) });
+  },
+});
+
+/** 自定义数值的草稿输入:仅在选中「自定义」时显示,回车/失焦提交(越界收敛到允许范围) */
+const sizeCustomText = ref(String(Math.round(normalizeUiFontSize(app.settings.uiFontSize) * 100)));
+const weightCustomText = ref(String(normalizeUiFontWeight(app.settings.uiFontWeight)));
+
+watch(
+  () => [app.settings.uiFontSize, app.settings.uiFontWeight] as const,
+  ([s, w]) => {
+    sizeCustomText.value = String(Math.round(normalizeUiFontSize(s) * 100));
+    weightCustomText.value = String(normalizeUiFontWeight(w));
+  },
+);
+
+function commitSizeCustom() {
+  const n = Number(sizeCustomText.value);
+  if (!Number.isFinite(n)) return;
+  void app.setAppearance({ uiFontSize: Math.min(1.3, Math.max(0.85, n / 100)) });
+}
+function commitWeightCustom() {
+  const n = Number(weightCustomText.value);
+  if (!Number.isFinite(n)) return;
+  void app.setAppearance({ uiFontWeight: Math.min(600, Math.max(400, Math.round(n))) });
+}
 
 const editorFontOptions = computed<{ value: EditorFontMode; label: string }[]>(() => [
   { value: "default", label: t("settings.fontEditorDefault") },
@@ -514,28 +535,20 @@ function openRelease(url: string) {
                     <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.uiFontSize") }}</p>
                     <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.uiFontSizeHint") }}</p>
                   </div>
-                  <div class="flex shrink-0 items-center gap-2.5">
-                    <input
-                      type="range"
-                      class="range-input w-[140px]"
-                      min="0.85"
-                      max="1.3"
-                      step="0.05"
-                      :value="uiFontSizeValue"
-                      :style="{ '--range-fill': uiFontSizeFill }"
-                      @input="onUiFontSizeInput"
-                      @change="onUiFontSizeChange"
-                    />
-                    <span class="mono w-[44px] text-right text-[calc(11px*var(--ui-font-scale))] text-ink-2">{{ uiFontSizeLabel }}</span>
-                    <button
-                      v-if="uiFontSizeValue !== 1"
-                      type="button"
-                      class="btn-icon h-6 w-6 shrink-0"
-                      :title="t('theme.resetValue')"
-                      @click="app.setAppearance({ uiFontSize: 1 })"
-                    >
-                      <AppIcon name="refresh" :size="12" />
-                    </button>
+                  <div class="flex shrink-0 items-center gap-2">
+                    <SelectMenu v-model="uiFontSizeModel" :options="uiFontSizeOptions" align="right" class="shrink-0" />
+                    <template v-if="uiFontSizeModel === CUSTOM_SIZE">
+                      <input
+                        v-model="sizeCustomText"
+                        class="input mono h-8 w-[76px] text-center text-[calc(12px*var(--ui-font-scale))]"
+                        type="text"
+                        inputmode="decimal"
+                        :aria-label="t('settings.uiFontSize')"
+                        @keydown.enter="($event.target as HTMLInputElement).blur()"
+                        @blur="commitSizeCustom"
+                      />
+                      <span class="shrink-0 text-[calc(11px*var(--ui-font-scale))] text-ink-3">%</span>
+                    </template>
                   </div>
                 </div>
 
@@ -545,28 +558,18 @@ function openRelease(url: string) {
                     <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.uiFontWeight") }}</p>
                     <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.uiFontWeightHint") }}</p>
                   </div>
-                  <div class="flex shrink-0 items-center gap-2.5">
+                  <div class="flex shrink-0 items-center gap-2">
+                    <SelectMenu v-model="uiFontWeightModel" :options="uiFontWeightOptions" align="right" class="shrink-0" />
                     <input
-                      type="range"
-                      class="range-input w-[140px]"
-                      min="400"
-                      max="600"
-                      step="100"
-                      :value="uiFontWeightValue"
-                      :style="{ '--range-fill': uiFontWeightFill }"
-                      @input="onUiFontWeightInput"
-                      @change="onUiFontWeightChange"
+                      v-if="uiFontWeightModel === CUSTOM_WEIGHT"
+                      v-model="weightCustomText"
+                      class="input mono h-8 w-[76px] text-center text-[calc(12px*var(--ui-font-scale))]"
+                      type="text"
+                      inputmode="numeric"
+                      :aria-label="t('settings.uiFontWeight')"
+                      @keydown.enter="($event.target as HTMLInputElement).blur()"
+                      @blur="commitWeightCustom"
                     />
-                    <span class="mono w-[44px] text-right text-[calc(11px*var(--ui-font-scale))] text-ink-2">{{ uiFontWeightValue }}</span>
-                    <button
-                      v-if="uiFontWeightValue !== 400"
-                      type="button"
-                      class="btn-icon h-6 w-6 shrink-0"
-                      :title="t('theme.resetValue')"
-                      @click="app.setAppearance({ uiFontWeight: 400 })"
-                    >
-                      <AppIcon name="refresh" :size="12" />
-                    </button>
                   </div>
                 </div>
 
@@ -591,7 +594,7 @@ function openRelease(url: string) {
                 </div>
 
                 <!-- 发布成功彩带 -->
-                <div class="settings-row" style="--i: 5">
+                <div class="settings-row" style="--i: 6">
                   <div class="min-w-0">
                     <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.confetti") }}</p>
                     <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.confettiHint") }}</p>
@@ -602,21 +605,6 @@ function openRelease(url: string) {
                     align="right"
                     class="shrink-0"
                     @update:model-value="app.setConfetti($event as ConfettiLevel)"
-                  />
-                </div>
-
-                <!-- 启动动画(更改自下次启动生效) -->
-                <div class="settings-row" style="--i: 6">
-                  <div class="min-w-0">
-                    <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.startAnim") }}</p>
-                    <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.startAnimHint") }}</p>
-                  </div>
-                  <SelectMenu
-                    :model-value="app.settings.startAnim ?? 'fade'"
-                    :options="startAnimOptions"
-                    align="right"
-                    class="shrink-0"
-                    @update:model-value="app.setAppearance({ startAnim: $event as StartAnim })"
                   />
                 </div>
               </div>

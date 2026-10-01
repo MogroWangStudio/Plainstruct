@@ -8,6 +8,7 @@ import { useUiStore } from "@/stores/ui";
 import { assetRefPrefix } from "@/lib/paths";
 import Modal from "./Modal.vue";
 import AppIcon from "./AppIcon.vue";
+import DateTimePicker from "./DateTimePicker.vue";
 
 export interface FrontMatterForm {
   title: string;
@@ -48,9 +49,10 @@ const coverPrefix = computed(() => {
   return assetRefPrefix(depth);
 });
 
-/** 站点资产(asset,兼容旧 images)里的图,按目标文档位置换算为可直接使用的路径建议 */
+/** 站点资产(asset,兼容旧 images)里的图,按目标文档位置换算为可直接使用的路径建议
+ *  (子文件夹中的图片保留其相对层级) */
 const coverSuggestions = computed(() =>
-  site.assetFiles.map((n) => coverPrefix.value + n.name),
+  site.assetFiles.map((n) => coverPrefix.value + n.path.slice(n.path.indexOf("/") + 1)),
 );
 
 /** 直接选取本地图片导入 asset,作为表单里的封面图 */
@@ -79,7 +81,7 @@ async function importCover() {
       </label>
       <label class="flex flex-col gap-1">
         <span class="field-label">{{ t("editor.fmDate") }}</span>
-        <input v-model="form.date" class="input" type="date" />
+        <DateTimePicker v-model="form.date" />
       </label>
       <label class="flex flex-col gap-1">
         <span class="field-label">{{ t("editor.fmCover") }}</span>

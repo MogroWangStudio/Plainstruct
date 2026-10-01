@@ -316,23 +316,42 @@ async function loadDocs() {
 
 onMounted(loadDocs);
 
+/** 手动刷新:重读文件树(资产分组随树重建)与全部文档内容,
+ *  外部改动或个别情况下自动刷新缺失时,这里都能完整恢复 */
+async function refreshAll() {
+  await site.refreshTree();
+  await loadDocs();
+}
+
 const refCounts = computed(() =>
   countImageRefs(images.value.map((n) => n.path), Object.keys(docs.value), docs.value),
 );
 
-/* ---------- 详情窗宽度可拖拽(右侧面板) ---------- */
+/* ---------- 详情窗宽度可拖拽(右侧面板;拖动中才跟踪,避免误触) ---------- */
 const splitHost = ref<HTMLElement>();
 const detailW = ref(300);
+let detailDragging = false;
 
 function onDividerDown(e: PointerEvent) {
+  if (e.button !== 0) return;
   (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  detailDragging = true;
 }
 
 function onDividerMove(e: PointerEvent) {
-  if (!(e.buttons & 1) || !splitHost.value) return;
+  if (!detailDragging) return;
+  if (!(e.buttons & 1)) {
+    detailDragging = false;
+    return;
+  }
+  if (!splitHost.value) return;
   const rect = splitHost.value.getBoundingClientRect();
   // 界面缩放档位下指针与 rect 均为视觉像素,宽度声明值经 toCssPx 还原
   detailW.value = Math.min(520, Math.max(220, toCssPx(rect.right - e.clientX)));
+}
+
+function onDividerUp() {
+  detailDragging = false;
 }
 
 const selectedRefs = computed<ImageRef[]>(() =>
@@ -474,6 +493,31 @@ function thumbUrl(path: string): string {
   // 浏览器 mock 无 site:// 资源服务:返回空让 <img> 以 alt(文件名)占位
   return app.platform === "browser" ? "" : siteUrl(app.platform, `content/${path}`);
 }
+
+/* ---------- 文件夹移出至回收站(二级确认,联动统计引用) ---------- */
+
+async function removeFolder(g: { dir: string; label: string; images: TreeNode[] }) {
+  // 根资产目录(asset)是站点结构的一部分,不提供移出
+  if (!g.label) return;
+  const refs = g.images.reduce((sum, img) => sum + (refCounts.value.get(img.path) ?? 0), 0);
+  const ok = await ui.confirmDialog({
+    title: t("assets.folderTrashTitle", { name: g.label }),
+    body: refs
+      ? t("assets.folderTrashBodyRefs", { name: g.label, files: g.images.length, refs })
+      : t("assets.folderTrashBody", { name: g.label, files: g.images.length }),
+    danger: true,
+    confirmText: t("assets.folderTrashConfirm"),
+  });
+  if (!ok) return;
+  try {
+    await site.deleteItems([g.dir]);
+    // 选中的文件可能随文件夹一并移出,清理残留选择
+    selected.value = selected.value.filter((p) => !p.startsWith(`${g.dir}/`));
+    ui.toast(t("assets.folderTrashed", { name: g.label }), "success");
+  } catch (e) {
+    ui.toast(t("ui.operationFailed", { msg: ipc.errText(e) }), "error");
+  }
+}
 </script>
 
 <template>
@@ -484,7 +528,7 @@ function thumbUrl(path: string): string {
         <h1 class="text-[calc(15px*var(--ui-font-scale))] font-semibold leading-tight">{{ t("assets.title") }}</h1>
         <p class="truncate text-[calc(12px*var(--ui-font-scale))] text-ink-3">{{ t("assets.subtitle") }}</p>
       </div>
-      <button class="btn-icon ml-auto !h-8 !w-8" :title="t('common.refresh')" @click="loadDocs">
+      <button class="btn-icon ml-auto !h-8 !w-8" :title="t('common.refresh')" @click="refreshAll">
         <AppIcon name="refresh" :size="15" />
       </button>
     </header>
@@ -529,7 +573,7 @@ function thumbUrl(path: string): string {
         <!-- 按文件夹分组:组标题即投放目标(拖图到标题上移动),空文件夹同样列出 -->
         <template v-for="g in site.assetGroups" :key="g.dir">
           <div
-            class="asset-group"
+            class="asset-group group"
             :class="{ 'is-drop': dropTarget === g.dir, 'is-empty': !g.images.length }"
             @dragover="onGroupDragOver(g.dir, $event)"
             @dragleave="onGroupDragLeave(g.dir, $event)"
@@ -538,6 +582,15 @@ function thumbUrl(path: string): string {
             <AppIcon name="folder" :size="13" class="shrink-0" />
             <span class="truncate">{{ g.label || t("assets.folderRootLabel") }}</span>
             <span class="mono shrink-0 text-ink-3">{{ g.images.length }}</span>
+            <!-- 子文件夹可移出至回收站(根资产目录除外);悬停时出现,避免误触 -->
+            <button
+              v-if="g.label"
+              class="btn-icon !h-6 !w-6 shrink-0 opacity-0 transition-opacity hover:!text-danger group-hover:opacity-100"
+              :title="t('assets.folderTrash')"
+              @click.stop="removeFolder(g)"
+            >
+              <AppIcon name="trash" :size="12" />
+            </button>
           </div>
 
           <p v-if="!g.images.length" class="asset-group-empty">{{ t("assets.emptyFolder") }}</p>
@@ -650,9 +703,14 @@ function thumbUrl(path: string): string {
       />
     </div>
 
-    <!-- 右:详情(单选)/ 批量操作(多选) -->
-    <template v-if="selected.length">
-      <div class="divider w-px shrink-0 cursor-col-resize bg-line" @pointerdown="onDividerDown" @pointermove="onDividerMove" />
+    <!-- 右:详情/批量操作面板:宽度平滑展开,选中时不再挤压抖动 -->
+    <div
+      class="detail-dock shrink-0 overflow-hidden"
+      :style="{ width: selected.length ? detailW + 1 + 'px' : '0px' }"
+      :aria-hidden="!selected.length"
+    >
+      <div class="flex h-full" :style="{ width: detailW + 1 + 'px' }">
+      <div class="divider w-px shrink-0 cursor-col-resize bg-line" @pointerdown="onDividerDown" @pointermove="onDividerMove" @pointerup="onDividerUp" @pointercancel="onDividerUp" @lostpointercapture="onDividerUp" />
 
       <!-- 多选:摘要 + 批量动作 -->
       <aside
@@ -744,7 +802,8 @@ function thumbUrl(path: string): string {
         </ul>
         <p v-else class="mt-1 text-[calc(12px*var(--ui-font-scale))] text-ink-3">{{ t("assets.noRefs") }}</p>
       </aside>
-    </template>
+      </div>
+    </div>
 
     </div>
 
@@ -790,6 +849,11 @@ function thumbUrl(path: string): string {
 </template>
 
 <style scoped>
+/* 详情面板伸展:宽度非线性过渡,展开/收起时网格平滑让位而不是突然跳动 */
+.detail-dock {
+  transition: width 220ms var(--ease-plain);
+}
+
 /* 分组标题:同时是拖放目标 —— 悬停拖拽时整行给出明确的落点反馈 */
 .asset-group {
   display: flex;
@@ -805,6 +869,9 @@ function thumbUrl(path: string): string {
     border-color var(--duration-base) var(--ease-plain),
     background-color var(--duration-base) var(--ease-plain),
     color var(--duration-base) var(--ease-plain);
+}
+.asset-group:hover {
+  background: var(--color-surface-2);
 }
 .asset-group.is-empty {
   border-color: var(--color-line);

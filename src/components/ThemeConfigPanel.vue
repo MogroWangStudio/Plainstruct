@@ -3,7 +3,7 @@
 import { computed, nextTick, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import type { ThemeField } from "@/ipc/types";
-import { navMaxOf, topNavItems } from "@/lib/builder";
+import { navMaxOf, topNavItems, type NavPickerItem } from "@/lib/builder";
 import { useSiteStore } from "@/stores/site";
 import { useThemeStore } from "@/stores/theme";
 import Modal from "@/components/Modal.vue";
@@ -61,8 +61,31 @@ function commitEdit(field: ThemeField, e: Event) {
   onField(field, Math.min(field.max ?? 100, Math.max(field.min ?? 0, n)));
 }
 
-/* navlist(博客顶栏导航):可选项与构建同源 -- 内容树顶层的文章/文件夹(按文件树排序) */
-const navOptions = computed(() => topNavItems(site.tree, site.docsCache));
+/* navlist(博客顶栏导航):可选项与构建同源 -- 完整导航树,文件夹默认折叠,点箭头展开 */
+const navOptions = computed<NavPickerItem[]>(() => topNavItems(site.tree, site.docsCache));
+
+/** 已展开的文件夹(未展开的默认折叠) */
+const expandedDirs = ref(new Set<string>());
+
+function toggleDir(key: string) {
+  const next = new Set(expandedDirs.value);
+  if (next.has(key)) next.delete(key);
+  else next.add(key);
+  expandedDirs.value = next;
+}
+
+/** 选择器的平铺展示序列(随展开状态变化),保留层级缩进与折叠箭头信息 */
+const pickerRows = computed(() => {
+  const rows: { opt: NavPickerItem; depth: number; hasChildren: boolean }[] = [];
+  const walk = (opts: NavPickerItem[], depth: number) => {
+    for (const opt of opts) {
+      rows.push({ opt, depth, hasChildren: opt.children.length > 0 });
+      if (opt.children.length && expandedDirs.value.has(opt.key)) walk(opt.children, depth + 1);
+    }
+  };
+  walk(navOptions.value, 0);
+  return rows;
+});
 
 function pickedOf(field: ThemeField): string[] {
   return String(fieldValue(field) ?? "")
@@ -74,13 +97,20 @@ function pickedOf(field: ThemeField): string[] {
 /** 数量上限与构建同源(navMaxItems 配置,缺省 6) */
 const maxNav = computed(() => navMaxOf(theme.configValues));
 
-/** 已选项的显示名(顺序与导航一致;文档已删除的项不再展示) */
+/** 已选项的显示名(含所在文件夹链;文档已删除的项不再展示) */
 function pickedLabels(field: ThemeField): string[] {
-  const byKey = new Map(navOptions.value.map((o) => [o.key, o]));
+  const labels = new Map<string, string>();
+  const walk = (opts: NavPickerItem[], prefix: string) => {
+    for (const o of opts) {
+      const label = prefix ? `${prefix} / ${o.title}` : o.title;
+      labels.set(o.key, label);
+      if (o.children.length) walk(o.children, o.dir ? label : prefix);
+    }
+  };
+  walk(navOptions.value, "");
   return pickedOf(field)
-    .map((key) => byKey.get(key))
-    .filter((o) => o !== undefined)
-    .map((o) => (o.dir ? `${o.title} /` : o.title));
+    .map((key) => labels.get(key))
+    .filter((l) => l !== undefined) as string[];
 }
 
 /* 弹窗选择器:草稿集,点击确认才写入配置 */
@@ -230,21 +260,33 @@ function confirmPicker() {
     <!-- 顶栏导航选择弹窗:勾选数量上限内的项,确认后才写入配置 -->
     <Modal v-if="pickerOpen" :title="t('theme.navPickTitle')" :width="420" @cancel="pickerOpen = false">
       <div class="flex min-h-[420px] flex-col">
-        <label
-          v-for="opt in navOptions"
-          :key="opt.key"
+        <!-- 文件夹默认折叠,点小箭头展开/收起;任意层级的页面均可勾选 -->
+        <div
+          v-for="row in pickerRows"
+          :key="row.opt.key"
           class="navlist-row"
-          :class="{ off: draftFull && !draft.has(opt.key) }"
+          :class="{ off: draftFull && !draft.has(row.opt.key) }"
+          :style="{ paddingLeft: row.depth * 18 + 'px' }"
         >
+          <button
+            v-if="row.hasChildren"
+            type="button"
+            class="navlist-caret"
+            :aria-label="expandedDirs.has(row.opt.key) ? t('theme.navCollapse') : t('theme.navExpand')"
+            @click.stop="toggleDir(row.opt.key)"
+          >
+            <AppIcon :name="expandedDirs.has(row.opt.key) ? 'chevronDown' : 'chevronRight'" :size="12" />
+          </button>
+          <span v-else class="navlist-caret-sp" aria-hidden="true" />
           <input
             type="checkbox"
             class="checkbox-input"
-            :checked="draft.has(opt.key)"
-            :disabled="draftFull && !draft.has(opt.key)"
-            @change="toggleDraft(opt.key, ($event.target as HTMLInputElement).checked)"
+            :checked="draft.has(row.opt.key)"
+            :disabled="draftFull && !draft.has(row.opt.key)"
+            @change="toggleDraft(row.opt.key, ($event.target as HTMLInputElement).checked)"
           />
-          <span class="min-w-0 truncate text-[calc(13px*var(--ui-font-scale))] text-ink-2">{{ opt.title }}{{ opt.dir ? " /" : "" }}</span>
-        </label>
+          <span class="min-w-0 truncate text-[calc(13px*var(--ui-font-scale))] text-ink-2">{{ row.opt.title }}{{ row.opt.dir ? " /" : "" }}</span>
+        </div>
       </div>
       <p v-if="draftFull" class="mt-1 text-[calc(12px*var(--ui-font-scale))] text-ink-3">{{ t("theme.navlistMax", { n: maxNav }) }}</p>
       <template #footer>
@@ -284,5 +326,30 @@ function confirmPicker() {
 .navlist-row.off {
   opacity: 0.4;
   cursor: default;
+}
+/* 文件夹折叠箭头:占位宽度与无子项的缩进占位一致,勾选框始终对齐 */
+.navlist-caret {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-ink-3);
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-plain),
+    color var(--duration-fast) var(--ease-plain);
+}
+.navlist-caret:hover {
+  background: var(--color-surface-2);
+  color: var(--color-ink);
+}
+.navlist-caret-sp {
+  width: 18px;
+  flex-shrink: 0;
 }
 </style>

@@ -1,5 +1,4 @@
 import { defineStore } from "pinia";
-import { ref } from "vue";
 import { ipc } from "@/ipc/ipc";
 import { Events, listen } from "@/ipc/events";
 import type {
@@ -13,7 +12,6 @@ import type {
   Locale,
   Platform,
   RecentSite,
-  StartAnim,
   UiFontMode,
   UpdateProgress,
 } from "@/ipc/types";
@@ -39,26 +37,9 @@ export interface AppearanceSettings {
   uiFontCustom?: string;
   uiFontSize?: number;
   uiFontWeight?: number;
-  startAnim?: StartAnim;
   editorFont?: EditorFontMode;
   editorFontCustom?: string;
 }
-
-/** 启动动画镜像:启动画面在 bootstrap(异步)加载前即需渲染,预设选择时
- *  同步写入 localStorage,应用启动时从此处同步读取;真实配置仍以 app.json 为准 */
-const BOOT_ANIM_KEY = "plainstruct.startAnim";
-
-function readBootAnim(): StartAnim {
-  try {
-    const v = localStorage.getItem(BOOT_ANIM_KEY);
-    return v === "pulse" || v === "progress" || v === "off" ? v : "fade";
-  } catch {
-    return "fade";
-  }
-}
-
-/** 启动动画预设(启动期快照,设置页更改时同步更新镜像) */
-export const bootStartAnim = ref<StartAnim>(readBootAnim());
 
 /** 编辑器写作偏好(空白标记与键位) */
 export interface EditorPrefs {
@@ -151,7 +132,6 @@ export const useAppStore = defineStore("app", {
           uiFont: "system",
           uiFontSize: 1,
           uiFontWeight: 400,
-          startAnim: "fade",
           editorFont: "default",
           editorWhitespace: true,
           editorBreakKey: "enter",
@@ -367,18 +347,10 @@ export const useAppStore = defineStore("app", {
         ...this.bootstrap!,
         settings: { ...this.settings, ...patch },
       };
-      if (patch.startAnim) {
-        bootStartAnim.value = patch.startAnim;
-        try {
-          localStorage.setItem(BOOT_ANIM_KEY, patch.startAnim);
-        } catch {
-          /* 存储不可用时忽略,下次启动回退默认预设 */
-        }
-      }
       this.applyAppearance();
     },
 
-    /** 保存个性化外观并立即应用;启动动画预设同时镜像到 localStorage 供下次启动同步读取 */
+    /** 保存个性化外观并立即应用 */
     async setAppearance(patch: AppearanceSettings) {
       this.previewAppearance(patch);
       await ipc.saveSettings(patch);

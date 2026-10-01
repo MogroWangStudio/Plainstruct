@@ -8,7 +8,7 @@ const app = useAppStore();
 
 const items: { view: AppView; icon: string; label: string }[] = [
   { view: "editor", icon: "doc", label: "nav.editor" },
-  { view: "assets", icon: "image", label: "nav.assets" },
+  { view: "assets", icon: "assets", label: "nav.assets" },
   { view: "site", icon: "sliders", label: "nav.site" },
   { view: "build", icon: "box", label: "nav.build" },
   { view: "theme", icon: "palette", label: "nav.theme" },

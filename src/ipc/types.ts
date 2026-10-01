@@ -9,8 +9,6 @@ export type SiteType = "docs" | "blog";
 export type AppTheme = "light" | "dark" | "sepia" | "mint" | "ocean" | "plum" | "system";
 /** 界面字体模式:系统默认 / 衬线 / 等宽 / 自定义 font-family */
 export type UiFontMode = "system" | "serif" | "mono" | "custom";
-/** 启动动画预设:浮现 / 呼吸 / 进度线 / 关闭 */
-export type StartAnim = "fade" | "pulse" | "progress" | "off";
 /** 编辑器字体模式:默认等宽 / 跟随界面 / 衬线 / 自定义 font-family */
 export type EditorFontMode = "default" | "ui" | "serif" | "custom";
 /** 硬换行触发键 */
@@ -31,8 +29,6 @@ export interface AppSettings {
   uiFontSize?: number;
   /** 界面基础字重(400–600,默认 400);旧版本为档位枚举,读取时归一 */
   uiFontWeight?: number;
-  /** 启动动画预设,默认 fade(浮现) */
-  startAnim?: StartAnim;
   editorFont?: EditorFontMode;
   editorFontCustom?: string;
   /** 空白标记显示:硬换行(¶)与首行缩进(⇥)的可见标记 */

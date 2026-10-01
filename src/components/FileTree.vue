@@ -418,11 +418,17 @@ async function importImages() {
   }
 }
 
-/** 树内右键:命中行弹出该节点的文件操作,空白处弹出根目录操作 */
+/** 树内右键:命中行弹出该节点的文件操作,主页行弹出首页操作,空白处弹出根目录操作 */
 function openTreeMenu(e: MouseEvent) {
   const target = e.target as HTMLElement | null;
+  // 主页是固定入口,不在树行内:单独识别,菜单视作 index.md 节点(含编辑配置头)
+  const homeRow = target?.closest<HTMLElement>(".home-row") ?? null;
   const row = target?.closest<HTMLElement>(".tree-row") ?? null;
-  const node = row?.dataset.path ? findNodeByPath(row.dataset.path) : null;
+  const node = homeRow
+    ? homeNode.value
+    : row?.dataset.path
+      ? findNodeByPath(row.dataset.path)
+      : null;
   const dir = node ? (node.type === "dir" ? node.path : dirname(node.path)) : "";
 
   const items: MenuItem[] = [
@@ -474,7 +480,7 @@ function openTreeMenu(e: MouseEvent) {
         run: () => void onRemove(node),
       },
     );
-    // Markdown 文档可从文件树直接打开配置头表单(图片没有配置头)
+    // Markdown 文档可从文件树直接打开配置头表单(图片没有配置头;主页同样可用)
     if (node.type === "file" && !isImageFile(node.path)) {
       items.splice(2, 0, {
         id: "frontmatter",

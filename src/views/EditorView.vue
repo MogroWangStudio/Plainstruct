@@ -30,6 +30,7 @@ watch(() => editor.activeImage, () => (imageFailed.value = false));
 const editorRef = ref<InstanceType<typeof MarkdownEditor>>();
 const previewRef = ref<InstanceType<typeof DocPreview>>();
 const splitHost = ref<HTMLElement>();
+const hostRef = ref<HTMLElement>();
 const ratio = ref(0.52);
 let syncing = false;
 
@@ -39,30 +40,59 @@ const modes: { value: EditorMode; icon: string; label: string }[] = [
   { value: "preview", icon: "eye", label: "editor.modePreview" },
 ];
 
-/* ---------- 分栏拖动(Pointer Events + capture) ---------- */
+/* ---------- 分栏拖动(Pointer Events + capture;拖动中才跟踪,避免选字划过时误触) ---------- */
+
+let splitDragging = false;
 
 function onDividerDown(e: PointerEvent) {
+  if (e.button !== 0) return;
   (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  splitDragging = true;
 }
 
 function onDividerMove(e: PointerEvent) {
-  if (!(e.buttons & 1) || !splitHost.value) return;
+  if (!splitDragging) return;
+  if (!(e.buttons & 1)) {
+    splitDragging = false;
+    return;
+  }
+  if (!splitHost.value) return;
   const rect = splitHost.value.getBoundingClientRect();
   const next = (e.clientX - rect.left) / rect.width;
   ratio.value = Math.min(0.8, Math.max(0.2, next));
 }
 
-/* ---------- 文件树宽度可拖(右缘分隔线;缩放档位下指针坐标经 toCssPx 还原) ---------- */
+function onDividerUp() {
+  splitDragging = false;
+}
+
+/* ---------- 文件树宽度可拖(右缘分隔线) ---------- */
 
 const treeW = ref(240);
+/** 拖动中标记:只有在本分隔线上按下后才跟踪移动,避免编辑器内拖动选字划过分隔线时误触 */
+let treeDragging = false;
 
 function onTreeDividerDown(e: PointerEvent) {
+  if (e.button !== 0) return;
   (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  treeDragging = true;
 }
 
 function onTreeDividerMove(e: PointerEvent) {
-  if (!(e.buttons & 1)) return;
-  treeW.value = Math.min(360, Math.max(180, toCssPx(e.clientX)));
+  if (!treeDragging || e.pointerId === undefined) return;
+  if (!(e.buttons & 1)) {
+    treeDragging = false;
+    return;
+  }
+  const host = hostRef.value;
+  if (!host) return;
+  // 以工作区主容器左缘(活动栏右侧)为原点,分隔线始终贴合指针,不受活动栏宽度影响
+  const rect = host.getBoundingClientRect();
+  treeW.value = Math.min(360, Math.max(180, toCssPx(e.clientX - rect.left)));
+}
+
+function onTreeDividerUp() {
+  treeDragging = false;
 }
 
 /* ---------- 比例滚动同步(编辑器 -> 预览) ---------- */
@@ -88,7 +118,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="flex h-full min-h-0">
+  <div ref="hostRef" class="flex h-full min-h-0">
     <!-- 文件树侧栏 -->
     <!-- 文件树侧栏:宽度可拖(右缘分隔线,180–360px) -->
     <aside class="shrink-0 bg-surface" :style="{ width: treeW + 'px' }">
@@ -98,6 +128,9 @@ onBeforeUnmount(() => {
       class="relative w-px shrink-0 cursor-col-resize bg-line after:absolute after:-left-1 after:-right-1 after:inset-y-0 after:content-['']"
       @pointerdown="onTreeDividerDown"
       @pointermove="onTreeDividerMove"
+      @pointerup="onTreeDividerUp"
+      @pointercancel="onTreeDividerUp"
+      @lostpointercapture="onTreeDividerUp"
     />
 
     <!-- 主区 -->
@@ -173,6 +206,9 @@ onBeforeUnmount(() => {
             class="divider w-px cursor-col-resize bg-line"
             @pointerdown="onDividerDown"
             @pointermove="onDividerMove"
+            @pointerup="onDividerUp"
+            @pointercancel="onDividerUp"
+            @lostpointercapture="onDividerUp"
           />
 
           <div v-show="editor.mode !== 'edit'" class="min-w-0 flex-1">

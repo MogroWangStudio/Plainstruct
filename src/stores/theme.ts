@@ -134,11 +134,31 @@ export const useThemeStore = defineStore("theme", {
       return bundle;
     },
 
+    /**
+     * 切换主题:仅键名与类型都兼容的配置值随身携带(共有设置不丢),
+     * 其余回落到新主题默认 —— 自定义与内置主题之间切换不再「部分设置被替换」。 */
+    carriedConfig(targetId: string, source: ThemeSource): Record<string, string | number | boolean> {
+      const prev = useSiteStore().config?.theme.config ?? {};
+      const pool = source === "builtin" ? this.builtinMetas : this.customMetas;
+      const meta = pool.find((m) => m.id === targetId);
+      const carried: Record<string, string | number | boolean> = {};
+      for (const f of meta?.config ?? []) {
+        const v = prev[f.key];
+        if (v === undefined) continue;
+        if (f.type === "number" && typeof v === "number") carried[f.key] = v;
+        else if (f.type === "boolean" && typeof v === "boolean") carried[f.key] = v;
+        else if (f.type === "select") {
+          if ((f.options ?? []).includes(String(v))) carried[f.key] = String(v);
+        } else if (typeof v === "string") carried[f.key] = v;
+      }
+      return carried;
+    },
+
     async selectTheme(id: string, source: ThemeSource) {
       const site = useSiteStore();
       this.suggestCopyForBuiltin = false;
       this.copyPromptDismissed = false;
-      await site.saveConfig({ theme: { id, source, config: {} } });
+      await site.saveConfig({ theme: { id, source, config: this.carriedConfig(id, source) } });
       await this.loadAll();
       useBuilderStore().onSiteChanged();
     },

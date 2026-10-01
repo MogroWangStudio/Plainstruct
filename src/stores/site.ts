@@ -44,11 +44,17 @@ export const useSiteStore = defineStore("site", {
       return state.tree.filter((n) => n.type === "dir" && isAssetDirName(n.name));
     },
 
-    /** 资产目录下的全部图片文件(资产栏与资产页同源) */
+    /** 资产目录下的全部图片文件(资产栏与资产页同源;含各层子文件夹中的图片) */
     assetFiles(): TreeNode[] {
-      return this.assetDirs.flatMap((d) =>
-        (d.children ?? []).filter((n) => n.type === "file" && isImageFile(n.name)),
-      );
+      const out: TreeNode[] = [];
+      const walk = (node: TreeNode) => {
+        for (const c of node.children ?? []) {
+          if (c.type === "file" && isImageFile(c.name)) out.push(c);
+          else if (c.type === "dir") walk(c);
+        }
+      };
+      for (const d of this.assetDirs) walk(d);
+      return out;
     },
 
     /** 资产分组:每个资产目录的根层与各子文件夹各成一组(资产页分组展示与移动目标)。

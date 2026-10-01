@@ -107,7 +107,9 @@ async function save() {
       description: form.description.trim() || undefined,
       locale:
         form.locale === CUSTOM_LOCALE ? form.customLocale.trim() || undefined : form.locale,
-      titleFormat: form.titleFormat.trim() || undefined,
+      // 允许显式传空串清除格式(后端收到空串即回退默认连接符);
+      // 传 undefined 会被序列化时省略,导致旧格式一直残留
+      titleFormat: form.titleFormat.trim(),
     });
     ui.toast(t("site.saved"), "success");
   } catch (e) {

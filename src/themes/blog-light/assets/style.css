@@ -1,4 +1,4 @@
-/* 手记 -- 博客浅色:纸面素栏,文章为流,日期为记。层级靠字重与留白,一个强调色点到即止。 */
+/* 素记 -- 博客浅色:纸面素栏,文章为流,日期为记。层级靠字重与留白,一个强调色点到即止。 */
 
 * {
   box-sizing: border-box;
@@ -63,10 +63,12 @@ body.font-custom {
   padding: 0 24px;
   height: var(--ps-topbar-h);
   background: var(--ps-bg);
-  background: color-mix(in srgb, var(--ps-bg) 82%, transparent);
-  -webkit-backdrop-filter: blur(14px) saturate(150%);
-  backdrop-filter: blur(14px) saturate(150%);
-  border-bottom: 1px solid var(--ps-line);
+  background: var(--ps-topbar-fill, color-mix(in srgb, var(--ps-bg) 82%, transparent));
+  -webkit-backdrop-filter: blur(var(--ps-topbar-blur, 14px)) saturate(150%);
+  backdrop-filter: blur(var(--ps-topbar-blur, 14px)) saturate(150%);
+  border: 1px solid transparent;
+  border-bottom-color: var(--ps-line);
+  box-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
 }
 
 @media (prefers-reduced-transparency: reduce) {
@@ -162,6 +164,10 @@ body:not([data-hv-nav="无"]) .blog-nav a:hover {
 /* ---------- 首页:卡片式文章流 ---------- */
 
 .blog-home {
+  width: 100%;
+  max-width: var(--ps-home-w, calc(var(--ps-content-w) + 236px));
+  margin-right: auto;
+  margin-left: auto;
   padding-top: 40px;
 }
 
@@ -1170,15 +1176,23 @@ body[data-loading="进度条"] .ps-loader-spin {
 
 /* ---------- 顶栏滚动形态(顶栏滚动形态:固定不动 / 药丸 / 圆角矩形) ---------- */
 .blog-topbar {
+  --tb-ease: cubic-bezier(0.23, 1, 0.32, 1);
   transition:
-    max-width 220ms cubic-bezier(0.23, 1, 0.32, 1), /* deslop-ignore 26: 顶栏变形过渡的就是宽度本身 */
-    top 220ms cubic-bezier(0.23, 1, 0.32, 1),
-    height 220ms cubic-bezier(0.23, 1, 0.32, 1),
-    border-radius 220ms cubic-bezier(0.23, 1, 0.32, 1),
-    border-color 220ms cubic-bezier(0.23, 1, 0.32, 1),
-    box-shadow 220ms cubic-bezier(0.23, 1, 0.32, 1),
-    background-color 220ms cubic-bezier(0.23, 1, 0.32, 1);
+    max-width var(--ps-topbar-dur, 220ms) var(--tb-ease), /* deslop-ignore 26: 顶栏变形过渡的就是宽度本身 */
+    top var(--ps-topbar-dur, 220ms) var(--tb-ease),
+    height var(--ps-topbar-dur, 220ms) var(--tb-ease),
+    border-radius var(--ps-topbar-dur, 220ms) var(--tb-ease),
+    border-color var(--ps-topbar-dur, 220ms) var(--tb-ease),
+    box-shadow var(--ps-topbar-dur, 220ms) var(--tb-ease),
+    background-color var(--ps-topbar-dur, 220ms) var(--tb-ease);
 }
+/* 变形曲线预设(自定义读 layout 注入的 cubic-bezier 参数) */
+body[data-topbar-ease="标准"] .blog-topbar { --tb-ease: cubic-bezier(0.23, 1, 0.32, 1); }
+body[data-topbar-ease="缓出"] .blog-topbar { --tb-ease: cubic-bezier(0.16, 1, 0.3, 1); }
+body[data-topbar-ease="缓入"] .blog-topbar { --tb-ease: cubic-bezier(0.55, 0.06, 0.68, 0.19); }
+body[data-topbar-ease="线性"] .blog-topbar { --tb-ease: linear; }
+body[data-topbar-ease="弹性"] .blog-topbar { --tb-ease: cubic-bezier(0.34, 1.56, 0.64, 1); }
+body[data-topbar-ease="自定义"] .blog-topbar { --tb-ease: cubic-bezier(var(--ps-topbar-ease-custom, 0.23, 1, 0.32, 1)); }
 /* 药丸:滚动后收成居中浮动胶囊 */
 body[data-topbar-shape="药丸"] .blog-topbar.is-scrolled {
   top: 12px;

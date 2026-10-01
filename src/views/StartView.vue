@@ -34,11 +34,15 @@ async function loadSiteInfos() {
   );
 }
 
-function siteMetaText(path: string): string {
+function siteTypeText(path: string): string {
   const info = siteInfos.value[path];
   if (!info) return "";
-  const type = info.siteType === "blog" ? t("wizard.typeBlog") : t("wizard.typeDocs");
-  return `${type} · ${formatSize(info.sizeBytes) || "0 B"}`;
+  return info.siteType === "blog" ? t("wizard.typeBlog") : t("wizard.typeDocs");
+}
+
+/** 站点类型图标:与新建向导的类型卡片一致(文档站 = doc,博客站 = pencil) */
+function siteTypeIcon(path: string): string {
+  return siteInfos.value[path]?.siteType === "blog" ? "pencil" : "doc";
 }
 
 const showWizard = ref(false);
@@ -96,10 +100,10 @@ async function openRecent(path: string) {
 <template>
   <div class="h-full overflow-y-auto bg-bg">
     <div class="mx-auto flex min-h-full w-full max-w-[480px] flex-col items-center justify-center px-6 py-16">
-      <img :src="app.isDark ? '/logo-full-dark.svg' : '/logo-full.svg'" alt="Plainstruct" class="h-11 select-none" draggable="false" />
-      <p class="mt-6 text-center text-[calc(14px*var(--ui-font-scale))] leading-relaxed text-ink-2">{{ t("app.tagline") }}</p>
+      <img :src="app.isDark ? '/logo-full-dark.svg' : '/logo-full.svg'" alt="Plainstruct" class="float-in h-11 select-none" draggable="false" />
+      <p class="float-in mt-6 text-center text-[calc(14px*var(--ui-font-scale))] leading-relaxed text-ink-2" style="--d: 30ms">{{ t("app.tagline") }}</p>
 
-      <div class="mt-10 flex w-full gap-3">
+      <div class="float-in mt-10 flex w-full gap-3" style="--d: 60ms">
         <button class="btn btn-primary h-10 flex-1" @click="showWizard = true">
           <AppIcon name="plus" :size="16" />
           {{ t("start.createSite") }}
@@ -110,7 +114,7 @@ async function openRecent(path: string) {
         </button>
       </div>
 
-      <div class="mt-12 w-full">
+      <div class="float-in mt-12 w-full" style="--d: 90ms">
         <h2 class="field-label">{{ t("start.recent") }}</h2>
         <div v-if="!app.recentSites.length" class="rounded-lg border border-dashed border-line px-4 py-6 text-center text-[calc(13px*var(--ui-font-scale))] text-ink-3">
           {{ t("start.recentEmpty") }}
@@ -127,7 +131,12 @@ async function openRecent(path: string) {
               <span class="block truncate text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ item.name }}</span>
               <span class="block truncate text-[calc(11.5px*var(--ui-font-scale))] text-ink-3">{{ item.path }}</span>
               <span class="block pt-0.5 text-[calc(10.5px*var(--ui-font-scale))] text-ink-3">
-                <template v-if="siteMetaText(item.path)">{{ siteMetaText(item.path) }}</template>
+                <template v-if="siteTypeText(item.path)">
+                  <span class="inline-flex items-center gap-1">
+                    <AppIcon :name="siteTypeIcon(item.path)" :size="11" class="shrink-0" />
+                    {{ siteTypeText(item.path) }} · {{ formatSize(siteInfos[item.path]?.sizeBytes ?? 0) || "0 B" }}
+                  </span>
+                </template>
                 <span v-else class="inline-block h-2 w-24 rounded bg-surface-3 align-middle"></span>
               </span>
             </span>
@@ -136,12 +145,12 @@ async function openRecent(path: string) {
         </TransitionGroup>
       </div>
 
-      <button class="btn btn-ghost mt-10 h-9 px-4 text-[calc(12.5px*var(--ui-font-scale))] text-ink-3" @click="app.setView('about')">
+      <button class="btn btn-ghost float-in mt-10 h-9 px-4 text-[calc(12.5px*var(--ui-font-scale))] text-ink-3" style="--d: 120ms" @click="app.setView('about')">
         <AppIcon name="info" :size="15" />
         {{ t("nav.about") }}
       </button>
 
-      <button class="btn btn-ghost mt-2 h-9 px-4 text-[calc(12.5px*var(--ui-font-scale))] text-ink-3" @click="app.setView('settings')">
+      <button class="btn btn-ghost float-in mt-2 h-9 px-4 text-[calc(12.5px*var(--ui-font-scale))] text-ink-3" style="--d: 120ms" @click="app.setView('settings')">
         <AppIcon name="settings" :size="15" />
         {{ t("nav.settings") }}
       </button>
@@ -251,6 +260,28 @@ async function openRecent(path: string) {
 </template>
 
 <style scoped>
+/* 启动页元素次第浮入:非线性缓出,延迟 0/30/60/90/120ms + 180ms 动画,
+   完整动画窗口不超过 300ms(reduced-motion 下直接呈现) */
+.float-in {
+  animation: float-in 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--d, 0ms);
+}
+@keyframes float-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .float-in {
+    animation: none;
+  }
+}
+
 .recent-item {
   display: flex;
   align-items: center;

@@ -8,6 +8,7 @@ import { useThemeStore } from "@/stores/theme";
 import { useUiStore } from "@/stores/ui";
 import { assetRefPrefix } from "@/lib/paths";
 import AppIcon from "@/components/AppIcon.vue";
+import DateTimePicker from "@/components/DateTimePicker.vue";
 
 const props = defineProps<{ open: boolean; dir: string }>();
 const emit = defineEmits<{
@@ -32,7 +33,7 @@ watch(
       form.title = "";
       form.description = "";
       const d = new Date();
-      form.date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      form.date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} 00:00:00`;
       form.cover = "";
       void nextTick(() => inputRef.value?.focus());
     }
@@ -46,7 +47,7 @@ function coverPrefix(): string {
 }
 
 const coverSuggestions = computed(() =>
-  site.assetFiles.map((n) => coverPrefix() + n.name),
+  site.assetFiles.map((n) => coverPrefix() + n.path.slice(n.path.indexOf("/") + 1)),
 );
 
 /** 选取本地图片导入 asset,直接作为封面 */
@@ -105,7 +106,7 @@ function submit() {
             <div class="flex gap-3">
               <label class="flex flex-1 flex-col gap-1">
                 <span class="field-label">{{ t("editor.fmDate") }}</span>
-                <input v-model="form.date" class="input" type="date" />
+                <DateTimePicker v-model="form.date" />
               </label>
             </div>
             <label class="flex flex-col gap-1">

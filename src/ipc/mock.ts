@@ -29,7 +29,7 @@ export const DEMO_ROOT = "C:/Sites/Plainstruct 演示站点";
 const files = new Map<string, string>();
 /** 自定义主题 id -> 文件表 */
 const customThemes = new Map<string, Record<string, string>>();
-let settings: AppSettings = { locale: "zh-CN", autosave: true, theme: "system", uiFont: "system", uiFontSize: 1, uiFontWeight: 400, startAnim: "fade", editorFont: "default", editorWhitespace: true, editorBreakKey: "enter", editorIndentKey: "tab", editorIndentWidth: 2 };
+let settings: AppSettings = { locale: "zh-CN", autosave: true, theme: "system", uiFont: "system", uiFontSize: 1, uiFontWeight: 400, editorFont: "default", editorWhitespace: true, editorBreakKey: "enter", editorIndentKey: "tab", editorIndentWidth: 2 };
 let recent: RecentSite[] = [];
 let currentRoot: string | null = null;
 let siteCounter = 0;

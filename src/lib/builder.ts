@@ -237,6 +237,7 @@ export function navMaxOf(config: Record<string, string | number | boolean>): num
 
 /**
  * 博客顶栏导航:navMode 为"自定义"时按选择(htmlPath 按行分隔)保留,顺序仍随内容树;
+ * 可选池为整棵导航树(含文件夹内页面,选择器中展开后可选),不再限于顶层。
  * 选择为空或全部失效时回退为全部,避免导航意外消失。任何模式都受数量上限收敛。
  */
 export function blogTopNav(config: Record<string, string | number | boolean>, raw: RawNav[]): RawNav[] {
@@ -246,20 +247,32 @@ export function blogTopNav(config: Record<string, string | number | boolean>, ra
     .filter(Boolean);
   const chosen =
     String(config.navMode ?? "") === "自定义" && picked.length
-      ? raw.filter((item) => item.htmlPath !== undefined && picked.includes(item.htmlPath))
+      ? flattenNav(raw).filter((item) => item.htmlPath !== undefined && picked.includes(item.htmlPath))
       : raw;
   return chosen.slice(0, navMaxOf(config));
 }
 
-/** 配置面板用:顶层导航项(与构建同源),key 为 htmlPath(blogTopNav 按它匹配) */
-export function topNavItems(
-  tree: TreeNode[],
-  cache: DocsCache,
-): { key: string; title: string; dir: boolean }[] {
+/** 导航选择器条目:与构建同源的导航树(文件夹内页面可在选择器中展开后勾选) */
+export interface NavPickerItem {
+  key: string;
+  title: string;
+  dir: boolean;
+  children: NavPickerItem[];
+}
+
+/** 配置面板用:完整导航树(与构建同源),key 为 htmlPath(blogTopNav 按它匹配) */
+export function topNavItems(tree: TreeNode[], cache: DocsCache): NavPickerItem[] {
   const metas = buildMetas(collectDocPaths(tree), cache);
-  return buildNav(tree, metas)
-    .filter((item) => item.htmlPath !== undefined)
-    .map((item) => ({ key: item.htmlPath!, title: item.title, dir: item.dir === true }));
+  const conv = (items: RawNav[]): NavPickerItem[] =>
+    items
+      .filter((item) => item.htmlPath !== undefined)
+      .map((item) => ({
+        key: item.htmlPath!,
+        title: item.title,
+        dir: item.dir === true,
+        children: conv(item.children),
+      }));
+  return conv(buildNav(tree, metas));
 }
 
 /** 博客首页系列的 extras:当前页文章切片 + 分页信息(url 由 renderOnePage 按页深换算) */
