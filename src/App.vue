@@ -1,12 +1,16 @@
 <script setup lang="ts">
-import { computed, onMounted } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useAppStore } from "@/stores/app";
 import { useSiteStore } from "@/stores/site";
+import { useEditorStore } from "@/stores/editor";
+import { ipc } from "@/ipc/ipc";
+import { useI18n } from "vue-i18n";
 import { installContextMenu } from "@/lib/contextMenu";
 import TitleBar from "@/components/TitleBar.vue";
 import ActivityBar from "@/components/ActivityBar.vue";
 import ContextMenu from "@/components/ContextMenu.vue";
 import FeedbackHost from "@/components/FeedbackHost.vue";
+import Modal from "@/components/Modal.vue";
 import StartView from "@/views/StartView.vue";
 import EditorView from "@/views/EditorView.vue";
 import AssetsView from "@/views/AssetsView.vue";
@@ -19,6 +23,44 @@ import AboutView from "@/views/AboutView.vue";
 
 const app = useAppStore();
 const site = useSiteStore();
+const editor = useEditorStore();
+const { t } = useI18n();
+
+/* ---------- 关窗守卫:有未保存修改时先询问(保存并关闭 / 不保存 / 取消) ----------
+ * 监听 Tauri 的 CloseRequested:自绘标题栏关闭按钮与任务栏关闭都会走到这里。
+ * macOS 不拦截 —— 关窗按惯例只是隐藏窗口(Rust 侧处理),不销毁界面,没有数据丢失 */
+const closeAskOpen = ref(false);
+let closeAsked = false;
+
+async function installCloseGuard() {
+  if (!ipc.inTauri) return;
+  const { getCurrentWindow } = await import("@tauri-apps/api/window");
+  await getCurrentWindow().onCloseRequested((event) => {
+    if (app.platform === "macos" || closeAsked || !editor.dirty) return;
+    event.preventDefault();
+    closeAsked = true;
+    closeAskOpen.value = true;
+  });
+}
+
+async function destroyWindow() {
+  const { getCurrentWindow } = await import("@tauri-apps/api/window");
+  await getCurrentWindow().destroy();
+}
+
+async function closeSaveAndExit() {
+  await editor.save();
+  await destroyWindow();
+}
+
+async function closeDiscard() {
+  await destroyWindow();
+}
+
+function closeCancel() {
+  closeAskOpen.value = false;
+  closeAsked = false;
+}
 
 const viewMap = {
   editor: EditorView,
@@ -34,6 +76,7 @@ const currentView = computed(() => viewMap[app.view as keyof typeof viewMap]);
 
 onMounted(() => {
   void app.init();
+  void installCloseGuard();
   installContextMenu();
 });
 </script>
@@ -76,6 +119,18 @@ onMounted(() => {
 
     <FeedbackHost />
     <ContextMenu />
+
+    <!-- 关窗守卫:有未保存修改时的三选确认 -->
+    <Modal v-if="closeAskOpen" :title="t('editor.closeDirtyTitle')" :width="380" @cancel="closeCancel">
+      <p class="text-[calc(13.5px*var(--ui-font-scale))] leading-relaxed text-ink-2">
+        {{ t("editor.closeDirtyBody", { doc: editor.activePath ?? "" }) }}
+      </p>
+      <template #footer>
+        <button class="btn btn-secondary" @click="closeCancel">{{ t("common.cancel") }}</button>
+        <button class="btn btn-secondary" @click="closeDiscard">{{ t("editor.closeDiscard") }}</button>
+        <button class="btn btn-primary" @click="closeSaveAndExit">{{ t("editor.closeSave") }}</button>
+      </template>
+    </Modal>
   </div>
 </template>
 

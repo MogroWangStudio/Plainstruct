@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { useI18n } from "vue-i18n";
 import { useAppStore, type AppView } from "@/stores/app";
+import { useEditorStore } from "@/stores/editor";
 import AppIcon from "./AppIcon.vue";
 
 const { t } = useI18n();
 const app = useAppStore();
+const editor = useEditorStore();
 
 const items: { view: AppView; icon: string; label: string }[] = [
   { view: "editor", icon: "doc", label: "nav.editor" },
@@ -32,6 +34,26 @@ const items: { view: AppView; icon: string; label: string }[] = [
 
     <button
       class="nav-btn mt-auto"
+      :disabled="!editor.canUndo"
+      :title="t('editor.undo')"
+      :aria-label="t('editor.undo')"
+      @click="editor.doUndo()"
+    >
+      <AppIcon name="undo" :size="18" />
+    </button>
+
+    <button
+      class="nav-btn"
+      :disabled="!editor.canRedo"
+      :title="t('editor.redo')"
+      :aria-label="t('editor.redo')"
+      @click="editor.doRedo()"
+    >
+      <AppIcon name="redo" :size="18" />
+    </button>
+
+    <button
+      class="nav-btn"
       :class="{ active: app.view === 'settings' }"
       :title="t('nav.settings')"
       :aria-label="t('nav.settings')"
@@ -76,6 +98,14 @@ const items: { view: AppView; icon: string; label: string }[] = [
 }
 .nav-btn:active {
   transform: scale(0.94);
+}
+.nav-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.nav-btn:disabled:hover {
+  background: transparent;
+  color: var(--color-ink-3);
 }
 .nav-btn.active {
   background: var(--color-surface-2);

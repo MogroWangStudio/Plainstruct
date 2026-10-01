@@ -1,4 +1,7 @@
 import { defineStore } from "pinia";
+import { shallowRef } from "vue";
+import type { EditorView } from "@codemirror/view";
+import { redo, undo } from "@codemirror/commands";
 import { ipc } from "@/ipc/ipc";
 import type { TreeNode } from "@/ipc/types";
 import { extractHeadings, type Heading } from "@/lib/markdown";
@@ -28,6 +31,9 @@ let autosaveTimer: ReturnType<typeof setTimeout> | null = null;
 let savingPromise: Promise<void> = Promise.resolve();
 /** openDoc 请求序号:快速连续打开文档时只让最后一次请求生效 */
 let openSeq = 0;
+/** 当前文档的 CodeMirror 实例:全局撤销/重做按钮经此驱动编辑器历史。
+ *  用模块级 shallowRef 而非 store state:避免 Pinia 深层响应式代理 CodeMirror 实例 */
+const cmViewRef = shallowRef<EditorView | null>(null);
 
 export const useEditorStore = defineStore("editor", {
   state: (): State => ({
@@ -50,9 +56,36 @@ export const useEditorStore = defineStore("editor", {
       const { data } = parseFrontMatter(state.content);
       return data.title ?? stripExt(state.activePath.split("/").pop() ?? "");
     },
+    /** 全局撤销/重做可用性:有活动的编辑器实例且文档已打开 */
+    canUndo(): boolean {
+      return cmViewRef.value !== null && this.activePath !== null;
+    },
+    canRedo(): boolean {
+      return cmViewRef.value !== null && this.activePath !== null;
+    },
   },
 
   actions: {
+    /** MarkdownEditor 挂载/卸载时登记编辑器实例(全局撤销/重做与文档生命周期同步) */
+    registerView(view: EditorView) {
+      cmViewRef.value = view;
+    },
+    unregisterView(view: EditorView) {
+      if (cmViewRef.value === view) cmViewRef.value = null;
+    },
+
+    /** 全局撤销/重做:作用于当前文档的 CodeMirror 历史;无实例时为空操作 */
+    doUndo() {
+      const view = cmViewRef.value;
+      if (!view) return;
+      if (undo(view)) view.focus();
+    },
+    doRedo() {
+      const view = cmViewRef.value;
+      if (!view) return;
+      if (redo(view)) view.focus();
+    },
+
     reset() {
       if (autosaveTimer) clearTimeout(autosaveTimer);
       autosaveTimer = null;

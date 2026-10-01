@@ -161,6 +161,12 @@ export default {
     fmCoverImport: "Import",
     fmHint: "Saving writes these back to the front-matter at the top of the document; empty fields are omitted, custom fields you wrote by hand are kept as-is.",
     fmTitlePlaceholder: "Document title",
+    undo: "Undo",
+    redo: "Redo",
+    closeDirtyTitle: "Unsaved changes",
+    closeDirtyBody: "“{doc}” has unsaved changes. Save before closing?",
+    closeSave: "Save and close",
+    closeDiscard: "Don't save",
   },
   assets: {
     title: "Assets",

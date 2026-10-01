@@ -172,7 +172,7 @@ onBeforeUnmount(() => {
             </template>
             <template v-else>
               {{ t("editor.unsaved") }}
-              <button class="btn btn-sm btn-secondary" @click="editor.save()">{{ t("editor.saveNow") }}</button>
+              <button class="btn btn-sm btn-secondary save-urge" @click="editor.save()">{{ t("editor.saveNow") }}</button>
             </template>
           </span>
 
@@ -265,5 +265,29 @@ onBeforeUnmount(() => {
 }
 .divider:hover {
   background: var(--color-line-strong);
+}
+
+/* 「立即保存」提醒:蓝色边框呼吸闪烁,把视线从未保存文字引到按钮上
+   (浅/深主题共用一个注意色;减弱动态时保持常亮蓝边不闪烁) */
+.save-urge {
+  border: 1.5px solid var(--color-attention);
+  background: color-mix(in srgb, var(--color-attention) 6%, var(--color-surface));
+  animation: urge-blink 1.2s ease-in-out infinite;
+}
+@keyframes urge-blink {
+  0%,
+  100% {
+    border-color: var(--color-attention);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-attention) 24%, transparent);
+  }
+  50% {
+    border-color: color-mix(in srgb, var(--color-attention) 30%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-attention) 14%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .save-urge {
+    animation: none;
+  }
 }
 </style>

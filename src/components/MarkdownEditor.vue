@@ -787,6 +787,8 @@ onMounted(() => {
   });
   // 注册到右键菜单:编辑器内的右键文本操作直接作用于 CodeMirror 选区
   registerCmView(host.value!, view);
+  // 登记到全局 store:侧边栏的全局撤销/重做按钮经 store 驱动编辑器历史
+  editor.registerView(view);
 });
 
 // 外部写回(新建文档配置头、资产页重命名联动):把 store 的新内容同步进 CodeMirror
@@ -827,6 +829,7 @@ watch(
 
 onBeforeUnmount(() => {
   if (host.value) unregisterCmView(host.value);
+  editor.unregisterView(view!);
   view?.destroy();
   view = null;
 });

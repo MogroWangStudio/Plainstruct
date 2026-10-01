@@ -161,6 +161,12 @@ export default {
     fmCoverImport: "导入图片",
     fmHint: "保存后写回文档开头的配置头;留空的字段不会写入,文档排序等自定义字段会原样保留。",
     fmTitlePlaceholder: "文档标题",
+    undo: "撤销",
+    redo: "重做",
+    closeDirtyTitle: "有未保存的修改",
+    closeDirtyBody: "「{doc}」还有未保存的修改,关闭前要保存吗?",
+    closeSave: "保存并关闭",
+    closeDiscard: "不保存",
   },
   assets: {
     title: "资产",

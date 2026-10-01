@@ -18,6 +18,8 @@
   --color-danger: #b3261e;
   --color-danger-soft: #fbf1f0;
   --color-danger-strong: #99201a;
+  /* 注意色:需要跳出素色层级的一次性提醒(如未保存提示),不参与主题配色 */
+  --color-attention: #3574f0;
 
   --radius-md: 6px;
   --radius-lg: 8px;
