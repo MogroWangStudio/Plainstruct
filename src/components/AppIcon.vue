@@ -31,6 +31,7 @@ const paths: Record<string, string[]> = {
   ],
   filePlus: ["M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z", "M14 3v5h5", "M12 11v6", "M9 14h6"],
   chevronRight: ["M9 6l6 6-6 6"],
+  chevronLeft: ["M15 6l-6 6 6 6"],
   chevronDown: ["M6 9l6 6 6-6"],
   x: ["M6 6l12 12", "M18 6L6 18"],
   search: ["M11 5a6 6 0 1 0 0 12 6 6 0 0 0 0-12z", "M20 20l-4.2-4.2"],

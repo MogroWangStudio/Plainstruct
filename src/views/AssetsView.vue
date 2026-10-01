@@ -331,6 +331,10 @@ const refCounts = computed(() =>
 const splitHost = ref<HTMLElement>();
 const detailW = ref(300);
 let detailDragging = false;
+/** 详情悬浮面板折叠态:折叠后只剩窄轨与展开把手,选择保留 */
+const detailCollapsed = ref(false);
+/** 把手的横向位置:展开时骑在面板左缘,折叠后居中在窄轨上 */
+const tabRight = computed(() => (detailCollapsed.value ? "23px" : `${detailW.value + 1}px`));
 
 function onDividerDown(e: PointerEvent) {
   if (e.button !== 0) return;
@@ -528,9 +532,22 @@ async function removeFolder(g: { dir: string; label: string; images: TreeNode[] 
         <h1 class="text-[calc(15px*var(--ui-font-scale))] font-semibold leading-tight">{{ t("assets.title") }}</h1>
         <p class="truncate text-[calc(12px*var(--ui-font-scale))] text-ink-3">{{ t("assets.subtitle") }}</p>
       </div>
-      <button class="btn-icon ml-auto !h-8 !w-8" :title="t('common.refresh')" @click="refreshAll">
-        <AppIcon name="refresh" :size="15" />
-      </button>
+      <!-- 顶栏右侧:视图切换 / 新建文件夹 / 刷新 -->
+      <div class="ml-auto flex items-center gap-1">
+        <button
+          class="btn-icon !h-8 !w-8"
+          :title="viewMode === 'card' ? t('tree.assetListView') : t('tree.assetCardView')"
+          @click="viewMode = viewMode === 'card' ? 'list' : 'card'"
+        >
+          <AppIcon :name="viewMode === 'card' ? 'listBullet' : 'grid'" :size="15" />
+        </button>
+        <button class="btn-icon !h-8 !w-8" :title="t('assets.newFolder')" @click="newFolder">
+          <AppIcon name="folderPlus" :size="15" />
+        </button>
+        <button class="btn-icon !h-8 !w-8" :title="t('common.refresh')" @click="refreshAll">
+          <AppIcon name="refresh" :size="15" />
+        </button>
+      </div>
     </header>
 
     <!-- 左:图片网格 | 右:详情窗(宽度可拖拽) -->
@@ -543,24 +560,12 @@ async function removeFolder(g: { dir: string; label: string; images: TreeNode[] 
       @pointerup="onHostPointerUp"
       @pointercancel="onHostPointerUp"
     >
-      <!-- 工具行:双视图切换单按钮 + 新建文件夹 -->
-      <div class="flex items-center justify-between">
+      <!-- 工具行:仅剩计数(视图切换与新建文件夹已移到页头顶栏) -->
+      <div class="flex items-center">
         <span class="field-label">
           {{ t("tree.assets") }} · {{ images.length }}
           <span v-if="selected.length" class="ml-2 text-ink-3">{{ t("assets.selectedCount", { n: selected.length }) }}</span>
         </span>
-        <div class="flex items-center gap-1">
-          <button
-            class="btn-icon !h-7 !w-7"
-            :title="viewMode === 'card' ? t('tree.assetListView') : t('tree.assetCardView')"
-            @click="viewMode = viewMode === 'card' ? 'list' : 'card'"
-          >
-            <AppIcon :name="viewMode === 'card' ? 'listBullet' : 'grid'" :size="14" />
-          </button>
-          <button class="btn-icon !h-7 !w-7" :title="t('assets.newFolder')" @click="newFolder">
-            <AppIcon name="folderPlus" :size="14" />
-          </button>
-        </div>
       </div>
 
       <p v-if="!images.length && site.assetGroups.length <= 1" class="mt-3 rounded-lg border border-dashed border-line px-4 py-10 text-center text-[calc(13px*var(--ui-font-scale))] leading-relaxed text-ink-3">
@@ -706,7 +711,12 @@ async function removeFolder(g: { dir: string; label: string; images: TreeNode[] 
     <!-- 右:详情/批量操作面板:悬浮于列表之上,滑入/滑出只动 transform,
          列表与网格的布局宽度永不变化 —— 选中零位移 -->
     <Transition name="detail-slide">
-      <aside v-if="selected.length" class="detail-panel" :style="{ width: detailW + 'px' }">
+      <aside
+        v-if="selected.length"
+        class="detail-panel"
+        :class="{ collapsed: detailCollapsed }"
+        :style="{ width: (detailCollapsed ? 44 : detailW) + 'px' }"
+      >
         <div
           class="detail-handle"
           @pointerdown="onDividerDown"
@@ -715,6 +725,21 @@ async function removeFolder(g: { dir: string; label: string; images: TreeNode[] 
           @pointercancel="onDividerUp"
           @lostpointercapture="onDividerUp"
         />
+
+        <!-- 折叠/展开把手:骑在面板左缘,折叠后横移到窄轨中央成为唯一控件 -->
+        <button
+          class="detail-tab"
+          :style="{ right: tabRight }"
+          :title="detailCollapsed ? t('assets.expandPanel') : t('assets.collapsePanel')"
+          :aria-expanded="!detailCollapsed"
+          @click="detailCollapsed = !detailCollapsed"
+        >
+          <AppIcon :name="detailCollapsed ? 'chevronLeft' : 'chevronRight'" :size="14" />
+        </button>
+
+        <!-- 圆角裁剪层:折叠时内容淡出,宽度过渡期间内容被面板边缘裁掉 -->
+        <div class="detail-clip">
+          <div class="detail-contents" :class="{ hidden: detailCollapsed }">
 
         <!-- 多选:摘要 + 批量动作 -->
         <div v-if="selected.length > 1" class="detail-body">
@@ -797,7 +822,8 @@ async function removeFolder(g: { dir: string; label: string; images: TreeNode[] 
           </li>
         </ul>
         <p v-else class="mt-1 text-[calc(12px*var(--ui-font-scale))] text-ink-3">{{ t("assets.noRefs") }}</p>
-      </div>
+          </div>
+        </div>
       </aside>
     </Transition>
 
@@ -845,20 +871,84 @@ async function removeFolder(g: { dir: string; label: string; images: TreeNode[] 
 </template>
 
 <style scoped>
-/* 详情面板:悬浮层 —— 滑入/滑出只动 transform,不触发任何重排(零位移);
+/* 详情面板:悬浮圆角面板 —— 上/右/下离边缘留白,不与内容区拼接;
+   滑入/滑出只动 transform,折叠/展开过渡宽度(面板脱离文档流,仅自身重绘);
    拖拽把手调宽只影响面板自身,列表与网格布局不变 */
 .detail-panel {
   position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
+  top: 12px;
+  right: 12px;
+  bottom: 12px;
   z-index: 20;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  border-left: 1px solid var(--color-line);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-xl, 10px);
   background: var(--color-surface);
   box-shadow: var(--shadow-popover);
+  transition: width 260ms var(--ease-plain); /* deslop-ignore 26: 折叠/展开过渡的就是宽度本身,面板脱离文档流仅自身重绘 */
+}
+/* 圆角裁剪层:面板本体不裁剪(折叠把手要探出左缘),由它负责圆角内的滚动裁剪 */
+.detail-clip {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: inherit;
+}
+.detail-contents {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  transition:
+    opacity var(--duration-base) var(--ease-plain),
+    visibility var(--duration-base) linear;
+}
+.detail-contents.hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+/* 折叠/展开把手:骑在面板左缘的小竖把手;折叠后横移到窄轨中央。
+   元素脱离文档流且仅自身重绘,位移用 right 过渡即可 */
+.detail-tab {
+  position: absolute;
+  top: 50%;
+  right: 321px; /* 实际值由行内样式给出 */
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 40px;
+  border: 1px solid var(--color-line);
+  border-radius: 6px;
+  background: var(--color-surface);
+  color: var(--color-ink-3);
+  cursor: pointer;
+  transform: translateY(-50%);
+  box-shadow: var(--shadow-popover);
+  transition:
+    right 260ms var(--ease-plain),
+    background-color var(--duration-base) var(--ease-plain),
+    color var(--duration-base) var(--ease-plain),
+    transform 100ms ease-out;
+}
+.detail-tab:hover {
+  background: var(--color-surface-2);
+  color: var(--color-ink);
+}
+.detail-tab:active {
+  transform: translateY(-50%) scale(0.94);
+}
+.detail-tab:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+.detail-panel.collapsed .detail-handle {
+  display: none;
 }
 .detail-body {
   flex: 1;
@@ -878,7 +968,10 @@ async function removeFolder(g: { dir: string; label: string; images: TreeNode[] 
 }
 .detail-slide-enter-active,
 .detail-slide-leave-active {
-  transition: transform 220ms var(--ease-plain);
+  /* deslop-ignore-next-line 26 */
+  transition:
+    transform 240ms var(--ease-plain),
+    width 260ms var(--ease-plain);
 }
 .detail-slide-enter-from,
 .detail-slide-leave-to {
@@ -892,6 +985,15 @@ async function removeFolder(g: { dir: string; label: string; images: TreeNode[] 
   .detail-slide-enter-from,
   .detail-slide-leave-to {
     transform: none;
+  }
+  .detail-panel {
+    transition: none;
+  }
+  .detail-tab {
+    transition: none;
+  }
+  .detail-contents {
+    transition: none;
   }
 }
 

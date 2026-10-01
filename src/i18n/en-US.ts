@@ -206,6 +206,8 @@ export default {
     selectHint: "Drag on empty space to marquee-select, or Ctrl / ⌘ click and Shift click; drag images onto a folder title to move them.",
     selectedCount: "{n} selected",
     clearSelection: "Clear selection",
+    collapsePanel: "Collapse details",
+    expandPanel: "Expand details",
     totalSize: "{size} total",
     moveSelected: "Move to folder…",
     deleteSelected: "Delete selected",

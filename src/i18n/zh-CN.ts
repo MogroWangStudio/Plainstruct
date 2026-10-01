@@ -206,6 +206,8 @@ export default {
     selectHint: "在空白处拖动框选,或按住 Ctrl / ⌘ 点选、Shift 连选;把图片拖到文件夹标题上即可移动。",
     selectedCount: "已选 {n} 项",
     clearSelection: "取消选择",
+    collapsePanel: "收起详情",
+    expandPanel: "展开详情",
     totalSize: "合计 {size}",
     moveSelected: "移动到文件夹…",
     deleteSelected: "删除所选",
