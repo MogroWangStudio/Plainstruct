@@ -822,7 +822,8 @@ async function removeFolder(g: { dir: string; label: string; images: TreeNode[] 
           </li>
         </ul>
         <p v-else class="mt-1 text-[calc(12px*var(--ui-font-scale))] text-ink-3">{{ t("assets.noRefs") }}</p>
-          </div>
+        </div>
+        </div>
         </div>
       </aside>
     </Transition>
