@@ -58,7 +58,7 @@ body.font-custom {
   display: flex;
   align-items: center;
   gap: 24px;
-  max-width: var(--ps-topbar-w, 916px);
+  max-width: var(--ps-topbar-w, 75%);
   margin: 0 auto;
   padding: 0 24px;
   height: var(--ps-topbar-h);
@@ -95,6 +95,24 @@ body.font-custom {
 .blog-site-name::before {
   content: "❯ ";
   color: var(--ps-accent);
+}
+
+/* ---------- 顶栏当前页标题(主题配置开启后显示;首页与站点名重复,不显示) ---------- */
+
+.blog-topbar-page {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-align: right;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 13px;
+  color: var(--ps-ink-2);
+}
+
+/* 标题在场时导航收为内容宽度,标题贴着导航右对齐 */
+.blog-topbar-page ~ .blog-nav {
+  flex: 0 1 auto;
 }
 
 .blog-logo {
@@ -181,7 +199,7 @@ body:not([data-hv-nav="无"]) .blog-nav a:hover {
 
 .blog-home {
   width: 100%;
-  max-width: var(--ps-home-w, calc(var(--ps-content-w) + 236px));
+  max-width: var(--ps-home-w, 75%);
   margin-right: auto;
   margin-left: auto;
   padding-top: 36px;
@@ -863,6 +881,10 @@ a.blog-page-step:active {
     display: none;
   }
 
+  .blog-topbar-page {
+    display: none;
+  }
+
   .blog-main {
     padding: 0 16px 48px;
   }
@@ -1264,8 +1286,8 @@ body[data-loading="进度条"] .ps-loader-spin {
 /* ---------- 品牌配置:logo 尺寸按百分比缩放(基准为各主题原尺寸),圆角可调 ---------- */
 
 .blog-logo {
-  width: calc(22px * var(--ps-logo-w, 100) / 100);
-  height: calc(22px * var(--ps-logo-h, 100) / 100);
+  width: var(--ps-logo-w, 22px);
+  height: var(--ps-logo-h, 22px);
   border-radius: var(--ps-logo-r, 4px);
 }
 
@@ -1309,16 +1331,6 @@ body[data-topbar-shape="圆角矩形"] .blog-topbar.is-scrolled {
     transition: none;
   }
 }
-/* ---------- 封面图宽度(封面图宽度%:100 保持满宽出血,收窄则居中留白) ---------- */
-
-body:not([data-cover-w="100"]) .blog-entry-cover,
-body:not([data-cover-w="100"]) .blog-entry-cover-empty {
-  width: calc(var(--ps-cover-w, 100) * 1%);
-  margin-right: auto;
-  margin-left: auto;
-  border-radius: 8px;
-}
-
 /* ---------- 顶栏变形后宽度(药丸 / 圆角矩形浮起时收窄到指定宽度) ---------- */
 
 body[data-topbar-shape="药丸"] .blog-topbar.is-scrolled,

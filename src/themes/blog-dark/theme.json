@@ -14,7 +14,8 @@
       "options": [
         "全部",
         "自定义"
-      ]
+      ],
+      "category": "顶栏与导航"
     },
     {
       "key": "navPicked",
@@ -24,7 +25,8 @@
       "visibleIf": {
         "key": "navMode",
         "equals": "自定义"
-      }
+      },
+      "category": "顶栏与导航"
     },
     {
       "key": "navMaxItems",
@@ -33,58 +35,25 @@
       "default": 6,
       "min": 1,
       "max": 12,
-      "step": 1
+      "step": 1,
+      "category": "顶栏与导航"
     },
     {
-      "key": "accentColor",
-      "label": "强调色",
-      "type": "color",
-      "default": "#8ea8cc"
+      "key": "topbarPageTitle",
+      "label": "顶栏显示当前页面标题",
+      "type": "boolean",
+      "default": false,
+      "category": "顶栏与导航"
     },
     {
-      "key": "contentWidth",
-      "label": "正文宽度(px)",
+      "key": "topbarWidthPct",
+      "label": "顶栏宽度(%)",
       "type": "number",
-      "default": 680,
-      "min": 560,
-      "max": 860,
-      "step": 20
-    },
-    {
-      "key": "navColumns",
-      "label": "文章卡片并排(个)",
-      "type": "number",
-      "default": 1,
-      "min": 1,
-      "max": 4,
-      "step": 1
-    },
-    {
-      "key": "coverHeight",
-      "label": "封面图高度(px)",
-      "type": "number",
-      "default": 220,
-      "min": 120,
-      "max": 420,
-      "step": 20
-    },
-    {
-      "key": "coverWidth",
-      "label": "封面图宽度(%)",
-      "type": "number",
-      "default": 100,
-      "min": 40,
+      "default": 75,
+      "min": 50,
       "max": 100,
-      "step": 5
-    },
-    {
-      "key": "topbarWidth",
-      "label": "顶栏宽度(px)",
-      "type": "number",
-      "default": 920,
-      "min": 600,
-      "max": 1600,
-      "step": 20
+      "step": 5,
+      "category": "顶栏与导航"
     },
     {
       "key": "topbarShape",
@@ -95,7 +64,8 @@
         "固定不动",
         "药丸",
         "圆角矩形"
-      ]
+      ],
+      "category": "顶栏与导航"
     },
     {
       "key": "topbarShapeWidth",
@@ -111,7 +81,8 @@
           "药丸",
           "圆角矩形"
         ]
-      }
+      },
+      "category": "顶栏与导航"
     },
     {
       "key": "topbarEase",
@@ -125,7 +96,8 @@
         "线性",
         "弹性",
         "自定义"
-      ]
+      ],
+      "category": "顶栏与导航"
     },
     {
       "key": "topbarEaseCustom",
@@ -135,7 +107,8 @@
       "visibleIf": {
         "key": "topbarEase",
         "equals": "自定义"
-      }
+      },
+      "category": "顶栏与导航"
     },
     {
       "key": "topbarDuration",
@@ -144,7 +117,8 @@
       "default": 220,
       "min": 0,
       "max": 800,
-      "step": 20
+      "step": 20,
+      "category": "顶栏与导航"
     },
     {
       "key": "topbarScrollAt",
@@ -153,13 +127,15 @@
       "default": 24,
       "min": 0,
       "max": 400,
-      "step": 4
+      "step": 4,
+      "category": "顶栏与导航"
     },
     {
       "key": "topbarBgColor",
       "label": "顶栏背景颜色",
       "type": "color",
-      "default": "#16181d"
+      "default": "#16181d",
+      "category": "顶栏与导航"
     },
     {
       "key": "topbarBlur",
@@ -168,7 +144,8 @@
       "default": 14,
       "min": 0,
       "max": 40,
-      "step": 1
+      "step": 1,
+      "category": "顶栏与导航"
     },
     {
       "key": "topbarFill",
@@ -177,110 +154,8 @@
       "default": 82,
       "min": 0,
       "max": 100,
-      "step": 1
-    },
-    {
-      "key": "homeWidth",
-      "label": "主页卡片流宽度(px)",
-      "type": "number",
-      "default": 916,
-      "min": 480,
-      "max": 1400,
-      "step": 20
-    },
-    {
-      "key": "postsPerPage",
-      "label": "每页文章数",
-      "type": "number",
-      "default": 10,
-      "min": 3,
-      "max": 30,
-      "step": 1
-    },
-    {
-      "key": "bodyFont",
-      "label": "正文字体",
-      "type": "select",
-      "default": "system",
-      "options": [
-        "system",
-        "serif",
-        "mono",
-        "custom"
-      ]
-    },
-    {
-      "key": "customFont",
-      "label": "自定义字体(font-family)",
-      "type": "text",
-      "default": "",
-      "visibleIf": {
-        "key": "bodyFont",
-        "equals": "custom"
-      }
-    },
-    {
-      "key": "showLogo",
-      "label": "显示 Logo",
-      "type": "boolean",
-      "default": true
-    },
-    {
-      "key": "showTitle",
-      "label": "显示站点标题",
-      "type": "boolean",
-      "default": true
-    },
-    {
-      "key": "logoWidth",
-      "label": "Logo 宽度(%)",
-      "type": "number",
-      "default": 100,
-      "min": 50,
-      "max": 300,
-      "step": 5
-    },
-    {
-      "key": "logoHeight",
-      "label": "Logo 高度(%)",
-      "type": "number",
-      "default": 100,
-      "min": 50,
-      "max": 300,
-      "step": 5
-    },
-    {
-      "key": "logoRadius",
-      "label": "Logo 圆角(px)",
-      "type": "number",
-      "default": 6,
-      "min": 0,
-      "max": 26,
-      "step": 1
-    },
-    {
-      "key": "logoHover",
-      "label": "Logo 悬停反馈",
-      "type": "select",
-      "default": "无",
-      "options": [
-        "无",
-        "淡化",
-        "放大",
-        "强调色"
-      ]
-    },
-    {
-      "key": "titleHover",
-      "label": "标题悬停反馈",
-      "type": "select",
-      "default": "无",
-      "options": [
-        "无",
-        "淡化",
-        "强调色",
-        "下划线"
-      ]
+      "step": 1,
+      "category": "顶栏与导航"
     },
     {
       "key": "navHover",
@@ -293,7 +168,128 @@
         "强调色",
         "下划线",
         "底色"
-      ]
+      ],
+      "category": "顶栏与导航"
+    },
+    {
+      "key": "showLogo",
+      "label": "显示 Logo",
+      "type": "boolean",
+      "default": true,
+      "category": "品牌与标识"
+    },
+    {
+      "key": "showTitle",
+      "label": "显示站点标题",
+      "type": "boolean",
+      "default": true,
+      "category": "品牌与标识"
+    },
+    {
+      "key": "logoWidthPx",
+      "label": "Logo 宽度(px)",
+      "type": "number",
+      "default": 26,
+      "min": 16,
+      "max": 128,
+      "step": 2,
+      "category": "品牌与标识"
+    },
+    {
+      "key": "logoHeightPx",
+      "label": "Logo 高度(px)",
+      "type": "number",
+      "default": 26,
+      "min": 16,
+      "max": 128,
+      "step": 2,
+      "category": "品牌与标识"
+    },
+    {
+      "key": "logoRadius",
+      "label": "Logo 圆角(px)",
+      "type": "number",
+      "default": 6,
+      "min": 0,
+      "max": 26,
+      "step": 1,
+      "category": "品牌与标识"
+    },
+    {
+      "key": "logoHover",
+      "label": "Logo 悬停反馈",
+      "type": "select",
+      "default": "无",
+      "options": [
+        "无",
+        "淡化",
+        "放大",
+        "强调色"
+      ],
+      "category": "品牌与标识"
+    },
+    {
+      "key": "titleHover",
+      "label": "标题悬停反馈",
+      "type": "select",
+      "default": "无",
+      "options": [
+        "无",
+        "淡化",
+        "强调色",
+        "下划线"
+      ],
+      "category": "品牌与标识"
+    },
+    {
+      "key": "contentWidth",
+      "label": "正文宽度(px)",
+      "type": "number",
+      "default": 680,
+      "min": 560,
+      "max": 860,
+      "step": 20,
+      "category": "布局"
+    },
+    {
+      "key": "navColumns",
+      "label": "文章卡片并排(个)",
+      "type": "number",
+      "default": 1,
+      "min": 1,
+      "max": 4,
+      "step": 1,
+      "category": "布局"
+    },
+    {
+      "key": "coverHeight",
+      "label": "封面图高度(px)",
+      "type": "number",
+      "default": 220,
+      "min": 120,
+      "max": 420,
+      "step": 20,
+      "category": "布局"
+    },
+    {
+      "key": "homeWidthPct",
+      "label": "主页卡片流宽度(%)",
+      "type": "number",
+      "default": 75,
+      "min": 50,
+      "max": 100,
+      "step": 5,
+      "category": "布局"
+    },
+    {
+      "key": "postsPerPage",
+      "label": "每页文章数",
+      "type": "number",
+      "default": 10,
+      "min": 3,
+      "max": 30,
+      "step": 1,
+      "category": "布局"
     },
     {
       "key": "cardShadow",
@@ -306,7 +302,8 @@
         "中",
         "深",
         "自定义"
-      ]
+      ],
+      "category": "卡片外观"
     },
     {
       "key": "cardShadowColor",
@@ -321,7 +318,78 @@
           "深",
           "自定义"
         ]
-      }
+      },
+      "category": "卡片外观"
+    },
+    {
+      "key": "cardShadowX",
+      "label": "阴影 X 偏移(px)",
+      "type": "number",
+      "default": 0,
+      "min": -24,
+      "max": 24,
+      "step": 1,
+      "visibleIf": {
+        "key": "cardShadow",
+        "equals": "自定义"
+      },
+      "category": "卡片外观"
+    },
+    {
+      "key": "cardShadowY",
+      "label": "阴影 Y 偏移(px)",
+      "type": "number",
+      "default": 2,
+      "min": -24,
+      "max": 24,
+      "step": 1,
+      "visibleIf": {
+        "key": "cardShadow",
+        "equals": "自定义"
+      },
+      "category": "卡片外观"
+    },
+    {
+      "key": "cardShadowBlur",
+      "label": "阴影模糊(px)",
+      "type": "number",
+      "default": 8,
+      "min": 0,
+      "max": 60,
+      "step": 1,
+      "visibleIf": {
+        "key": "cardShadow",
+        "equals": "自定义"
+      },
+      "category": "卡片外观"
+    },
+    {
+      "key": "cardShadowSpread",
+      "label": "阴影扩散(px)",
+      "type": "number",
+      "default": 0,
+      "min": -20,
+      "max": 20,
+      "step": 1,
+      "visibleIf": {
+        "key": "cardShadow",
+        "equals": "自定义"
+      },
+      "category": "卡片外观"
+    },
+    {
+      "key": "cardShadowOpacity",
+      "label": "阴影不透明度(%)",
+      "type": "number",
+      "default": 9,
+      "min": 0,
+      "max": 50,
+      "step": 1,
+      "visibleIf": {
+        "key": "cardShadow",
+        "equals": "自定义"
+      },
+      "category": "卡片外观"
     },
     {
       "key": "cardShadowHover",
@@ -334,7 +402,8 @@
         "中",
         "深",
         "自定义"
-      ]
+      ],
+      "category": "卡片外观"
     },
     {
       "key": "cardShadowHoverColor",
@@ -349,72 +418,8 @@
           "深",
           "自定义"
         ]
-      }
-    },
-    {
-      "key": "cardShadowX",
-      "label": "阴影 X 偏移(px)",
-      "type": "number",
-      "default": 0,
-      "min": -24,
-      "max": 24,
-      "step": 1,
-      "visibleIf": {
-        "key": "cardShadow",
-        "equals": "自定义"
-      }
-    },
-    {
-      "key": "cardShadowY",
-      "label": "阴影 Y 偏移(px)",
-      "type": "number",
-      "default": 2,
-      "min": -24,
-      "max": 24,
-      "step": 1,
-      "visibleIf": {
-        "key": "cardShadow",
-        "equals": "自定义"
-      }
-    },
-    {
-      "key": "cardShadowBlur",
-      "label": "阴影模糊(px)",
-      "type": "number",
-      "default": 8,
-      "min": 0,
-      "max": 60,
-      "step": 1,
-      "visibleIf": {
-        "key": "cardShadow",
-        "equals": "自定义"
-      }
-    },
-    {
-      "key": "cardShadowSpread",
-      "label": "阴影扩散(px)",
-      "type": "number",
-      "default": 0,
-      "min": -20,
-      "max": 20,
-      "step": 1,
-      "visibleIf": {
-        "key": "cardShadow",
-        "equals": "自定义"
-      }
-    },
-    {
-      "key": "cardShadowOpacity",
-      "label": "阴影不透明度(%)",
-      "type": "number",
-      "default": 9,
-      "min": 0,
-      "max": 50,
-      "step": 1,
-      "visibleIf": {
-        "key": "cardShadow",
-        "equals": "自定义"
-      }
+      },
+      "category": "卡片外观"
     },
     {
       "key": "cardShadowHoverX",
@@ -427,7 +432,8 @@
       "visibleIf": {
         "key": "cardShadowHover",
         "equals": "自定义"
-      }
+      },
+      "category": "卡片外观"
     },
     {
       "key": "cardShadowHoverY",
@@ -440,7 +446,8 @@
       "visibleIf": {
         "key": "cardShadowHover",
         "equals": "自定义"
-      }
+      },
+      "category": "卡片外观"
     },
     {
       "key": "cardShadowHoverBlur",
@@ -453,7 +460,8 @@
       "visibleIf": {
         "key": "cardShadowHover",
         "equals": "自定义"
-      }
+      },
+      "category": "卡片外观"
     },
     {
       "key": "cardShadowHoverSpread",
@@ -466,7 +474,8 @@
       "visibleIf": {
         "key": "cardShadowHover",
         "equals": "自定义"
-      }
+      },
+      "category": "卡片外观"
     },
     {
       "key": "cardShadowHoverOpacity",
@@ -479,7 +488,8 @@
       "visibleIf": {
         "key": "cardShadowHover",
         "equals": "自定义"
-      }
+      },
+      "category": "卡片外观"
     },
     {
       "key": "cardHover",
@@ -494,7 +504,8 @@
         "缩小",
         "淡化",
         "倾斜"
-      ]
+      ],
+      "category": "卡片外观"
     },
     {
       "key": "cardHoverEase",
@@ -508,7 +519,8 @@
         "线性",
         "弹性",
         "自定义"
-      ]
+      ],
+      "category": "卡片外观"
     },
     {
       "key": "cardHoverEaseCustom",
@@ -518,7 +530,8 @@
       "visibleIf": {
         "key": "cardHoverEase",
         "equals": "自定义"
-      }
+      },
+      "category": "卡片外观"
     },
     {
       "key": "cardHoverDuration",
@@ -527,25 +540,46 @@
       "default": 240,
       "min": 80,
       "max": 800,
-      "step": 20
+      "step": 20,
+      "category": "卡片外观"
     },
     {
-      "key": "loadingAnim",
-      "label": "页面加载动画",
+      "key": "accentColor",
+      "label": "强调色",
+      "type": "color",
+      "default": "#8ea8cc",
+      "category": "颜色与字体"
+    },
+    {
+      "key": "bodyFont",
+      "label": "正文字体",
       "type": "select",
-      "default": "关闭",
+      "default": "system",
       "options": [
-        "关闭",
-        "转圈",
-        "点点",
-        "进度条"
-      ]
+        "system",
+        "serif",
+        "mono",
+        "custom"
+      ],
+      "category": "颜色与字体"
+    },
+    {
+      "key": "customFont",
+      "label": "自定义字体(font-family)",
+      "type": "text",
+      "default": "",
+      "visibleIf": {
+        "key": "bodyFont",
+        "equals": "custom"
+      },
+      "category": "颜色与字体"
     },
     {
       "key": "tocEnabled",
       "label": "启用文章目录",
       "type": "boolean",
-      "default": true
+      "default": true,
+      "category": "目录与动效"
     },
     {
       "key": "tocStyle",
@@ -560,7 +594,8 @@
       "visibleIf": {
         "key": "tocEnabled",
         "equals": true
-      }
+      },
+      "category": "目录与动效"
     },
     {
       "key": "tocHover",
@@ -576,13 +611,8 @@
       "visibleIf": {
         "key": "tocEnabled",
         "equals": true
-      }
-    },
-    {
-      "key": "showDate",
-      "label": "显示文章日期",
-      "type": "boolean",
-      "default": true
+      },
+      "category": "目录与动效"
     },
     {
       "key": "pageTransition",
@@ -599,13 +629,35 @@
         "模糊聚焦",
         "翻页",
         "揭开"
-      ]
+      ],
+      "category": "目录与动效"
+    },
+    {
+      "key": "loadingAnim",
+      "label": "页面加载动画",
+      "type": "select",
+      "default": "关闭",
+      "options": [
+        "关闭",
+        "转圈",
+        "点点",
+        "进度条"
+      ],
+      "category": "目录与动效"
+    },
+    {
+      "key": "showDate",
+      "label": "显示文章日期",
+      "type": "boolean",
+      "default": true,
+      "category": "内容显示"
     },
     {
       "key": "showFooterCredit",
       "label": "在底部显示由 Plainstruct 创建",
       "type": "boolean",
-      "default": true
+      "default": true,
+      "category": "内容显示"
     }
   ]
 }

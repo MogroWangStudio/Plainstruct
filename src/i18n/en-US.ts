@@ -329,6 +329,8 @@ export default {
     navPickedHeading: "Shown in the nav",
     navExpand: "Expand",
     navCollapse: "Collapse",
+    catNav: "Jump to a section",
+    otherCategory: "Other",
     colorPick: "Pick a color",
     colorPickArea: "Saturation and brightness — arrow keys to fine-tune",
     colorPickHue: "Hue",

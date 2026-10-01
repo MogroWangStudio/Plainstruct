@@ -329,6 +329,8 @@ export default {
     navPickedHeading: "当前在导航中显示",
     navExpand: "展开",
     navCollapse: "收起",
+    catNav: "按分类跳转",
+    otherCategory: "其他",
     colorPick: "选择颜色",
     colorPickArea: "饱和度与明度,方向键微调",
     colorPickHue: "色相",

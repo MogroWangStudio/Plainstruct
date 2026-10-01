@@ -23,6 +23,54 @@ function fieldValue(field: ThemeField): string | number | boolean {
   return theme.configValues[field.key] ?? field.default ?? "";
 }
 
+/* ---------- 配置分组(theme.json 的 category;无分类的旧主题保持平铺) ---------- */
+
+interface Section {
+  id: string;
+  label: string;
+  fields: ThemeField[];
+}
+
+/** 全部分组(按 theme.json 中的出现顺序);字段没有分类时归入「其他」 */
+const sections = computed<Section[]>(() => {
+  const fields = theme.activeMeta?.config ?? [];
+  if (!fields.some((f) => f.category)) return [];
+  const order: string[] = [];
+  const groups = new Map<string, ThemeField[]>();
+  for (const f of fields) {
+    const label = f.category ?? t("theme.otherCategory");
+    if (!groups.has(label)) {
+      groups.set(label, []);
+      order.push(label);
+    }
+    groups.get(label)!.push(f);
+  }
+  return order.map((label, i) => ({ id: `theme-cat-${i}`, label, fields: groups.get(label)! }));
+});
+
+/** 渲染行:分组标题与其下当前可见的字段;可见性联动使整组隐藏时不渲染标题 */
+const rows = computed<{ head?: Section; field?: ThemeField }[]>(() => {
+  const flat = (theme.activeMeta?.config ?? []).filter((f) => isVisible(f));
+  if (!sections.value.length) return flat.map((field) => ({ field }));
+  const out: { head?: Section; field?: ThemeField }[] = [];
+  for (const section of sections.value) {
+    const visible = section.fields.filter((f) => isVisible(f));
+    if (!visible.length) continue;
+    out.push({ head: section });
+    for (const field of visible) out.push({ field });
+  }
+  return out;
+});
+
+/** 顶部快速跳转按钮:只列当前有可见配置的分类 */
+const navSections = computed(() => sections.value.filter((s) => s.fields.some((f) => isVisible(f))));
+
+/** 点击分类按钮滚动到对应分组(减弱动态时直接跳位) */
+function jumpTo(id: string) {
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  document.getElementById(id)?.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
+}
+
 /** visibleIf:仅当依赖字段(含默认值兜底)命中 equals 或 oneOf 时渲染该字段 */
 function isVisible(field: ThemeField): boolean {
   const cond = field.visibleIf;
@@ -142,114 +190,128 @@ function confirmPicker() {
 
 <template>
   <div class="flex flex-col gap-5">
-    <div v-for="field in theme.activeMeta?.config ?? []" :key="field.key" v-show="isVisible(field)" class="flex flex-col">
-      <!-- 开关自带行内标签,不再重复渲染标题 -->
-      <label v-if="field.type !== 'boolean'" class="field-label">{{ field.label }}</label>
+    <!-- 分类快速跳转:粘性吸顶,点击滚动到对应分组 -->
+    <nav v-if="navSections.length" class="cat-nav" :aria-label="t('theme.catNav')">
+      <button v-for="s in navSections" :key="s.id" type="button" class="cat-chip" @click="jumpTo(s.id)">
+        {{ s.label }}
+      </button>
+    </nav>
 
-      <!-- 颜色:自定义取色器(色块 + 十六进制值,面板取色,不用系统原生控件) -->
-      <ColorPicker
-        v-if="field.type === 'color'"
-        :model-value="String(fieldValue(field))"
-        :label="field.label"
-        @update:model-value="(v: string) => onField(field, v)"
-      />
+    <template v-for="row in rows" :key="row.head ? row.head.id : (row.field?.key ?? '')">
+      <!-- 分组标题:面板顶部的分类按钮滚动到这里 -->
+      <h3 v-if="row.head" :id="row.head.id" class="cat-head">{{ row.head.label }}</h3>
+      <template v-else>
+        <!-- 单行循环把该行字段交给原有渲染块:结构与旧版完全一致 -->
+        <div v-for="field in row.field ? [row.field] : []" :key="field.key" class="flex flex-col">
+        <!-- 开关自带行内标签,不再重复渲染标题 -->
+        <label v-if="field.type !== 'boolean'" class="field-label">{{ field.label }}</label>
 
-      <!-- 数值:拖动滑块;双击数字可直接输入;偏离默认值时出现一键重置 -->
-      <div v-else-if="field.type === 'number'" class="flex items-center gap-3">
-        <input
-          type="range"
-          class="range-input min-w-0 flex-1"
-          :min="field.min ?? 0"
-          :max="field.max ?? 100"
-          :step="field.step ?? 1"
-          :value="Number(fieldValue(field))"
-          :style="{ '--range-fill': rangeFill(field) }"
-          @input="onField(field, Number(($event.target as HTMLInputElement).value))"
+        <!-- 颜色:自定义取色器(色块 + 十六进制值,面板取色,不用系统原生控件) -->
+        <ColorPicker
+          v-if="field.type === 'color'"
+          :model-value="String(fieldValue(field))"
+          :label="field.label"
+          @update:model-value="(v: string) => onField(field, v)"
         />
-        <input
-          v-if="editingKey === field.key"
-          ref="editInput"
-          class="input h-7 w-14 px-1 text-center text-[calc(12px*var(--ui-font-scale))]"
-          type="text"
-          inputmode="decimal"
-          :value="String(fieldValue(field))"
-          @keydown.enter="commitEdit(field, $event)"
-          @keydown.esc="editingKey = null"
-          @blur="commitEdit(field, $event)"
-        />
-        <button
-          v-else
-          type="button"
-          class="mono w-14 cursor-text rounded text-center text-[calc(12px*var(--ui-font-scale))] text-ink-2 transition-colors hover:text-ink"
-          :title="t('theme.numEditHint')"
-          @dblclick="editingKey = field.key"
-        >
-          {{ fieldValue(field) }}
-        </button>
-        <button
-          v-if="Number(fieldValue(field)) !== Number(field.default ?? 0)"
-          type="button"
-          class="btn-icon h-6 w-6 shrink-0"
-          :title="t('theme.resetValue')"
-          @click="onField(field, Number(field.default ?? 0))"
-        >
-          <AppIcon name="refresh" :size="12" />
-        </button>
-      </div>
 
-      <!-- 选项:与全应用统一的自定义下拉(无系统原生黑边选中态) -->
-      <SelectMenu
-        v-else-if="field.type === 'select'"
-        :model-value="String(fieldValue(field))"
-        :options="(field.options ?? []).map((o) => ({ value: o, label: o }))"
-        align="right"
-        class="shrink-0"
-        @update:model-value="(v: string) => onField(field, v)"
-      />
-
-      <!-- 博客顶栏导航:按钮弹出选择窗口,确认后面板列出当前在导航中显示的项 -->
-      <div v-else-if="field.type === 'navlist'" class="flex flex-col gap-2">
-        <p v-if="!navOptions.length" class="text-[calc(13px*var(--ui-font-scale))] text-ink-3">{{ t("theme.navlistEmpty") }}</p>
-        <template v-else>
-          <button type="button" class="select !w-64 cursor-pointer text-left" @click="openPicker(field)">
-            {{ pickedOf(field).length ? t("theme.navPickedCount", { n: pickedOf(field).length }) : t("theme.navPickEmpty") }}
+        <!-- 数值:拖动滑块;双击数字可直接输入;偏离默认值时出现一键重置 -->
+        <div v-else-if="field.type === 'number'" class="flex items-center gap-3">
+          <input
+            type="range"
+            class="range-input min-w-0 flex-1"
+            :min="field.min ?? 0"
+            :max="field.max ?? 100"
+            :step="field.step ?? 1"
+            :value="Number(fieldValue(field))"
+            :style="{ '--range-fill': rangeFill(field) }"
+            @input="onField(field, Number(($event.target as HTMLInputElement).value))"
+          />
+          <input
+            v-if="editingKey === field.key"
+            ref="editInput"
+            class="input h-7 w-14 px-1 text-center text-[calc(12px*var(--ui-font-scale))]"
+            type="text"
+            inputmode="decimal"
+            :value="String(fieldValue(field))"
+            @keydown.enter="commitEdit(field, $event)"
+            @keydown.esc="editingKey = null"
+            @blur="commitEdit(field, $event)"
+          />
+          <button
+            v-else
+            type="button"
+            class="mono w-14 cursor-text rounded text-center text-[calc(12px*var(--ui-font-scale))] text-ink-2 transition-colors hover:text-ink"
+            :title="t('theme.numEditHint')"
+            @dblclick="editingKey = field.key"
+          >
+            {{ fieldValue(field) }}
           </button>
-          <template v-if="pickedLabels(field).length">
-            <p class="text-[calc(12px*var(--ui-font-scale))] text-ink-3">{{ t("theme.navPickedHeading") }}</p>
-            <ul class="flex flex-col">
-              <li
-                v-for="(label, i) in pickedLabels(field)"
-                :key="i"
-                class="max-w-64 truncate py-0.5 text-[calc(13px*var(--ui-font-scale))] text-ink-2"
-                :title="label"
-              >
-                {{ label }}
-              </li>
-            </ul>
-          </template>
-        </template>
-      </div>
+          <button
+            v-if="Number(fieldValue(field)) !== Number(field.default ?? 0)"
+            type="button"
+            class="btn-icon h-6 w-6 shrink-0"
+            :title="t('theme.resetValue')"
+            @click="onField(field, Number(field.default ?? 0))"
+          >
+            <AppIcon name="refresh" :size="12" />
+          </button>
+        </div>
 
-      <!-- 开关 -->
-      <label v-else-if="field.type === 'boolean'" class="flex cursor-pointer items-center gap-2">
-        <input
-          type="checkbox"
-          class="checkbox-input"
-          :checked="Boolean(fieldValue(field))"
-          @change="onField(field, ($event.target as HTMLInputElement).checked)"
+        <!-- 选项:与全应用统一的自定义下拉(无系统原生黑边选中态) -->
+        <SelectMenu
+          v-else-if="field.type === 'select'"
+          :model-value="String(fieldValue(field))"
+          :options="(field.options ?? []).map((o) => ({ value: o, label: o }))"
+          align="right"
+          class="shrink-0"
+          @update:model-value="(v: string) => onField(field, v)"
         />
-        <span class="text-[calc(13px*var(--ui-font-scale))] text-ink-2">{{ field.label }}</span>
-      </label>
 
-      <!-- 文本 -->
-      <input
-        v-else
-        class="input !w-64"
-        type="text"
-        :value="String(fieldValue(field))"
-        @change="onField(field, ($event.target as HTMLInputElement).value)"
-      />
-    </div>
+        <!-- 博客顶栏导航:按钮弹出选择窗口,确认后面板列出当前在导航中显示的项 -->
+        <div v-else-if="field.type === 'navlist'" class="flex flex-col gap-2">
+          <p v-if="!navOptions.length" class="text-[calc(13px*var(--ui-font-scale))] text-ink-3">{{ t("theme.navlistEmpty") }}</p>
+          <template v-else>
+            <button type="button" class="select !w-64 cursor-pointer text-left" @click="openPicker(field)">
+              {{ pickedOf(field).length ? t("theme.navPickedCount", { n: pickedOf(field).length }) : t("theme.navPickEmpty") }}
+            </button>
+            <template v-if="pickedLabels(field).length">
+              <p class="text-[calc(12px*var(--ui-font-scale))] text-ink-3">{{ t("theme.navPickedHeading") }}</p>
+              <ul class="flex flex-col">
+                <li
+                  v-for="(label, i) in pickedLabels(field)"
+                  :key="i"
+                  class="max-w-64 truncate py-0.5 text-[calc(13px*var(--ui-font-scale))] text-ink-2"
+                  :title="label"
+                >
+                  {{ label }}
+                </li>
+              </ul>
+            </template>
+          </template>
+        </div>
+
+        <!-- 开关 -->
+        <label v-else-if="field.type === 'boolean'" class="flex cursor-pointer items-center gap-2">
+          <input
+            type="checkbox"
+            class="checkbox-input"
+            :checked="Boolean(fieldValue(field))"
+            @change="onField(field, ($event.target as HTMLInputElement).checked)"
+          />
+          <span class="text-[calc(13px*var(--ui-font-scale))] text-ink-2">{{ field.label }}</span>
+        </label>
+
+        <!-- 文本 -->
+        <input
+          v-else
+          class="input !w-64"
+          type="text"
+          :value="String(fieldValue(field))"
+          @change="onField(field, ($event.target as HTMLInputElement).value)"
+        />
+        </div>
+      </template>
+    </template>
 
     <p v-if="!(theme.activeMeta?.config ?? []).length" class="text-[calc(13px*var(--ui-font-scale))] text-ink-3">
       {{ t("common.empty") }}
@@ -296,6 +358,60 @@ function confirmPicker() {
 </template>
 
 <style scoped>
+/* ---------- 分类快速跳转(粘性吸顶)与分组标题 ---------- */
+.cat-nav {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 0;
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-line);
+}
+.cat-chip {
+  height: 26px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-ink-2);
+  font-size: calc(12px * var(--ui-font-scale));
+  cursor: pointer;
+  transition:
+    background-color var(--duration-base) var(--ease-plain),
+    color var(--duration-base) var(--ease-plain),
+    transform 100ms ease-out;
+}
+.cat-chip:hover {
+  background: var(--color-surface-2);
+  color: var(--color-ink);
+}
+.cat-chip:active {
+  transform: scale(0.97);
+}
+.cat-chip:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+.cat-head {
+  margin: 6px 0 -10px;
+  font-size: calc(12px * var(--ui-font-scale));
+  font-weight: 600;
+  color: var(--color-ink-3);
+  /* 跳转落点让出吸顶分类栏的高度 */
+  scroll-margin-top: 52px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cat-chip {
+    transition: none;
+  }
+  .cat-chip:active {
+    transform: none;
+  }
+}
+
 .navlist-row {
   display: flex;
   align-items: center;

@@ -10,16 +10,8 @@
       "key": "accentColor",
       "label": "强调色",
       "type": "color",
-      "default": "#43d17c"
-    },
-    {
-      "key": "contentWidth",
-      "label": "正文宽度(px)",
-      "type": "number",
-      "default": 780,
-      "min": 620,
-      "max": 980,
-      "step": 20
+      "default": "#43d17c",
+      "category": "颜色与字体"
     },
     {
       "key": "bodyFont",
@@ -31,7 +23,8 @@
         "serif",
         "mono",
         "custom"
-      ]
+      ],
+      "category": "颜色与字体"
     },
     {
       "key": "customFont",
@@ -41,25 +34,39 @@
       "visibleIf": {
         "key": "bodyFont",
         "equals": "custom"
-      }
+      },
+      "category": "颜色与字体"
     },
     {
       "key": "scanline",
       "label": "CRT 扫描线纹理",
       "type": "boolean",
-      "default": false
+      "default": false,
+      "category": "颜色与字体"
+    },
+    {
+      "key": "contentWidth",
+      "label": "正文宽度(px)",
+      "type": "number",
+      "default": 780,
+      "min": 620,
+      "max": 980,
+      "step": 20,
+      "category": "布局"
     },
     {
       "key": "showDate",
       "label": "显示文档日期",
       "type": "boolean",
-      "default": false
+      "default": false,
+      "category": "内容显示"
     },
     {
       "key": "showFooterCredit",
       "label": "在底部显示由 Plainstruct 创建",
       "type": "boolean",
-      "default": true
+      "default": true,
+      "category": "内容显示"
     }
   ]
 }

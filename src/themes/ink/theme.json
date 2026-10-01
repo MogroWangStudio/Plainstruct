@@ -10,16 +10,8 @@
       "key": "accentColor",
       "label": "强调色",
       "type": "color",
-      "default": "#9a3324"
-    },
-    {
-      "key": "contentWidth",
-      "label": "正文宽度(px)",
-      "type": "number",
-      "default": 720,
-      "min": 600,
-      "max": 900,
-      "step": 20
+      "default": "#9a3324",
+      "category": "颜色与字体"
     },
     {
       "key": "bodyFont",
@@ -31,7 +23,8 @@
         "serif",
         "mono",
         "custom"
-      ]
+      ],
+      "category": "颜色与字体"
     },
     {
       "key": "customFont",
@@ -41,13 +34,25 @@
       "visibleIf": {
         "key": "bodyFont",
         "equals": "custom"
-      }
+      },
+      "category": "颜色与字体"
+    },
+    {
+      "key": "contentWidth",
+      "label": "正文宽度(px)",
+      "type": "number",
+      "default": 720,
+      "min": 600,
+      "max": 900,
+      "step": 20,
+      "category": "布局"
     },
     {
       "key": "dropCap",
       "label": "首段首字下沉",
       "type": "boolean",
-      "default": false
+      "default": false,
+      "category": "布局"
     },
     {
       "key": "pageTransition",
@@ -64,19 +69,22 @@
         "模糊聚焦",
         "翻页",
         "揭开"
-      ]
+      ],
+      "category": "动效"
     },
     {
       "key": "showDate",
       "label": "显示文档日期",
       "type": "boolean",
-      "default": false
+      "default": false,
+      "category": "内容显示"
     },
     {
       "key": "showFooterCredit",
       "label": "在底部显示由 Plainstruct 创建",
       "type": "boolean",
-      "default": true
+      "default": true,
+      "category": "内容显示"
     }
   ]
 }
