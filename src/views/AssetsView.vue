@@ -750,7 +750,7 @@ async function removeFolder(g: { dir: string; label: string; images: TreeNode[] 
             {{ n.path }}
           </li>
         </ul>
-      </aside>
+        </div>
 
       <!-- 单选:预览 + 引用位置 -->
       <div v-else-if="selectedNode" class="detail-body">
