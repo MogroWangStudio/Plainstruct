@@ -1,7 +1,7 @@
 {
   "id": "magazine",
   "name": "专栏",
-  "version": "3.4.1",
+  "version": "3.5.0",
   "author": "MogroWang Studio",
   "type": "blog",
   "description": "杂志编辑部风:衬线报头,双线分章,栏目气度。",
@@ -43,7 +43,8 @@
       "label": "顶栏显示当前页面标题",
       "type": "boolean",
       "default": false,
-      "category": "顶栏与导航"
+      "category": "顶栏与导航",
+      "hint": "首页不显示(避免与站点名重复);窗口宽度 ≤640px 时自动隐藏"
     },
     {
       "key": "topbarWidthPct",

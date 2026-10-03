@@ -133,6 +133,8 @@ export interface ThemeField {
   options?: string[];
   /** 配置面板中的分组名;缺省时旧式平铺(兼容无分类的自定义主题) */
   category?: string;
+  /** 可选:字段下方的说明小字(如「首页不显示」之类的行为边界) */
+  hint?: string;
   /** 可选:仅当另一字段等于 equals,或落在 oneOf 之一时显示
    *  (如自定义字体依赖 bodyFont=custom;顶栏变形宽度对「药丸 / 圆角矩形」两种形态都可见) */
   visibleIf?: {

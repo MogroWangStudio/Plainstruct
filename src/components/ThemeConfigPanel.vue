@@ -374,6 +374,8 @@ function confirmPicker() {
           :value="String(fieldValue(field))"
           @change="onField(field, ($event.target as HTMLInputElement).value)"
         />
+        <!-- 行为边界说明(来自 theme.json 的 hint):如「首页不显示」之类,在配置处即可见 -->
+        <p v-if="field.hint" class="opt-hint">{{ field.hint }}</p>
       </div>
     </section>
 
@@ -506,6 +508,12 @@ function confirmPicker() {
   color: var(--color-ink-2);
   /* 跳转落点让位悬浮分类栏:距离 = 悬浮间隙 + 栏实际高度 + 渐变模糊带,由 --cat-float 动态给出 */
   scroll-margin-top: var(--cat-float, 76px);
+}
+.opt-hint {
+  margin-top: 2px;
+  font-size: calc(11px * var(--ui-font-scale));
+  line-height: 1.6;
+  color: var(--color-ink-3);
 }
 @media (prefers-reduced-motion: reduce) {
   .cat-chip {
