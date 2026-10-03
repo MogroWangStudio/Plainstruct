@@ -86,6 +86,12 @@ export const useBuilderStore = defineStore("builder", {
       const site = useSiteStore();
       const app = useAppStore();
       if (!site.root) return;
+      // 浏览器 mock:以新标签页打开壳层页面(site:// 协议不可用,壳层仅演示界面形态)
+      if (app.platform === "browser") {
+        const title = `${site.config?.name ?? "Plainstruct"} · ${i18n.global.t("build.preview")}`;
+        window.open(previewShellUrl(app, title), "_blank");
+        return;
+      }
       try {
         const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
         const existing = await WebviewWindow.getByLabel("site-preview");

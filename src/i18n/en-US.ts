@@ -432,7 +432,7 @@ export default {
     viewportLogical: "CSS",
     viewportPhysical: "Physical",
     blank: "Waiting for the site…",
-    browserOnly: "The standalone preview window is available in the desktop app only.",
+    browserOnly: "Site content is not rendered in the browser preview — open the desktop app for the full preview.",
     swipeHint: "Swipe right from the left edge to go back · pointer clicks are delivered as real touch events",
   },
   menu: {

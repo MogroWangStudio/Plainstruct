@@ -432,7 +432,7 @@ export default {
     viewportLogical: "逻辑",
     viewportPhysical: "物理",
     blank: "等待站点加载…",
-    browserOnly: "独立预览窗口需在桌面应用内打开。",
+    browserOnly: "浏览器预览不渲染站点内容,完整预览请在桌面应用中打开。",
     swipeHint: "自左缘向右滑动返回上一页 · 指针点击以真实触摸事件送达页面",
   },
   menu: {
