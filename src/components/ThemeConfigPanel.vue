@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /** 主题可视化配置面板 -- 由 theme.json 的 config schema 自动生成表单 */
-import { computed, nextTick, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import type { ThemeField } from "@/ipc/types";
 import { navMaxOf, topNavItems, type NavPickerItem } from "@/lib/builder";
@@ -65,7 +65,38 @@ const rows = computed<{ head?: Section; field?: ThemeField }[]>(() => {
 /** 顶部快速跳转按钮:只列当前有可见配置的分类 */
 const navSections = computed(() => sections.value.filter((s) => s.fields.some((f) => isVisible(f))));
 
-/** 点击分类按钮滚动到对应分组(减弱动态时直接跳位) */
+/* 悬浮分类栏:圆角矩形浮层,滚动时内容从其下方穿过。分组标题的让位距离
+   按栏的「实际渲染高度」动态计算 —— 分类多换行、界面字号缩放、语言切换
+   都会改变高度,硬编码值必然失准;ResizeObserver 随时跟进。 */
+const catNav = ref<HTMLElement>();
+const catFloat = ref(0); // scroll-margin:吸附位 6px + 栏高 + 渐变模糊带 14px + 呼吸 4px
+const catTop = ref(0); // sticky top:补偿滚动容器的参照系差,使视觉吸附位恒为 6px
+let catNavObserver: ResizeObserver | null = null;
+
+function measureCatNav() {
+  const nav = catNav.value;
+  if (!nav) return;
+  // sticky 的 top 以滚动容器「内边距缘」为参照,而视觉期望从容器顶边算起:
+  // 找到实际滚动容器读出 padding-top,把它从 top 里扣掉(不同主题页容器内边距不同)
+  let scroller: HTMLElement | null = nav.parentElement;
+  while (scroller && scroller.scrollHeight <= scroller.clientHeight + 1) scroller = scroller.parentElement;
+  const padTop = scroller ? parseFloat(getComputedStyle(scroller).paddingTop) || 0 : 0;
+  catTop.value = 6 - padTop;
+  catFloat.value = nav.offsetHeight + 24;
+}
+
+watch(catNav, (el) => {
+  catNavObserver?.disconnect();
+  catNavObserver = null;
+  if (!el) return;
+  catNavObserver = new ResizeObserver(measureCatNav);
+  catNavObserver.observe(el);
+  measureCatNav();
+});
+
+onBeforeUnmount(() => catNavObserver?.disconnect());
+
+/** 点击分类按钮滚动到对应分组,落点由 --cat-float 精确让位(减弱动态时直接跳位) */
 function jumpTo(id: string) {
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   document.getElementById(id)?.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
@@ -189,9 +220,15 @@ function confirmPicker() {
 </script>
 
 <template>
-  <div class="flex flex-col gap-5">
-    <!-- 分类快速跳转:粘性吸顶,点击滚动到对应分组 -->
-    <nav v-if="navSections.length" class="cat-nav" :aria-label="t('theme.catNav')">
+  <div class="flex flex-col gap-5" :style="catFloat ? { '--cat-float': `${catFloat}px` } : undefined">
+    <!-- 分类快速跳转:悬浮圆角矩形栏,内容从其下方穿过,点击滚动到对应分组 -->
+    <nav
+      v-if="navSections.length"
+      ref="catNav"
+      class="cat-nav"
+      :style="{ '--cat-top': `${catTop}px` }"
+      :aria-label="t('theme.catNav')"
+    >
       <button v-for="s in navSections" :key="s.id" type="button" class="cat-chip" @click="jumpTo(s.id)">
         {{ s.label }}
       </button>
@@ -358,17 +395,47 @@ function confirmPicker() {
 </template>
 
 <style scoped>
-/* ---------- 分类快速跳转(粘性吸顶)与分组标题 ---------- */
+/* ---------- 分类快速跳转(悬浮圆角矩形)与分组标题 ---------- */
 .cat-nav {
   position: sticky;
-  top: 0;
+  /* 视觉吸附位 6px;--cat-top 由脚本按滚动容器的 padding-top 补偿(见 measureCatNav) */
+  top: var(--cat-top, 6px);
   z-index: 2;
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  padding: 8px 0;
-  background: var(--color-bg);
-  border-bottom: 1px solid var(--color-line);
+  gap: 4px;
+  padding: 6px 8px;
+  /* 毛玻璃材质:半透明表面 + 背景模糊,内容从栏后穿过时保持可读 */
+  background: color-mix(in srgb, var(--color-surface) 78%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(1.5);
+  backdrop-filter: blur(14px) saturate(1.5);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-popover);
+}
+/* 栏底渐变模糊带:滚动内容临近栏底逐渐虚化,避免硬边缘截断(滚动边缘效果) */
+.cat-nav::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  height: 14px;
+  pointer-events: none;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.85), transparent);
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.85), transparent);
+}
+@media (prefers-reduced-transparency: reduce) {
+  .cat-nav {
+    background: var(--color-surface);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .cat-nav::after {
+    display: none;
+  }
 }
 .cat-chip {
   height: 26px;
@@ -397,11 +464,11 @@ function confirmPicker() {
 }
 .cat-head {
   margin: 6px 0 -10px;
-  font-size: calc(12px * var(--ui-font-scale));
+  font-size: calc(13.5px * var(--ui-font-scale));
   font-weight: 600;
-  color: var(--color-ink-3);
-  /* 跳转落点让出吸顶分类栏的高度 */
-  scroll-margin-top: 52px;
+  color: var(--color-ink-2);
+  /* 跳转落点让位悬浮分类栏:距离 = 悬浮间隙 + 栏实际高度 + 渐变模糊带,由 --cat-float 动态给出 */
+  scroll-margin-top: var(--cat-float, 76px);
 }
 @media (prefers-reduced-motion: reduce) {
   .cat-chip {
