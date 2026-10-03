@@ -50,37 +50,86 @@ const DEVICES: DevicePreset[] = [
 ];
 
 const DEVICE_KEY = "plainstruct.previewDevice";
+const CUSTOM_KEY = "plainstruct.previewDeviceCustom";
 const DEFAULT_DEVICE = DEVICES.find((d) => d.name === "Google Pixel 8")!;
+const CUSTOM_NAME = "custom";
 
-function readDevice(): DevicePreset {
+function readDeviceName(): string {
   try {
     const name = localStorage.getItem(DEVICE_KEY);
-    return DEVICES.find((d) => d.name === name) ?? DEFAULT_DEVICE;
+    if (name === CUSTOM_NAME || DEVICES.some((d) => d.name === name)) return name!;
   } catch {
-    return DEFAULT_DEVICE;
+    /* 无记录走默认 */
+  }
+  return DEFAULT_DEVICE.name;
+}
+
+function readCustomDevice(): DevicePreset {
+  const fallback: DevicePreset = { name: "", w: 412, h: 915, dpr: 2.625 };
+  try {
+    const raw = localStorage.getItem(CUSTOM_KEY);
+    if (!raw) return fallback;
+    const v = JSON.parse(raw) as Partial<DevicePreset>;
+    const clamp = (n: unknown, min: number, max: number, fb: number) => {
+      const num = Number(n);
+      return Number.isFinite(num) ? Math.min(max, Math.max(min, num)) : fb;
+    };
+    return {
+      name: "",
+      w: Math.round(clamp(v.w, 200, 1600, fallback.w)),
+      h: Math.round(clamp(v.h, 200, 2560, fallback.h)),
+      dpr: Math.round(clamp(v.dpr, 1, 5, fallback.dpr) * 100) / 100,
+    };
+  } catch {
+    return fallback;
   }
 }
 
-const device = ref<DevicePreset>(readDevice());
+/** 选中的设备名(预设名或 custom);设备参数由预设表/自定义输入实时决定 */
+const selectedName = ref(readDeviceName());
+const customDevice = ref<DevicePreset>(readCustomDevice());
+const device = computed<DevicePreset>(() => {
+  if (selectedName.value === CUSTOM_NAME) return { ...customDevice.value, name: CUSTOM_NAME };
+  return DEVICES.find((d) => d.name === selectedName.value) ?? DEFAULT_DEVICE;
+});
 const screenW = computed(() => device.value.w);
 const screenH = computed(() => device.value.h);
 const physW = computed(() => Math.round(screenW.value * device.value.dpr));
 const physH = computed(() => Math.round(screenH.value * device.value.dpr));
 const deviceOuterW = computed(() => screenW.value + BEZEL * 2);
 const deviceOuterH = computed(() => screenH.value + BEZEL * 2);
-const deviceOptions = DEVICES.map((d) => ({ value: d.name, label: `${d.name} · ${d.w}×${d.h} @${d.dpr}x` }));
+const deviceOptions = [
+  ...DEVICES.map((d) => ({ value: d.name, label: `${d.name} · ${d.w}×${d.h} @${d.dpr}x` })),
+  { value: CUSTOM_NAME, label: t("previewShell.customDevice") },
+];
 
 function setDevice(name: string) {
-  const hit = DEVICES.find((d) => d.name === name);
-  if (hit) device.value = hit;
-}
-
-watch(device, (d) => {
+  selectedName.value = name;
   try {
-    localStorage.setItem(DEVICE_KEY, d.name);
+    localStorage.setItem(DEVICE_KEY, name);
   } catch {
     /* 持久化失败仅影响下次默认 */
   }
+}
+
+/** 自定义设备参数:立即生效并记忆 */
+function setCustom(field: "w" | "h" | "dpr", e: Event) {
+  const raw = Number((e.target as HTMLInputElement).value);
+  if (!Number.isFinite(raw)) return;
+  const limits = { w: [200, 1600] as const, h: [200, 2560] as const, dpr: [1, 5] as const };
+  const [min, max] = limits[field];
+  let v = Math.min(max, Math.max(min, raw));
+  if (field === "dpr") v = Math.round(v * 100) / 100;
+  else v = Math.round(v);
+  customDevice.value = { ...customDevice.value, [field]: v };
+  try {
+    localStorage.setItem(CUSTOM_KEY, JSON.stringify({ w: customDevice.value.w, h: customDevice.value.h, dpr: customDevice.value.dpr }));
+  } catch {
+    /* 持久化失败仅影响下次默认 */
+  }
+}
+
+watch(device, () => {
   void nextTick(refit);
 });
 
@@ -505,6 +554,20 @@ onBeforeUnmount(() => {
         <div class="ops-device">
           <span class="ops-label">{{ t("previewShell.device") }}</span>
           <SelectMenu :model-value="device.name" :options="deviceOptions" align="left" @update:model-value="setDevice" />
+          <div v-if="selectedName === CUSTOM_NAME" class="ops-custom">
+            <label class="ops-custom-field">
+              <span>{{ t("previewShell.customWidth") }}</span>
+              <input class="input h-7 px-1 text-center" type="number" :min="200" :max="1600" :value="customDevice.w" @change="setCustom('w', $event)" />
+            </label>
+            <label class="ops-custom-field">
+              <span>{{ t("previewShell.customHeight") }}</span>
+              <input class="input h-7 px-1 text-center" type="number" :min="200" :max="2560" :value="customDevice.h" @change="setCustom('h', $event)" />
+            </label>
+            <label class="ops-custom-field">
+              <span>{{ t("previewShell.customDpr") }}</span>
+              <input class="input h-7 px-1 text-center" type="number" :min="1" :max="5" step="0.25" :value="customDevice.dpr" @change="setCustom('dpr', $event)" />
+            </label>
+          </div>
         </div>
         <p class="ops-viewport">
           <span>{{ t("previewShell.viewportLogical") }} {{ screenW }} × {{ screenH }}</span>
@@ -729,6 +792,21 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+.ops-custom {
+  display: flex;
+  gap: 8px;
+}
+.ops-custom-field {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+.ops-custom-field span {
+  font-size: calc(11px * var(--ui-font-scale));
+  color: var(--color-ink-3);
 }
 .ops-label {
   font-size: calc(12px * var(--ui-font-scale));

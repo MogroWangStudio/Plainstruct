@@ -240,6 +240,157 @@
     endGesture(commit);
   }
 
+  /* ---------- 触摸平移:按住拖动即滚动页面(真机上手指拖动就是滚动,而非选字/拖元素) ---------- */
+
+  var pan = null;        // 进行中的平移
+  var flingRaf = 0;      // 惯性滚动的动画帧
+  var flingChain = null; // 惯性沿用的滚动链
+  var flingVX = 0;
+  var flingVY = 0;
+  var panDragGuard = null; // 平移期间拦下原生拖拽(链接/图片/选字)
+
+  function stopFling() {
+    if (flingRaf) {
+      cancelAnimationFrame(flingRaf);
+      flingRaf = 0;
+    }
+  }
+
+  // 指针落点处的滚动容器链:由内到外,平移的剩余量逐层外推(滚动链)
+  function scrollChainUnder(target) {
+    var chain = [];
+    var n = target;
+    while (n && n !== document.documentElement && n !== document.body) {
+      if (n.nodeType === 1) {
+        var cs = getComputedStyle(n);
+        if (/(auto|scroll)/.test(cs.overflowY + cs.overflowX) && (n.scrollHeight > n.clientHeight || n.scrollWidth > n.clientWidth)) {
+          chain.push(n);
+        }
+      }
+      n = n.parentElement;
+    }
+    chain.push(document.scrollingElement || document.documentElement);
+    return chain;
+  }
+
+  // 把位移施加到滚动容器,返回到达边界后的剩余量(内容跟手 1:1:手指向右内容向右)
+  function applyPan(el, dx, dy) {
+    var bx = el.scrollLeft;
+    var by = el.scrollTop;
+    el.scrollLeft = bx - dx;
+    el.scrollTop = by - dy;
+    return { x: dx - (bx - el.scrollLeft), y: dy - (by - el.scrollTop) };
+  }
+
+  function suppressPanClick(e) {
+    e.stopPropagation();
+    e.preventDefault();
+    document.removeEventListener("click", suppressPanClick, true);
+  }
+
+  function endPan(e) {
+    var p = pan;
+    pan = null;
+    if (!p || !p.locked) return;
+    document.body.style.userSelect = "";
+    document.removeEventListener("click", suppressPanClick, true);
+    document.addEventListener("click", suppressPanClick, true); // 拖拽松手不触发链接
+    try {
+      document.documentElement.releasePointerCapture(e.pointerId);
+    } catch (err) {
+      /* 未捕获时忽略 */
+    }
+    var v = sampleVec(p.hist);
+    if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches && (Math.abs(v.x) > 120 || Math.abs(v.y) > 120)) {
+      // 惯性:按松手速度衰减滚动,下一次按下即打断
+      flingChain = p.chain;
+      flingVX = v.x;
+      flingVY = v.y;
+      var last = performance.now();
+      var step = function (now) {
+        var dt = Math.min((now - last) / 1000, 1 / 30);
+        last = now;
+        var k = Math.exp(-dt * 4.2); // 指数衰减,模拟触屏滚动阻力
+        flingVX *= k;
+        flingVY *= k;
+        var left = { x: flingVX * dt, y: flingVY * dt };
+        for (var i = 0; i < flingChain.length && (Math.abs(left.x) > 0.1 || Math.abs(left.y) > 0.1); i++) {
+          left = applyPan(flingChain[i], left.x, left.y);
+        }
+        if (Math.abs(flingVX) < 24 && Math.abs(flingVY) < 24) {
+          flingRaf = 0;
+          return;
+        }
+        flingRaf = requestAnimationFrame(step);
+      };
+      flingRaf = requestAnimationFrame(step);
+    }
+  }
+
+  function onPanDown(e) {
+    if (mode !== "mobile" || pan) return;
+    if (gesture && gesture.locked) return; // 返回手势接管期间不平移
+    if (e.button !== 0 || (e.pointerType && e.pointerType !== "mouse")) return;
+    // 左缘让给返回手势(与真机的手势排除区一致)
+    if (e.clientX <= EDGE && e.clientY > EDGE_SAFE && e.clientY < window.innerHeight - EDGE_SAFE) return;
+    stopFling();
+    pan = {
+      id: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      lastX: e.clientX,
+      lastY: e.clientY,
+      locked: false,
+      chain: scrollChainUnder(e.target),
+      hist: [{ x: e.clientX, y: e.clientY, t: performance.now() }],
+    };
+  }
+
+  function onPanMove(e) {
+    if (!pan || e.pointerId !== pan.id) return;
+    var dxTotal = e.clientX - pan.startX;
+    var dyTotal = e.clientY - pan.startY;
+    if (!pan.locked) {
+      if (Math.abs(dxTotal) < 8 && Math.abs(dyTotal) < 8) return;
+      pan.locked = true;
+      try {
+        document.documentElement.setPointerCapture(e.pointerId);
+      } catch (err) {
+        /* 捕获失败不影响跟踪 */
+      }
+      document.body.style.userSelect = "none";
+      panDragGuard = function (ev) {
+        ev.preventDefault();
+      };
+      document.addEventListener("dragstart", panDragGuard, true);
+    }
+    var dx = e.clientX - pan.lastX;
+    var dy = e.clientY - pan.lastY;
+    pan.lastX = e.clientX;
+    pan.lastY = e.clientY;
+    pan.hist.push({ x: e.clientX, y: e.clientY, t: performance.now() });
+    if (pan.hist.length > 6) pan.hist.shift();
+    var left = { x: dx, y: dy };
+    for (var i = 0; i < pan.chain.length && (left.x || left.y); i++) {
+      left = applyPan(pan.chain[i], left.x, left.y);
+    }
+  }
+
+  function onPanUp(e) {
+    if (!pan || e.pointerId !== pan.id) return;
+    endPan(e);
+  }
+
+  // 二维速度采样(px/s),与侧滑手势共用同一形态
+  function sampleVec(hist) {
+    if (hist.length < 2) return { x: 0, y: 0 };
+    var first = hist[0];
+    var last = hist[hist.length - 1];
+    var dt = last.t - first.t;
+    if (dt <= 0) return { x: 0, y: 0 };
+    return { x: ((last.x - first.x) / dt) * 1000, y: ((last.y - first.y) / dt) * 1000 };
+  }
+
   /* ---------- 壳层消息:模式切换与历史导航 ---------- */
 
   // 移动模式的触点光标:圆形指尖样式替代系统箭头,模拟触摸屏幕。
@@ -256,10 +407,12 @@
     if (!on || document.getElementById("ps-touch-cursor-style")) return;
     var style = document.createElement("style");
     style.id = "ps-touch-cursor-style";
+    // 移动模式:触点光标 + 隐藏滚动条(真机浏览器无持续可见滚动条)
     style.textContent =
       ".ps-touch-cursor, .ps-touch-cursor * { cursor: url(\"data:image/svg+xml," +
       encodeURIComponent(TOUCH_CURSOR_SVG) +
-      "\") 14 14, pointer !important; }";
+      "\") 14 14, pointer !important; scrollbar-width: none !important; }" +
+      ".ps-touch-cursor::-webkit-scrollbar, .ps-touch-cursor *::-webkit-scrollbar { width: 0 !important; height: 0 !important; display: none !important; }";
     document.head.appendChild(style);
   }
 
@@ -271,6 +424,10 @@
       if (mode === d.mode) return;
       mode = d.mode;
       applyTouchCursor(mode === "mobile");
+      if (mode !== "mobile") {
+        stopFling();
+        pan = null;
+      }
       if (mode !== "mobile" && gesture) endGesture(false); // 切模式打断进行中的手势
     } else if (d.type === "history" && typeof d.delta === "number") {
       history.go(d.delta); // delta 0 = 刷新当前页
@@ -281,12 +438,22 @@
   document.addEventListener("pointermove", onMove, true);
   document.addEventListener("pointerup", onUp, true);
   document.addEventListener("pointercancel", onUp, true);
+  document.addEventListener("pointerdown", onPanDown, true);
+  document.addEventListener("pointermove", onPanMove, true);
+  document.addEventListener("pointerup", onPanUp, true);
+  document.addEventListener("pointercancel", onPanUp, true);
   document.addEventListener("pointerdown", mirror, true);
   document.addEventListener("pointermove", mirror, true);
   document.addEventListener("pointerup", mirror, true);
   document.addEventListener("pointercancel", mirror, true);
   window.addEventListener("blur", function () {
     if (gesture) endGesture(false); // 失焦打断手势,视作取消
+    if (pan) {
+      pan = null; // 失焦打断平移
+      document.body.style.userSelect = "";
+      document.removeEventListener("click", suppressPanClick, true);
+    }
+    stopFling();
   });
 
   reportPage();
