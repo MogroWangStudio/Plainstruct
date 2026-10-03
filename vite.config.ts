@@ -18,6 +18,16 @@ export default defineConfig(async () => ({
     __APP_VERSION__: JSON.stringify(pkg.version),
   },
 
+  build: {
+    rollupOptions: {
+      // 多页入口:main = 应用,preview = 独立预览窗口的自绘壳层
+      input: {
+        main: fileURLToPath(new URL("./index.html", import.meta.url)),
+        preview: fileURLToPath(new URL("./preview.html", import.meta.url)),
+      },
+    },
+  },
+
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),

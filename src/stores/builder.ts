@@ -1,13 +1,14 @@
 import { defineStore } from "pinia";
-import { invoke } from "@tauri-apps/api/core";
 import type { WebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { LogicalPosition } from "@tauri-apps/api/dpi";
 import type { BuildReport } from "@/ipc/types";
+import { Events } from "@/ipc/events";
 import { buildSite } from "@/lib/builder";
-import { buildIndexUrl } from "@/lib/preview";
 import { useSiteStore } from "./site";
 import { useThemeStore } from "./theme";
 import { useAppStore } from "./app";
 import { useUiStore } from "./ui";
+import { normalizeUiFontSize, normalizeUiFontWeight } from "./app";
 import { i18n } from "@/i18n";
 
 interface State {
@@ -75,8 +76,8 @@ export const useBuilderStore = defineStore("builder", {
     },
 
     /**
-     * 独立预览窗口:打开;已在则原地刷新加载最新构建(不销毁窗口,位置尺寸不重置)。
-     * 新开窗口时恢复上次关闭前的位置与尺寸。
+     * 独立预览窗口:打开自绘壳层(不加载站点本身);已在则原地刷新加载最新
+     * 构建产物并聚焦。新开窗口时恢复上次关闭前的位置与尺寸。
      */
     async openOrRefreshPreviewWindow() {
       const site = useSiteStore();
@@ -86,29 +87,54 @@ export const useBuilderStore = defineStore("builder", {
         const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
         const existing = await WebviewWindow.getByLabel("site-preview");
         if (existing) {
-          await invoke("reload_webview", { label: "site-preview" });
+          await this.notifyPreviewRebuilt();
           await existing.setFocus();
           return;
         }
+        const onMac = app.platform === "macos";
+        const title = `${site.config?.name ?? "Plainstruct"} · ${i18n.global.t("build.preview")}`;
         const win = new WebviewWindow("site-preview", {
-          url: buildIndexUrl(app.platform),
-          title: `${site.config?.name ?? "Plainstruct"} · ${i18n.global.t("build.preview")}`,
+          url: previewShellUrl(app, title),
+          title,
           ...previewWindowRect(),
+          minWidth: 620,
+          minHeight: 440,
+          // macOS 保留原生圆角与阴影,红绿灯以 Overlay 悬浮在自绘标题栏上;
+          // 其余平台无边框,窗口控制由壳层自绘(与主窗口同一策略)。
+          decorations: onMac,
+          ...(onMac
+            ? { titleBarStyle: "overlay" as const, hiddenTitle: true, trafficLightPosition: new LogicalPosition(10, 16) }
+            : {}),
+          // 壳层就绪后自显,避免无装饰窗口内容就绪前的白屏闪烁
+          visible: false,
+          dragDropEnabled: false,
         });
         void watchPreviewWindow(win);
+        // 兜底:壳层启动失败时窗口将永不显示,2s 后强制显示以便暴露问题
+        setTimeout(() => void win.show().catch(() => undefined), 2000);
       } catch {
         /* 非 Tauri 环境忽略 */
       }
     },
 
-    /** 构建完成后刷新独立预览窗口(未打开则不动作) */
+    /** 构建完成后让独立预览窗口原位刷新(未打开则不动作,不抢焦点) */
     async refreshPreviewWindow() {
       try {
         const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
         const existing = await WebviewWindow.getByLabel("site-preview");
-        if (existing) await this.openOrRefreshPreviewWindow();
+        if (existing) await this.notifyPreviewRebuilt();
       } catch {
         /* 非 Tauri 环境忽略 */
+      }
+    },
+
+    /** 向壳层广播「产物已更新」;壳层原位重载站点页,窗口位置/模式等状态不动 */
+    async notifyPreviewRebuilt() {
+      try {
+        const { emitTo } = await import("@tauri-apps/api/event");
+        await emitTo("site-preview", Events.PreviewRebuilt, { nonce: this.previewNonce });
+      } catch {
+        /* 窗口可能已被关闭 */
       }
     },
 
@@ -143,6 +169,21 @@ function ipcErr(e: unknown): string {
 
 const PREVIEW_RECT_KEY = "plainstruct.previewWindowRect";
 const PREVIEW_DEFAULT_SIZE = { width: 1120, height: 760 };
+
+/** 壳层页面地址:携带平台/语言/外观快照,壳层不依赖 bootstrap 命令即可自举 */
+function previewShellUrl(app: ReturnType<typeof useAppStore>, title: string): string {
+  const preferDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const themeSetting = app.settings.theme ?? "system";
+  const params = new URLSearchParams({
+    platform: app.platform,
+    locale: app.settings.locale,
+    theme: themeSetting === "system" ? (preferDark ? "dark" : "light") : themeSetting,
+    fontScale: String(normalizeUiFontSize(app.settings.uiFontSize)),
+    fontWeight: String(normalizeUiFontWeight(app.settings.uiFontWeight)),
+    title,
+  });
+  return `preview.html?${params.toString()}`;
+}
 
 /** 上次关闭前的逻辑位置与尺寸;无有效记录时回退默认尺寸并居中 */
 function previewWindowRect(): {

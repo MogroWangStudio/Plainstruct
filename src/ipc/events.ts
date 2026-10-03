@@ -5,6 +5,7 @@ export const Events = {
   UpdateProgress: "plainstruct://update-progress",
   PublishLog: "plainstruct://publish-log",
   CloseRequested: "plainstruct://close-requested",
+  PreviewRebuilt: "plainstruct://preview-rebuilt",
 } as const;
 
 export type SyncProgressEvent = typeof Events.SyncProgress;

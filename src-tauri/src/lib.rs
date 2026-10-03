@@ -47,6 +47,39 @@ fn mime_for(path: &str) -> &'static str {
 /// 禁止向外部发起 fetch/WebSocket(connect-src),防止构建产物中的不可信脚本外带数据。
 const SITE_CSP: &str = "default-src 'self' site:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; style-src 'self' 'unsafe-inline' https:; img-src * data: site:; font-src * data: https:; connect-src 'self' site:; frame-src 'self' site: https:; object-src 'none'; base-uri 'none'";
 
+/// 预览注入脚本:独立预览窗口的壳层经 postMessage 激活后提供触摸镜像与
+/// 安卓侧滑返回,对编辑器内嵌预览保持沉默。脚本说明见 preview_shim.js。
+const PREVIEW_SHIM: &str = include_str!("preview_shim.js");
+
+/// 向 HTML 响应注入预览脚本:插在 </body> 前(大小写不敏感地取最后一处),
+/// 找不到锚点时整体追加;已含注入标记的页面原样返回,保证幂等。
+/// 非 UTF-8 的响应不注入(构建产物 HTML 均为 UTF-8,此分支只是兜底)。
+fn inject_preview_shim(bytes: Vec<u8>) -> Vec<u8> {
+    let text = match std::str::from_utf8(&bytes) {
+        Ok(t) => t,
+        Err(_) => return bytes,
+    };
+    if text.contains("__psPreviewShim") {
+        return bytes;
+    }
+    let snippet = format!("<script>{PREVIEW_SHIM}</script>");
+    // to_ascii_lowercase 保持字节长度不变,小写副本里的下标可直接用于原文本
+    let anchor = text.to_ascii_lowercase().rfind("</body>");
+    let mut out = Vec::with_capacity(bytes.len() + snippet.len());
+    match anchor {
+        Some(at) => {
+            out.extend_from_slice(&bytes[..at]);
+            out.extend_from_slice(snippet.as_bytes());
+            out.extend_from_slice(&bytes[at..]);
+        }
+        None => {
+            out.extend_from_slice(&bytes);
+            out.extend_from_slice(snippet.as_bytes());
+        }
+    }
+    out
+}
+
 fn serve_response(status: StatusCode, mime: &str, body: Vec<u8>) -> Response<Cow<'static, [u8]>> {
     Response::builder()
         .status(status)
@@ -109,7 +142,9 @@ fn handle_site<R: tauri::Runtime>(
     match std::fs::read(&target) {
         Ok(bytes) => {
             let mime = mime_for(&target.to_string_lossy());
-            serve_response(StatusCode::OK, mime, bytes)
+            // HTML 页面注入预览脚本(幂等);其余类型原样返回
+            let body = if mime.starts_with("text/html") { inject_preview_shim(bytes) } else { bytes };
+            serve_response(StatusCode::OK, mime, body)
         }
         Err(_) => serve_response(StatusCode::NOT_FOUND, "text/plain; charset=utf-8", Vec::new()),
     }

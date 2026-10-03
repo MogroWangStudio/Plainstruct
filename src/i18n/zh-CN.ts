@@ -419,6 +419,18 @@ export default {
     noSite: "未打开站点",
     backToMenu: "返回主菜单",
   },
+  previewShell: {
+    back: "后退",
+    forward: "前进",
+    reload: "刷新当前页",
+    desktop: "桌面端",
+    mobile: "移动端",
+    modeLabel: "预览模式",
+    deviceSpec: "模拟移动设备视口",
+    blank: "等待站点加载…",
+    browserOnly: "独立预览窗口需在桌面应用内打开。",
+    swipeHint: "自左缘向右滑动返回上一页 · 指针点击以真实触摸事件送达页面",
+  },
   menu: {
     cut: "剪切",
     copy: "复制",

@@ -419,6 +419,18 @@ export default {
     noSite: "No site open",
     backToMenu: "Back to Menu",
   },
+  previewShell: {
+    back: "Back",
+    forward: "Forward",
+    reload: "Reload page",
+    desktop: "Desktop",
+    mobile: "Mobile",
+    modeLabel: "Preview mode",
+    deviceSpec: "Simulated mobile viewport",
+    blank: "Waiting for the site…",
+    browserOnly: "The standalone preview window is available in the desktop app only.",
+    swipeHint: "Swipe right from the left edge to go back · pointer clicks are delivered as real touch events",
+  },
   menu: {
     cut: "Cut",
     copy: "Copy",

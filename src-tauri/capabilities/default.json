@@ -1,8 +1,11 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Plainstruct 主窗口默认权限",
-  "windows": ["main"],
+  "description": "Plainstruct 主窗口与独立预览窗口权限",
+  "windows": [
+    "main",
+    "site-preview"
+  ],
   "permissions": [
     "core:default",
     "core:window:allow-minimize",
