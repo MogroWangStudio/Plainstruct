@@ -389,7 +389,8 @@ onBeforeUnmount(() => {
 .shell {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  /* 视口高度:#app 无确定高度,100% 会塌缩(内容区 flex:1 1 0 将得到 0 高) */
+  height: 100vh;
   background: var(--color-bg);
 }
 
@@ -522,6 +523,11 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 100%;
 }
+/* 移动模式:.fit 以未缩放设备尺寸布局(内联样式给出),从左上角原点缩放,
+   视觉外框恰好落回 .holder 的居中盒内;默认中心原点会向右下偏移出窗口 */
+.holder.is-mobile .fit {
+  transform-origin: 0 0;
+}
 .screen {
   position: relative;
   width: 100%;
@@ -567,6 +573,7 @@ onBeforeUnmount(() => {
 .mock-note {
   position: absolute;
   inset: 0;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: center;
