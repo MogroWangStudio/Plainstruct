@@ -48,16 +48,16 @@ const sections = computed<Section[]>(() => {
   return order.map((label, i) => ({ id: `theme-cat-${i}`, label, fields: groups.get(label)! }));
 });
 
-/** 渲染行:分组标题与其下当前可见的字段;可见性联动使整组隐藏时不渲染标题 */
-const rows = computed<{ head?: Section; field?: ThemeField }[]>(() => {
-  const flat = (theme.activeMeta?.config ?? []).filter((f) => isVisible(f));
-  if (!sections.value.length) return flat.map((field) => ({ field }));
-  const out: { head?: Section; field?: ThemeField }[] = [];
+/** 渲染分组:分类主题每组一个圆角边框容器;无分类的旧主题合成单个无标题组平铺 */
+const groupedRows = computed<{ id?: string; label?: string; fields: ThemeField[] }[]>(() => {
+  if (!sections.value.length) {
+    return [{ fields: (theme.activeMeta?.config ?? []).filter((f) => isVisible(f)) }];
+  }
+  const out: { id?: string; label?: string; fields: ThemeField[] }[] = [];
   for (const section of sections.value) {
-    const visible = section.fields.filter((f) => isVisible(f));
-    if (!visible.length) continue;
-    out.push({ head: section });
-    for (const field of visible) out.push({ field });
+    const fields = section.fields.filter((f) => isVisible(f));
+    if (!fields.length) continue;
+    out.push({ id: section.id, label: section.label, fields });
   }
   return out;
 });
@@ -94,12 +94,41 @@ watch(catNav, (el) => {
   measureCatNav();
 });
 
-onBeforeUnmount(() => catNavObserver?.disconnect());
+onBeforeUnmount(() => {
+  catNavObserver?.disconnect();
+  flashAnim?.cancel();
+});
 
-/** 点击分类按钮滚动到对应分组,落点由 --cat-float 精确让位(减弱动态时直接跳位) */
+/** 点击分类按钮滚动到对应分组,落点由 --cat-float 精确让位(减弱动态时直接跳位);
+ *  跳转后分组标题短暂闪烁变色,提示落点位置 */
 function jumpTo(id: string) {
+  const el = document.getElementById(id);
+  if (!el) return;
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  document.getElementById(id)?.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
+  el.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
+  flashHead(el, reduced);
+}
+
+let flashAnim: Animation | null = null;
+
+/** 标题颜色脉冲三次(素色 → 注意色 → 素色);减弱动态时不闪,落点即时可见即足矣 */
+function flashHead(el: HTMLElement, reduced: boolean) {
+  if (reduced) return;
+  const base = getComputedStyle(el).color;
+  const attn = getComputedStyle(document.documentElement).getPropertyValue("--color-attention").trim() || "#3574f0";
+  flashAnim?.cancel();
+  flashAnim = el.animate(
+    [
+      { color: base, offset: 0 },
+      { color: attn, offset: 0.12 },
+      { color: base, offset: 0.3 },
+      { color: attn, offset: 0.45 },
+      { color: base, offset: 0.63 },
+      { color: attn, offset: 0.8 },
+      { color: base, offset: 1 },
+    ],
+    { duration: 1500, easing: "ease-in-out" },
+  );
 }
 
 /** visibleIf:仅当依赖字段(含默认值兜底)命中 equals 或 oneOf 时渲染该字段 */
@@ -234,12 +263,11 @@ function confirmPicker() {
       </button>
     </nav>
 
-    <template v-for="row in rows" :key="row.head ? row.head.id : (row.field?.key ?? '')">
-      <!-- 分组标题:面板顶部的分类按钮滚动到这里 -->
-      <h3 v-if="row.head" :id="row.head.id" class="cat-head">{{ row.head.label }}</h3>
-      <template v-else>
-        <!-- 单行循环把该行字段交给原有渲染块:结构与旧版完全一致 -->
-        <div v-for="field in row.field ? [row.field] : []" :key="field.key" class="flex flex-col">
+    <!-- 分组:圆角矩形边框把每组配置框起来;无分类的旧主题合成单个无标题组 -->
+    <section v-for="group in groupedRows" :key="group.id ?? '__flat__'" class="cat-group">
+      <!-- 分组标题:面板顶部的分类按钮滚动到这里,跳转后短暂闪烁变色提示落点 -->
+      <h3 v-if="group.id" :id="group.id" class="cat-head">{{ group.label }}</h3>
+      <div v-for="field in group.fields" :key="field.key" class="flex flex-col">
         <!-- 开关自带行内标签,不再重复渲染标题 -->
         <label v-if="field.type !== 'boolean'" class="field-label">{{ field.label }}</label>
 
@@ -346,9 +374,8 @@ function confirmPicker() {
           :value="String(fieldValue(field))"
           @change="onField(field, ($event.target as HTMLInputElement).value)"
         />
-        </div>
-      </template>
-    </template>
+      </div>
+    </section>
 
     <p v-if="!(theme.activeMeta?.config ?? []).length" class="text-[calc(13px*var(--ui-font-scale))] text-ink-3">
       {{ t("common.empty") }}
@@ -395,7 +422,16 @@ function confirmPicker() {
 </template>
 
 <style scoped>
-/* ---------- 分类快速跳转(悬浮圆角矩形)与分组标题 ---------- */
+/* ---------- 分组容器(圆角边框)、悬浮分类栏与分组标题 ---------- */
+.cat-group {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 14px 16px 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-xl);
+}
 .cat-nav {
   position: sticky;
   /* 视觉吸附位 6px;--cat-top 由脚本按滚动容器的 padding-top 补偿(见 measureCatNav) */
@@ -463,7 +499,8 @@ function confirmPicker() {
   outline-offset: 1px;
 }
 .cat-head {
-  margin: 6px 0 -10px;
+  /* 组内顶部即标题,外间距交给分组容器的内边距与间隙 */
+  margin: 0;
   font-size: calc(13.5px * var(--ui-font-scale));
   font-weight: 600;
   color: var(--color-ink-2);
