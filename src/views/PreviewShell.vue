@@ -9,6 +9,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import type { StyleValue } from "vue";
 import { useI18n } from "vue-i18n";
 import AppIcon from "@/components/AppIcon.vue";
+import SelectMenu from "@/components/SelectMenu.vue";
 import { Events, listen } from "@/ipc/events";
 import { siteUrl } from "@/lib/preview";
 import { springValue, type SpringHandle } from "@/lib/spring";
@@ -21,12 +22,62 @@ const onMac = platform === "macos";
 const onWindows = platform === "windows";
 const inTauri = platform !== "browser";
 
-/* ---------- 移动设备模拟参数 ---------- */
-const SCREEN_W = 412;
-const SCREEN_H = 915;
+/* ---------- 移动设备模拟:机型预设(真机常见 CSS 视口逻辑尺寸,竖屏) ---------- */
 const BEZEL = 10;
-const DEVICE_OUTER_W = SCREEN_W + BEZEL * 2;
-const DEVICE_OUTER_H = SCREEN_H + BEZEL * 2;
+
+interface DevicePreset {
+  name: string;
+  w: number;
+  h: number;
+}
+
+const DEVICES: DevicePreset[] = [
+  { name: "小米 14", w: 393, h: 873 },
+  { name: "Redmi Note 13", w: 394, h: 872 },
+  { name: "华为 Mate 60 Pro", w: 418, h: 915 },
+  { name: "荣耀 Magic6", w: 405, h: 894 },
+  { name: "OPPO Find X7", w: 394, h: 888 },
+  { name: "vivo X100", w: 388, h: 844 },
+  { name: "三星 Galaxy S24", w: 360, h: 780 },
+  { name: "Google Pixel 8", w: 412, h: 915 },
+  { name: "iPhone SE 3", w: 375, h: 667 },
+  { name: "iPhone 13 / 14", w: 390, h: 844 },
+  { name: "iPhone 15", w: 393, h: 852 },
+  { name: "iPhone 15 Pro Max", w: 430, h: 932 },
+];
+
+const DEVICE_KEY = "plainstruct.previewDevice";
+const DEFAULT_DEVICE = DEVICES.find((d) => d.name === "Google Pixel 8")!;
+
+function readDevice(): DevicePreset {
+  try {
+    const name = localStorage.getItem(DEVICE_KEY);
+    return DEVICES.find((d) => d.name === name) ?? DEFAULT_DEVICE;
+  } catch {
+    return DEFAULT_DEVICE;
+  }
+}
+
+const device = ref<DevicePreset>(readDevice());
+const screenW = computed(() => device.value.w);
+const screenH = computed(() => device.value.h);
+const deviceOuterW = computed(() => screenW.value + BEZEL * 2);
+const deviceOuterH = computed(() => screenH.value + BEZEL * 2);
+const deviceOptions = DEVICES.map((d) => ({ value: d.name, label: `${d.name} · ${d.w}×${d.h}` }));
+
+function setDevice(name: string) {
+  const hit = DEVICES.find((d) => d.name === name);
+  if (hit) device.value = hit;
+}
+
+watch(device, (d) => {
+  try {
+    localStorage.setItem(DEVICE_KEY, d.name);
+  } catch {
+    /* 持久化失败仅影响下次默认 */
+  }
+  void nextTick(refit);
+});
 
 /* ---------- 站点 iframe 与模式 ---------- */
 const frame = ref<HTMLIFrameElement>();
@@ -147,7 +198,7 @@ function handleGesture(d: BackMsg) {
   }
   // phase === "end":按位移与松手速度裁决后的结果做弹簧收尾,
   // 松手速度换算为进度速度交接给弹簧,避免拖拽与动画之间出现速度断崖
-  const vps = (d.vx ?? 0) / SCREEN_W;
+  const vps = (d.vx ?? 0) / screenW.value;
   if (d.commit) {
     entrancePending = true;
     gestureAnim = springValue(
@@ -196,7 +247,7 @@ const gestureStyle = computed<StyleValue | undefined>(() => {
 
 /* ---------- 模式切换与设备缩放 ---------- */
 
-const stage = ref<HTMLElement>();
+const deviceZone = ref<HTMLElement>();
 const fitScale = ref(1);
 
 watch(mode, (m) => {
@@ -212,12 +263,12 @@ watch(mode, (m) => {
 });
 
 function refit() {
-  const el = stage.value;
+  const el = deviceZone.value;
   if (!el || mode.value !== "mobile") return;
-  const availW = el.clientWidth - 48;
-  const availH = el.clientHeight - 48 - 30; // 四周留白 + 底部提示行
+  const availW = el.clientWidth - 32;
+  const availH = el.clientHeight - 32;
   if (availW <= 0 || availH <= 0) return;
-  fitScale.value = Math.min(1, availW / DEVICE_OUTER_W, availH / DEVICE_OUTER_H);
+  fitScale.value = Math.min(1, availW / deviceOuterW.value, availH / deviceOuterH.value);
 }
 
 /** 布局尺寸取缩放后的设备外框,缩放经 transform 呈现,避免溢出产生滚动 */
@@ -225,16 +276,16 @@ const holderStyle = computed<StyleValue | undefined>(() =>
   mode.value !== "mobile"
     ? undefined
     : {
-        width: `${(DEVICE_OUTER_W * fitScale.value).toFixed(2)}px`,
-        height: `${(DEVICE_OUTER_H * fitScale.value).toFixed(2)}px`,
+        width: `${(deviceOuterW.value * fitScale.value).toFixed(2)}px`,
+        height: `${(deviceOuterH.value * fitScale.value).toFixed(2)}px`,
       },
 );
 const fitStyle = computed<StyleValue | undefined>(() =>
   mode.value !== "mobile"
     ? undefined
     : {
-        width: `${DEVICE_OUTER_W}px`,
-        height: `${DEVICE_OUTER_H}px`,
+        width: `${deviceOuterW.value}px`,
+        height: `${deviceOuterH.value}px`,
         transform: `scale(${fitScale.value.toFixed(4)})`,
       },
 );
@@ -271,9 +322,9 @@ let unlistenRebuilt: (() => void) | null = null;
 
 onMounted(() => {
   void nextTick(measurePill);
-  if (stage.value) {
+  if (deviceZone.value) {
     resizeObserver = new ResizeObserver(refit);
-    resizeObserver.observe(stage.value);
+    resizeObserver.observe(deviceZone.value);
   }
   window.addEventListener("message", onWindowMessage);
   if (inTauri) {
@@ -324,7 +375,6 @@ onBeforeUnmount(() => {
           {{ address || t("previewShell.blank") }}
         </span>
       </div>
-      <span v-if="mode === 'mobile'" class="spec" :title="t('previewShell.deviceSpec')">{{ SCREEN_W }} × {{ SCREEN_H }}</span>
       <div class="modes" role="group" :aria-label="t('previewShell.modeLabel')">
         <span class="modes-pill" :style="pillStyle" aria-hidden="true"></span>
         <button
@@ -361,26 +411,46 @@ onBeforeUnmount(() => {
       </div>
     </header>
 
-    <!-- 内容区:同一 iframe 在两种模式间重排,切换不重载站点 -->
-    <div ref="stage" class="content">
+    <!-- 内容区:同一 iframe 在两种模式间重排,切换不重载站点;
+         移动模式设备居左,右侧为操作面板(模拟操作 + 机型预设) -->
+    <div class="content">
       <div v-if="!inTauri" class="mock-note">{{ t("previewShell.browserOnly") }}</div>
-      <div class="holder" :class="mode === 'mobile' ? 'is-mobile' : 'is-desktop'" :style="holderStyle">
-        <div class="fit" :style="fitStyle">
-          <div class="screen">
-            <div class="behind" aria-hidden="true"></div>
-            <div class="gesture" :style="mode === 'mobile' ? gestureStyle : undefined">
-              <iframe
-                ref="frame"
-                class="site"
-                :src="siteSrc"
-                title="site preview"
-                @load="onFrameLoad"
-              />
+      <div ref="deviceZone" class="device-zone">
+        <div class="holder" :class="mode === 'mobile' ? 'is-mobile' : 'is-desktop'" :style="holderStyle">
+          <div class="fit" :style="fitStyle">
+            <div class="screen">
+              <div class="behind" aria-hidden="true"></div>
+              <div class="gesture" :style="mode === 'mobile' ? gestureStyle : undefined">
+                <iframe
+                  ref="frame"
+                  class="site"
+                  :src="siteSrc"
+                  title="site preview"
+                  @load="onFrameLoad"
+                />
+              </div>
             </div>
           </div>
         </div>
       </div>
-      <p v-if="mode === 'mobile' && inTauri" class="hint">{{ t("previewShell.swipeHint") }}</p>
+      <aside v-if="mode === 'mobile'" class="ops">
+        <div class="ops-actions">
+          <button class="btn btn-secondary w-full" :disabled="!backAvail" @click="sendHistory(-1)">
+            <AppIcon name="arrowLeft" :size="15" />
+            {{ t("previewShell.backAction") }}
+          </button>
+          <button class="btn btn-secondary w-full" @click="reloadSite">
+            <AppIcon name="refresh" :size="15" />
+            {{ t("previewShell.reload") }}
+          </button>
+        </div>
+        <div class="ops-device">
+          <span class="ops-label">{{ t("previewShell.device") }}</span>
+          <SelectMenu :model-value="device.name" :options="deviceOptions" align="left" @update:model-value="setDevice" />
+        </div>
+        <p class="ops-viewport">{{ screenW }} × {{ screenH }}</p>
+        <p class="ops-hint">{{ t("previewShell.swipeHint") }}</p>
+      </aside>
     </div>
   </div>
 </template>
@@ -439,13 +509,6 @@ onBeforeUnmount(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.spec {
-  flex: none;
-  font-family: var(--font-mono);
-  font-size: calc(11px * var(--ui-font-scale));
-  color: var(--color-ink-3);
-  padding: 0 4px;
 }
 
 /* 模式分段控件:滑动药丸指示选中段,缓动与全应用一致 */
@@ -510,6 +573,13 @@ onBeforeUnmount(() => {
   background: var(--color-surface-2);
   overflow: hidden;
 }
+/* 设备区:桌面模式满幅即浏览器视口;移动模式居左,右侧让给操作面板 */
+.device-zone {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+}
 .holder {
   position: relative;
   /* flex 容器内两轴居中;桌面模式占满 100% 时不生效 */
@@ -559,16 +629,47 @@ onBeforeUnmount(() => {
   height: 100%;
   border: 0;
 }
-.hint {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 10px;
-  margin: 0;
-  text-align: center;
+
+/* ---------- 移动模式右侧操作面板 ---------- */
+.ops {
+  width: 244px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 16px;
+  background: var(--color-surface);
+  border-left: 1px solid var(--color-line);
+  overflow-y: auto;
+}
+.ops-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ops-device {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ops-label {
   font-size: calc(12px * var(--ui-font-scale));
   color: var(--color-ink-3);
-  pointer-events: none;
+}
+.ops-viewport {
+  margin: -6px 0 0;
+  font-family: var(--font-mono);
+  font-size: calc(12px * var(--ui-font-scale));
+  color: var(--color-ink-3);
+  text-align: center;
+}
+.ops-hint {
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-line);
+  font-size: calc(12px * var(--ui-font-scale));
+  line-height: 1.7;
+  color: var(--color-ink-3);
 }
 .mock-note {
   position: absolute;
@@ -579,6 +680,7 @@ onBeforeUnmount(() => {
   justify-content: center;
   font-size: calc(13px * var(--ui-font-scale));
   color: var(--color-ink-3);
+  pointer-events: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

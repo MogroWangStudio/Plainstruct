@@ -242,6 +242,27 @@
 
   /* ---------- 壳层消息:模式切换与历史导航 ---------- */
 
+  // 移动模式的触点光标:圆形指尖样式替代系统箭头,模拟触摸屏幕。
+  // 光标由 iframe 内部文档决定,只能由本脚本注入;深浅底色都可见。
+  var TOUCH_CURSOR_SVG =
+    "<svg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'>" +
+    "<circle cx='14' cy='14' r='10' fill='rgba(110,110,120,0.16)' stroke='rgba(24,24,27,0.4)' stroke-width='2.6'/>" +
+    "<circle cx='14' cy='14' r='10' fill='none' stroke='rgba(255,255,255,0.95)' stroke-width='1.4'/>" +
+    "<circle cx='14' cy='14' r='2' fill='rgba(255,255,255,0.96)' stroke='rgba(24,24,27,0.4)' stroke-width='0.8'/>" +
+    "</svg>";
+
+  function applyTouchCursor(on) {
+    document.documentElement.classList.toggle("ps-touch-cursor", !!on);
+    if (!on || document.getElementById("ps-touch-cursor-style")) return;
+    var style = document.createElement("style");
+    style.id = "ps-touch-cursor-style";
+    style.textContent =
+      ".ps-touch-cursor, .ps-touch-cursor * { cursor: url(\"data:image/svg+xml," +
+      encodeURIComponent(TOUCH_CURSOR_SVG) +
+      "\") 14 14, pointer !important; }";
+    document.head.appendChild(style);
+  }
+
   window.addEventListener("message", function (e) {
     if (e.source !== window.parent) return;
     var d = e.data;
@@ -249,6 +270,7 @@
     if (d.type === "mode") {
       if (mode === d.mode) return;
       mode = d.mode;
+      applyTouchCursor(mode === "mobile");
       if (mode !== "mobile" && gesture) endGesture(false); // 切模式打断进行中的手势
     } else if (d.type === "history" && typeof d.delta === "number") {
       history.go(d.delta); // delta 0 = 刷新当前页
