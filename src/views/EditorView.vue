@@ -3,10 +3,12 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useAppStore } from "@/stores/app";
+import { useBuilderStore } from "@/stores/builder";
 import { useEditorStore, type EditorMode } from "@/stores/editor";
 import { basename } from "@/lib/paths";
 import { siteUrl } from "@/lib/preview";
 import { toCssPx } from "@/lib/scale";
+import { ipc } from "@/ipc/ipc";
 import FileTree from "@/components/FileTree.vue";
 import MarkdownEditor from "@/components/MarkdownEditor.vue";
 import DocPreview from "@/components/DocPreview.vue";
@@ -15,6 +17,17 @@ import AppIcon from "@/components/AppIcon.vue";
 const { t } = useI18n();
 const editor = useEditorStore();
 const app = useAppStore();
+const builder = useBuilderStore();
+
+/** 独立预览窗口开关:未开则先构建再弹出;已开则关闭(状态由 store 跟踪) */
+async function togglePreviewWindow() {
+  if (builder.previewWindowOpen) {
+    await builder.closePreviewWindow();
+    return;
+  }
+  await builder.build();
+  await builder.openOrRefreshPreviewWindow();
+}
 
 /** 选中图片的预览地址;浏览器 mock 无 site:// 资源服务,降级为文件名占位 */
 const imageUrl = computed(() =>
@@ -110,6 +123,8 @@ function onEditorScroll() {
 
 onMounted(() => {
   editorRef.value?.scroller()?.addEventListener("scroll", onEditorScroll, { passive: true });
+  // 同步独立预览窗口开关状态(应用启动时窗口可能已开着)
+  if (ipc.inTauri) void builder.syncPreviewWindowOpen();
 });
 
 onBeforeUnmount(() => {
@@ -189,6 +204,17 @@ onBeforeUnmount(() => {
               <AppIcon :name="m.icon" :size="15" />
             </button>
           </div>
+
+          <!-- 独立预览窗口开关:未开时点击自动构建并弹出,已开时点击关闭 -->
+          <button
+            v-if="ipc.inTauri"
+            class="mode-btn preview-toggle"
+            :class="{ active: builder.previewWindowOpen }"
+            :title="t('editor.previewWindow')"
+            @click="togglePreviewWindow"
+          >
+            <AppIcon name="window" :size="15" />
+          </button>
         </header>
 
         <!-- 编辑 / 预览 -->
@@ -252,6 +278,12 @@ onBeforeUnmount(() => {
   background: var(--color-surface);
   color: var(--color-ink);
   box-shadow: 0 0 0 1px var(--color-line);
+}
+/* 独立预览窗口开关:窗口打开期间保持点亮,提示当前处于外窗预览 */
+.preview-toggle.is-on,
+.preview-toggle.active {
+  background: var(--color-accent-soft);
+  color: var(--color-ink);
 }
 
 .divider {

@@ -20,6 +20,8 @@ interface State {
   previewNonce: number;
   /** 构建进行中收到保存请求,结束后需补一次重建 */
   pendingRebuild: boolean;
+  /** 独立预览窗口当前是否打开(供界面开关按钮同步状态) */
+  previewWindowOpen: boolean;
 }
 
 let rebuildTimer: ReturnType<typeof setTimeout> | null = null;
@@ -32,6 +34,7 @@ export const useBuilderStore = defineStore("builder", {
     autoRebuild: true,
     previewNonce: 0,
     pendingRebuild: false,
+    previewWindowOpen: false,
   }),
 
   actions: {
@@ -87,6 +90,7 @@ export const useBuilderStore = defineStore("builder", {
         const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
         const existing = await WebviewWindow.getByLabel("site-preview");
         if (existing) {
+          this.previewWindowOpen = true;
           await this.notifyPreviewRebuilt();
           await existing.setFocus();
           return;
@@ -109,11 +113,35 @@ export const useBuilderStore = defineStore("builder", {
           visible: false,
           dragDropEnabled: false,
         });
-        void watchPreviewWindow(win);
+        this.previewWindowOpen = true;
+        void watchPreviewWindow(win, () => (this.previewWindowOpen = false));
         // 兜底:壳层启动失败时窗口将永不显示,2s 后强制显示以便暴露问题
         setTimeout(() => void win.show().catch(() => undefined), 2000);
       } catch {
         /* 非 Tauri 环境忽略 */
+      }
+    },
+
+    /** 关闭独立预览窗口(已打开才有动作);状态同步供界面开关按钮呈现 */
+    async closePreviewWindow() {
+      try {
+        const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
+        const existing = await WebviewWindow.getByLabel("site-preview");
+        if (existing) await existing.close();
+      } catch {
+        /* 非 Tauri 环境忽略 */
+      } finally {
+        this.previewWindowOpen = false;
+      }
+    },
+
+    /** 同步独立预览窗口开关状态(应用启动/进入编辑页时调用一次) */
+    async syncPreviewWindowOpen() {
+      try {
+        const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
+        this.previewWindowOpen = !!(await WebviewWindow.getByLabel("site-preview"));
+      } catch {
+        this.previewWindowOpen = false;
       }
     },
 
@@ -204,8 +232,8 @@ function previewWindowRect(): {
   return { ...PREVIEW_DEFAULT_SIZE, center: true };
 }
 
-/** 监听预览窗口移动/缩放,防抖记录逻辑矩形;窗口销毁后停止监听 */
-async function watchPreviewWindow(win: WebviewWindow) {
+/** 监听预览窗口移动/缩放,防抖记录逻辑矩形;窗口销毁后停止监听并回调状态同步 */
+async function watchPreviewWindow(win: WebviewWindow, onClosed?: () => void) {
   let timer: ReturnType<typeof setTimeout> | null = null;
   const save = () => {
     if (timer) clearTimeout(timer);
@@ -238,6 +266,7 @@ async function watchPreviewWindow(win: WebviewWindow) {
     await win.once("tauri://destroyed", () => {
       offMoved();
       offResized();
+      onClosed?.();
     });
   } catch {
     /* 监听失败不影响窗口使用 */

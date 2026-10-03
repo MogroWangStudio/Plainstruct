@@ -108,6 +108,7 @@ export default {
     assetDragHint: "按住「{name}」拖到正文,即可插入图片引用",
   },
   editor: {
+    previewWindow: "独立预览窗口(点击自动构建并弹出,再次点击关闭)",
     emptyTitle: "开始写作",
     emptyBody: "从左侧选择或新建一篇文档。",
     saving: "保存中…",
@@ -428,6 +429,8 @@ export default {
     modeLabel: "预览模式",
     device: "设备",
     backAction: "返回",
+    viewportLogical: "逻辑",
+    viewportPhysical: "物理",
     blank: "等待站点加载…",
     browserOnly: "独立预览窗口需在桌面应用内打开。",
     swipeHint: "自左缘向右滑动返回上一页 · 指针点击以真实触摸事件送达页面",

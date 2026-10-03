@@ -108,6 +108,7 @@ export default {
     assetDragHint: "Drag \"{name}\" into the body to insert a reference",
   },
   editor: {
+    previewWindow: "Standalone preview window (click to build & open, click again to close)",
     emptyTitle: "Start writing",
     emptyBody: "Pick or create a document from the left.",
     saving: "Saving…",
@@ -428,6 +429,8 @@ export default {
     modeLabel: "Preview mode",
     device: "Device",
     backAction: "Back",
+    viewportLogical: "CSS",
+    viewportPhysical: "Physical",
     blank: "Waiting for the site…",
     browserOnly: "The standalone preview window is available in the desktop app only.",
     swipeHint: "Swipe right from the left edge to go back · pointer clicks are delivered as real touch events",

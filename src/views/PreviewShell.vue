@@ -22,28 +22,31 @@ const onMac = platform === "macos";
 const onWindows = platform === "windows";
 const inTauri = platform !== "browser";
 
-/* ---------- 移动设备模拟:机型预设(真机常见 CSS 视口逻辑尺寸,竖屏) ---------- */
+/* ---------- 移动设备模拟:机型预设(真机常见视口,竖屏;逻辑尺寸 × DPR ≈ 物理分辨率) ---------- */
 const BEZEL = 10;
 
 interface DevicePreset {
   name: string;
+  /** CSS 逻辑视口(模拟实际生效的尺寸) */
   w: number;
   h: number;
+  /** 设备像素比(用于展示物理分辨率;WebView 不改写 DPR) */
+  dpr: number;
 }
 
 const DEVICES: DevicePreset[] = [
-  { name: "小米 14", w: 393, h: 873 },
-  { name: "Redmi Note 13", w: 394, h: 872 },
-  { name: "华为 Mate 60 Pro", w: 418, h: 915 },
-  { name: "荣耀 Magic6", w: 405, h: 894 },
-  { name: "OPPO Find X7", w: 394, h: 888 },
-  { name: "vivo X100", w: 388, h: 844 },
-  { name: "三星 Galaxy S24", w: 360, h: 780 },
-  { name: "Google Pixel 8", w: 412, h: 915 },
-  { name: "iPhone SE 3", w: 375, h: 667 },
-  { name: "iPhone 13 / 14", w: 390, h: 844 },
-  { name: "iPhone 15", w: 393, h: 852 },
-  { name: "iPhone 15 Pro Max", w: 430, h: 932 },
+  { name: "小米 14", w: 400, h: 890, dpr: 3 },
+  { name: "Redmi Note 13", w: 393, h: 873, dpr: 2.75 },
+  { name: "华为 Mate 60 Pro", w: 420, h: 907, dpr: 3 },
+  { name: "荣耀 Magic6", w: 427, h: 933, dpr: 3 },
+  { name: "OPPO Find X7", w: 421, h: 920, dpr: 3 },
+  { name: "vivo X100", w: 420, h: 933, dpr: 3 },
+  { name: "三星 Galaxy S24", w: 360, h: 780, dpr: 3 },
+  { name: "Google Pixel 8", w: 412, h: 915, dpr: 2.625 },
+  { name: "iPhone SE 3", w: 375, h: 667, dpr: 2 },
+  { name: "iPhone 13 / 14", w: 390, h: 844, dpr: 3 },
+  { name: "iPhone 15", w: 393, h: 852, dpr: 3 },
+  { name: "iPhone 15 Pro Max", w: 430, h: 932, dpr: 3 },
 ];
 
 const DEVICE_KEY = "plainstruct.previewDevice";
@@ -61,9 +64,11 @@ function readDevice(): DevicePreset {
 const device = ref<DevicePreset>(readDevice());
 const screenW = computed(() => device.value.w);
 const screenH = computed(() => device.value.h);
+const physW = computed(() => Math.round(screenW.value * device.value.dpr));
+const physH = computed(() => Math.round(screenH.value * device.value.dpr));
 const deviceOuterW = computed(() => screenW.value + BEZEL * 2);
 const deviceOuterH = computed(() => screenH.value + BEZEL * 2);
-const deviceOptions = DEVICES.map((d) => ({ value: d.name, label: `${d.name} · ${d.w}×${d.h}` }));
+const deviceOptions = DEVICES.map((d) => ({ value: d.name, label: `${d.name} · ${d.w}×${d.h} @${d.dpr}x` }));
 
 function setDevice(name: string) {
   const hit = DEVICES.find((d) => d.name === name);
@@ -78,6 +83,55 @@ watch(device, (d) => {
   }
   void nextTick(refit);
 });
+
+/* ---------- 操作面板宽度:可拖拽调节并记忆(与文件树/资产面板同一交互) ---------- */
+const OPS_W_KEY = "plainstruct.previewOpsWidth";
+const OPS_W_MIN = 220;
+const OPS_W_MAX = 420;
+const opsW = ref(readOpsWidth());
+let opsDragging = false;
+
+function readOpsWidth(): number {
+  try {
+    const raw = localStorage.getItem(OPS_W_KEY);
+    if (raw) {
+      const v = Number(raw);
+      if (Number.isFinite(v) && v > 0) return Math.min(OPS_W_MAX, Math.max(OPS_W_MIN, Math.round(v)));
+    }
+  } catch {
+    /* 无记录走默认 */
+  }
+  return 280;
+}
+
+function onOpsDividerDown(e: PointerEvent) {
+  if (e.button !== 0) return;
+  (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  opsDragging = true;
+}
+
+function onOpsDividerMove(e: PointerEvent) {
+  if (!opsDragging) return;
+  if (!(e.buttons & 1)) {
+    opsDragging = false;
+    return;
+  }
+  // 以内容区右缘为基准,指针到右缘的距离即面板宽度
+  const content = deviceZone.value?.parentElement;
+  if (!content) return;
+  const w = content.getBoundingClientRect().right - e.clientX;
+  opsW.value = Math.min(OPS_W_MAX, Math.max(OPS_W_MIN, Math.round(w)));
+}
+
+function onOpsDividerUp() {
+  if (!opsDragging) return;
+  opsDragging = false;
+  try {
+    localStorage.setItem(OPS_W_KEY, String(opsW.value));
+  } catch {
+    /* 持久化失败仅影响下次默认 */
+  }
+}
 
 /* ---------- 站点 iframe 与模式 ---------- */
 const frame = ref<HTMLIFrameElement>();
@@ -414,8 +468,8 @@ onBeforeUnmount(() => {
     <!-- 内容区:同一 iframe 在两种模式间重排,切换不重载站点;
          移动模式设备居左,右侧为操作面板(模拟操作 + 机型预设) -->
     <div class="content">
-      <div v-if="!inTauri" class="mock-note">{{ t("previewShell.browserOnly") }}</div>
       <div ref="deviceZone" class="device-zone">
+        <div v-if="!inTauri" class="mock-note">{{ t("previewShell.browserOnly") }}</div>
         <div class="holder" :class="mode === 'mobile' ? 'is-mobile' : 'is-desktop'" :style="holderStyle">
           <div class="fit" :style="fitStyle">
             <div class="screen">
@@ -433,7 +487,11 @@ onBeforeUnmount(() => {
           </div>
         </div>
       </div>
-      <aside v-if="mode === 'mobile'" class="ops">
+      <aside v-if="mode === 'mobile'" class="ops-divider" role="separator" aria-orientation="vertical"
+        @pointerdown="onOpsDividerDown" @pointermove="onOpsDividerMove" @pointerup="onOpsDividerUp"
+        @pointercancel="onOpsDividerUp"
+      ></aside>
+      <aside v-if="mode === 'mobile'" class="ops" :style="{ width: `${opsW}px` }">
         <div class="ops-actions">
           <button class="btn btn-secondary w-full" :disabled="!backAvail" @click="sendHistory(-1)">
             <AppIcon name="arrowLeft" :size="15" />
@@ -448,7 +506,10 @@ onBeforeUnmount(() => {
           <span class="ops-label">{{ t("previewShell.device") }}</span>
           <SelectMenu :model-value="device.name" :options="deviceOptions" align="left" @update:model-value="setDevice" />
         </div>
-        <p class="ops-viewport">{{ screenW }} × {{ screenH }}</p>
+        <p class="ops-viewport">
+          <span>{{ t("previewShell.viewportLogical") }} {{ screenW }} × {{ screenH }}</span>
+          <span>@{{ device.dpr }}x · {{ t("previewShell.viewportPhysical") }} {{ physW }} × {{ physH }}</span>
+        </p>
         <p class="ops-hint">{{ t("previewShell.swipeHint") }}</p>
       </aside>
     </div>
@@ -632,7 +693,7 @@ onBeforeUnmount(() => {
 
 /* ---------- 移动模式右侧操作面板 ---------- */
 .ops {
-  width: 244px;
+  width: 280px;
   flex: none;
   display: flex;
   flex-direction: column;
@@ -641,6 +702,23 @@ onBeforeUnmount(() => {
   background: var(--color-surface);
   border-left: 1px solid var(--color-line);
   overflow-y: auto;
+}
+/* 面板左缘分隔线:拖拽调宽,命中区外扩 3px */
+.ops-divider {
+  position: relative;
+  flex: none;
+  width: 1px;
+  background: var(--color-line);
+  cursor: col-resize;
+  touch-action: none;
+}
+.ops-divider::after {
+  content: "";
+  position: absolute;
+  left: -3px;
+  right: -3px;
+  top: 0;
+  bottom: 0;
 }
 .ops-actions {
   display: flex;
@@ -657,11 +735,17 @@ onBeforeUnmount(() => {
   color: var(--color-ink-3);
 }
 .ops-viewport {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   margin: -6px 0 0;
   font-family: var(--font-mono);
   font-size: calc(12px * var(--ui-font-scale));
   color: var(--color-ink-3);
   text-align: center;
+}
+.ops-viewport .ops-physical {
+  font-size: calc(11px * var(--ui-font-scale));
 }
 .ops-hint {
   margin-top: auto;

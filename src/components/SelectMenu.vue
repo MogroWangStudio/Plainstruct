@@ -72,6 +72,14 @@ function onDocPointer(e: PointerEvent) {
   if (open.value && root.value && !root.value.contains(e.target as Node)) close();
 }
 
+/** 滚动收起:只对外部容器滚动生效。面板自身滚动不收起 —— 选中项在面板可视区
+ *  之外时,打开菜单聚焦它会自动滚动面板;选项列表超高后滚动手势也在面板内,
+ *  这两种滚动若触发收起,菜单就会在打开的瞬间或使用中直接消失 */
+function onDocScroll(e: Event) {
+  if (listEl.value && e.target instanceof Node && listEl.value.contains(e.target)) return;
+  close();
+}
+
 function onPanelKeydown(e: KeyboardEvent) {
   if (e.key === "Escape") {
     e.stopPropagation();
@@ -90,14 +98,14 @@ function onPanelKeydown(e: KeyboardEvent) {
 
 onMounted(() => {
   document.addEventListener("pointerdown", onDocPointer, true);
-  // 滚动/改变尺寸时收起,避免面板与触发器脱节
-  window.addEventListener("scroll", close, true);
+  // 滚动/改变尺寸时收起,避免面板与触发器脱节(面板内部滚动除外,见 onDocScroll)
+  window.addEventListener("scroll", onDocScroll, true);
   window.addEventListener("resize", close);
 });
 
 onBeforeUnmount(() => {
   document.removeEventListener("pointerdown", onDocPointer, true);
-  window.removeEventListener("scroll", close, true);
+  window.removeEventListener("scroll", onDocScroll, true);
   window.removeEventListener("resize", close);
 });
 </script>
