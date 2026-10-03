@@ -205,9 +205,8 @@ onBeforeUnmount(() => {
             </button>
           </div>
 
-          <!-- 独立预览窗口开关:未开时点击自动构建并弹出,已开时点击关闭 -->
+          <!-- 独立预览窗口开关:未开时点击自动构建并弹出,已开时点击关闭(浏览器 mock 为标签页) -->
           <button
-            v-if="ipc.inTauri"
             class="mode-btn preview-toggle"
             :class="{ active: builder.previewWindowOpen }"
             :title="t('editor.previewWindow')"

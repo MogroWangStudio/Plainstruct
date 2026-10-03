@@ -25,6 +25,8 @@ interface State {
 }
 
 let rebuildTimer: ReturnType<typeof setTimeout> | null = null;
+/** 浏览器 mock 下打开的壳层标签页(命名窗口,可复用与关闭) */
+let browserPreviewTab: Window | null = null;
 
 export const useBuilderStore = defineStore("builder", {
   state: (): State => ({
@@ -86,10 +88,13 @@ export const useBuilderStore = defineStore("builder", {
       const site = useSiteStore();
       const app = useAppStore();
       if (!site.root) return;
-      // 浏览器 mock:以新标签页打开壳层页面(site:// 协议不可用,壳层仅演示界面形态)
+      // 浏览器 mock:以命名标签页打开壳层页面(site:// 协议不可用,壳层仅演示界面形态;
+      // 命名窗口让重复打开复用同一标签,与 Tauri 侧 getByLabel 的语义一致)
       if (app.platform === "browser") {
         const title = `${site.config?.name ?? "Plainstruct"} · ${i18n.global.t("build.preview")}`;
-        window.open(previewShellUrl(app, title), "_blank");
+        browserPreviewTab = window.open(previewShellUrl(app, title), "plainstruct-preview");
+        browserPreviewTab?.focus();
+        this.previewWindowOpen = true;
         return;
       }
       try {
@@ -130,6 +135,12 @@ export const useBuilderStore = defineStore("builder", {
 
     /** 关闭独立预览窗口(已打开才有动作);状态同步供界面开关按钮呈现 */
     async closePreviewWindow() {
+      if (useAppStore().platform === "browser") {
+        browserPreviewTab?.close();
+        browserPreviewTab = null;
+        this.previewWindowOpen = false;
+        return;
+      }
       try {
         const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
         const existing = await WebviewWindow.getByLabel("site-preview");
