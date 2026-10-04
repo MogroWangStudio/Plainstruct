@@ -31,13 +31,21 @@ article a img {
   position: fixed;
   inset: 0;
   z-index: 10000;
+  pointer-events: auto;
+}
+/* 暗化背景独立成层:开合只淡出背景,飞回的图片保持完全不透明,
+   不会随遮罩一起淡化消失 */
+#ps-lightbox::before {
+  content: "";
+  position: absolute;
+  inset: 0;
   background: rgba(12, 12, 13, 0.78);
   -webkit-backdrop-filter: blur(10px) saturate(1.2);
   backdrop-filter: blur(10px) saturate(1.2);
   opacity: 0;
   transition: opacity 0.28s ease;
 }
-#ps-lightbox.ps-open {
+#ps-lightbox.ps-open::before {
   opacity: 1;
 }
 .ps-lb-img {
@@ -179,7 +187,7 @@ article a img {
   }
 }
 @media (prefers-reduced-transparency: reduce) {
-  #ps-lightbox {
+  #ps-lightbox::before {
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
     background: rgba(12, 12, 13, 0.92);
