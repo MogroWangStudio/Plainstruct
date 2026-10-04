@@ -61,7 +61,12 @@
   function zoomable(target) {
     var im = target && target.tagName === "IMG" ? target : null;
     if (!im || !im.getAttribute("src") || im.getAttribute("data-ps-nozoom") !== null) return false;
-    if (requireMark && (" " + im.className + " ").indexOf(" " + requireMark + " ") === -1) return false;
+    if (requireMark) {
+      var token = requireMark.replace(/[^A-Za-z0-9_-]/g, "");
+      var own = " " + im.className + " ";
+      var inMarked = own.indexOf(" " + requireMark + " ") !== -1 || (token && im.closest("." + token));
+      if (!inMarked) return false;
+    }
     if (im.closest("a, header, nav, footer, aside, button")) return false;
     if (!im.closest("main, article, .ps-main, .blog-main, .blog-post-body")) return false;
     var r = im.getBoundingClientRect();
@@ -143,27 +148,29 @@
           apply();
           return;
         }
-        // FLIP:先摆到源图的位置与尺寸,再迁移到居中适配位
+        // FLIP:先无过渡摆到源图的位置与尺寸(基尺寸用布局值,避免测到过渡中间帧),
+        // 强制回流让起点生效,再切长曲线迁移到居中适配位
+        setMode("ps-lb-dragging");
         st.scale = 1;
         st.tx = 0;
         st.ty = 0;
         st.rot = 0;
         apply();
         var from = im.getBoundingClientRect();
-        var to = img.getBoundingClientRect();
-        if (from.width && to.width) {
-          var s = Math.min(from.width / to.width, from.height / to.height);
+        var baseW = img.offsetWidth || 1;
+        var baseH = img.offsetHeight || 1;
+        if (from.width && baseW) {
+          st.scale = Math.min(from.width / baseW, from.height / baseH);
           st.tx = from.left + from.width / 2 - window.innerWidth / 2;
           st.ty = from.top + from.height / 2 - window.innerHeight / 2;
-          st.scale = s;
         }
         apply();
-        requestAnimationFrame(function () {
-          st.scale = 1;
-          st.tx = 0;
-          st.ty = 0;
-          apply();
-        });
+        img.getBoundingClientRect();
+        setMode(null);
+        st.scale = 1;
+        st.tx = 0;
+        st.ty = 0;
+        apply();
       });
     };
     if (img.complete && img.naturalWidth) showNow();
@@ -195,12 +202,16 @@
     var back = sourceImg && !reduced ? sourceImg.getBoundingClientRect() : null;
     var visible = back && back.bottom > 0 && back.top < window.innerHeight && back.width > 0;
     if (visible) {
-      // 空间一致:沿来路返回源图位置,而不是原地消散
+      // 空间一致:沿来路返回源图位置。基尺寸取 offsetWidth(布局尺寸,不受当前
+      // transform 影响;getBoundingClientRect 会带上 scale 导致二次缩放跳变),
+      // 旋转在返回途中收正到最近的整圈,落地时与源图朝向一致
       setMode(null);
-      var s = Math.min(back.width / img.getBoundingClientRect().width, back.height / img.getBoundingClientRect().height);
+      var baseW = img.offsetWidth || 1;
+      var baseH = img.offsetHeight || 1;
+      st.scale = Math.min(back.width / baseW, back.height / baseH);
       st.tx = back.left + back.width / 2 - window.innerWidth / 2;
       st.ty = back.top + back.height / 2 - window.innerHeight / 2;
-      st.scale = s;
+      st.rot = Math.round(st.rot / 360) * 360;
       apply();
       window.setTimeout(done, 580);
     } else {
@@ -281,7 +292,7 @@
     sep1.className = "ps-lb-sep";
     var rot = btn(ICON.rotate, T.rotate, function () {
       setMode("ps-lb-spring");
-      st.rot = (st.rot + 90) % 360;
+      st.rot += 90; // 累积角度:取模会让 270°→0° 沿原路倒转一大圈
       apply();
     });
     var dl = btn(ICON.download, T.download, function () {
@@ -489,7 +500,7 @@
       apply();
     } else if (e.key === "r" || e.key === "R") {
       setMode("ps-lb-spring");
-      st.rot = (st.rot + 90) % 360;
+      st.rot += 90; // 累积角度:取模会让 270°→0° 沿原路倒转一大圈
       apply();
     } else if (e.key.startsWith("Arrow")) {
       e.preventDefault();

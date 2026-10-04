@@ -16,6 +16,7 @@ import { useUiStore } from "@/stores/ui";
 import { ipc } from "@/ipc/ipc";
 import { applyFrontMatter, parseFrontMatter } from "@/lib/frontmatter";
 import { encodePath, stripExt, ASSET_MIME, assetRefPrefix, relPosix } from "@/lib/paths";
+import { IMG_PREVIEW_MARK } from "@/lib/plugins";
 import { registerCmView, unregisterCmView } from "@/lib/contextMenu";
 import AppIcon from "@/components/AppIcon.vue";
 import FrontMatterModal, { type FrontMatterForm } from "@/components/FrontMatterModal.vue";
@@ -375,7 +376,7 @@ async function insertImages(asFigure: boolean) {
     const pieces = names.map((name) => {
       const alt = stripExt(name) || t("editor.toolbar.imageAlt");
       return asFigure
-        ? `<figure class="ps-image">\n  <img src="${encodePath(coverPrefix() + name)}" alt="${esc(alt)}">\n  <figcaption>${esc(alt)}</figcaption>\n</figure>`
+        ? `<figure class="ps-image">\n  <img class="${IMG_PREVIEW_MARK}" src="${encodePath(coverPrefix() + name)}" alt="${esc(alt)}">\n  <figcaption>${esc(alt)}</figcaption>\n</figure>`
         : `![${alt}](${encodePath(coverPrefix() + name)})`;
     });
     const markdown = pieces.join("\n");

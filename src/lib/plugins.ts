@@ -8,6 +8,9 @@ import imgPreviewJs from "@/plugins/ps-imgpreview.js?raw";
 import type { SiteConfig, SitePluginEntry, SitePluginFiles } from "@/ipc/types";
 import { encodePath } from "./paths";
 
+/** 图片预览的默认标记类:带该 class(或经配置改名)的图片才可点击预览 */
+export const IMG_PREVIEW_MARK = "mws_ps_imgpreview";
+
 /** 内置插件在产物内的路径 -> 内容 */
 export const BUILTIN_PLUGIN_FILES: Record<string, string> = {
   "assets/ps-plugins/ps-search.css": searchCss,
@@ -27,7 +30,8 @@ export function normalizePlugins(site: SiteConfig): {
   return {
     search: p.search ?? true,
     imgPreview: p.imgPreview ?? true,
-    imgPreviewRequireMark: typeof p.imgPreviewRequireMark === "string" ? p.imgPreviewRequireMark.trim() : "",
+    // 默认开启标记模式(内置约定类名);用户清空该字段则对所有正文图片生效
+    imgPreviewRequireMark: typeof p.imgPreviewRequireMark === "string" ? p.imgPreviewRequireMark.trim() : IMG_PREVIEW_MARK,
     custom: Array.isArray(p.custom) ? p.custom : [],
   };
 }

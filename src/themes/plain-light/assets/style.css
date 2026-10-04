@@ -918,23 +918,30 @@ a.ps-home-link:hover {
 }
 
 
-/* ---------- 文档 meta:作者署名与 AIGC 声明(配置头 author/aigc,随主题开关显示) ---------- */
+/* ---------- 文档 meta 行:日期 + 作者署名 + AIGC 声明(同一行,配置可分别关闭) ---------- */
+.ps-doc-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  margin: 0 0 20px;
+}
+.ps-doc-meta:empty {
+  display: none;
+}
+.ps-doc-meta .ps-doc-date {
+  margin: 0;
+}
 .ps-doc-author {
-  margin-left: 12px;
   font-size: 13px;
   color: var(--ps-ink-2);
 }
-.ps-doc-author + .ps-aigc {
-  margin-left: 10px;
-}
 .ps-aigc {
-  display: inline-block;
   padding: 1px 10px;
   border: 1px solid var(--ps-line);
   border-radius: 999px;
   font-size: 11.5px;
   color: var(--ps-ink-3);
-  vertical-align: 1px;
 }
 .ps-aigc[data-aigc="present"] {
   color: var(--ps-ink-2);

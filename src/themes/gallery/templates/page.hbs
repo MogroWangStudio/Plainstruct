@@ -1,7 +1,7 @@
 <article class="ps-doc">
   <div class="ps-doc-card">
     {{#if page.title}}<h1 class="ps-doc-title">{{page.title}}</h1>{{/if}}
-    {{#if config.showDate}}{{#if page.date}}<time class="ps-doc-date">{{page.date}}</time>{{/if}}{{/if}}{{#if config.showAuthor}}{{#if page.author}}<span class="ps-doc-author">{{page.author}}</span>{{/if}}{{/if}}{{#if config.showAigc}}{{#if page.aigc}}<span class="ps-aigc" data-aigc="{{page.aigc}}">{{#if (eq page.aigc "present")}}本文由 AI 辅助生成{{else}}本文无任何 AIGC{{/if}}</span>{{/if}}{{/if}}
+    <div class="ps-doc-meta">{{#if config.showDate}}{{#if page.date}}<time class="ps-doc-date">{{page.date}}</time>{{/if}}{{/if}}{{#if config.showAuthor}}{{#if page.author}}<span class="ps-doc-author">{{page.author}}</span>{{/if}}{{/if}}{{#if config.showAigc}}{{#if page.aigc}}<span class="ps-aigc" data-aigc="{{page.aigc}}">{{#if (eq page.aigc "present")}}本文由 AI 辅助生成{{else}}本文无任何 AIGC{{/if}}</span>{{/if}}{{/if}}</div>
   {{#if page.description}}<p class="ps-doc-desc">{{page.description}}</p>{{/if}}
     <div class="ps-doc-body">{{{page.content}}}</div>
   </div>

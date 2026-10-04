@@ -266,7 +266,7 @@ function confirmPicker() {
 const plugins = computed(() =>
   site.config
     ? normalizePlugins(site.config)
-    : { search: true, imgPreview: true, imgPreviewRequireMark: "", custom: [] },
+    : { search: true, imgPreview: true, imgPreviewRequireMark: "mws_ps_imgpreview", custom: [] },
 );
 
 function setBuiltin(key: "search" | "imgPreview", on: boolean) {
