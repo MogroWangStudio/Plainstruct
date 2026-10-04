@@ -22,6 +22,8 @@ export type ConfettiLevel = "off" | "light" | "standard" | "grand";
 export interface AppSettings {
   locale: Locale;
   autosave: boolean;
+  /** 自动保存延迟:停止输入后多久落盘(毫秒,300–5000,缺省 900) */
+  autosaveDelay?: number;
   theme?: AppTheme;
   uiFont?: UiFontMode;
   uiFontCustom?: string;

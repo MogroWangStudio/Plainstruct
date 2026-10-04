@@ -41,12 +41,13 @@ export interface AppearanceSettings {
   editorFontCustom?: string;
 }
 
-/** 编辑器写作偏好(空白标记与键位) */
+/** 编辑器写作偏好(空白标记、键位与自动保存延迟) */
 export interface EditorPrefs {
   editorWhitespace?: boolean;
   editorBreakKey?: EditorBreakKey;
   editorIndentKey?: EditorIndentKey;
   editorIndentWidth?: number;
+  autosaveDelay?: number;
 }
 
 /** 常用字体栈(与素构站点主题一致) */
@@ -78,6 +79,18 @@ export function normalizeUiFontWeight(v: unknown): number {
   }
   const legacy: Record<string, number> = { normal: 400, medium: 500, semibold: 600 };
   return legacy[String(v)] ?? 400;
+}
+
+/** 自动保存延迟的缺省与边界(毫秒):历史数据缺字段或非法时按缺省处理 */
+export const AUTOSAVE_DELAY_DEFAULT = 900;
+export const AUTOSAVE_DELAY_MIN = 300;
+export const AUTOSAVE_DELAY_MAX = 5000;
+
+/** 自动保存延迟归一:取整并 clamp 到设置档位范围 */
+export function normalizeAutosaveDelay(v: unknown): number {
+  const n = Math.round(Number(v));
+  if (!Number.isFinite(n)) return AUTOSAVE_DELAY_DEFAULT;
+  return Math.min(AUTOSAVE_DELAY_MAX, Math.max(AUTOSAVE_DELAY_MIN, n));
 }
 
 interface State {
@@ -128,6 +141,7 @@ export const useAppStore = defineStore("app", {
         this.bootstrap?.settings ?? {
           locale: "zh-CN",
           autosave: true,
+          autosaveDelay: AUTOSAVE_DELAY_DEFAULT,
           theme: "system",
           uiFont: "system",
           uiFontSize: 1,

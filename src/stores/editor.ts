@@ -7,7 +7,7 @@ import type { TreeNode } from "@/ipc/types";
 import { extractHeadings, type Heading } from "@/lib/markdown";
 import { parseFrontMatter } from "@/lib/frontmatter";
 import { stripExt } from "@/lib/paths";
-import { useAppStore } from "./app";
+import { normalizeAutosaveDelay, useAppStore } from "./app";
 import { useBuilderStore } from "./builder";
 import { useSiteStore } from "./site";
 
@@ -124,9 +124,10 @@ export const useEditorStore = defineStore("editor", {
       this.headings = extractHeadings(text);
       if (!useAppStore().settings.autosave) return;
       if (autosaveTimer) clearTimeout(autosaveTimer);
+      // 停止输入后延迟落盘:延迟可在设置中调整(历史数据缺省 900ms)
       autosaveTimer = setTimeout(() => {
         void this.save();
-      }, 900);
+      }, normalizeAutosaveDelay(useAppStore().settings.autosaveDelay));
     },
 
     async save(): Promise<void> {

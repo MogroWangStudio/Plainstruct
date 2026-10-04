@@ -103,6 +103,7 @@ pub(crate) fn settings_defaults() -> Value {
     serde_json::json!({
         "locale": "zh-CN",
         "autosave": true,
+        "autosaveDelay": 900,
         "theme": "system",
         "uiFont": "system",
         "uiFontSize": 1,

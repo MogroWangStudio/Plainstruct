@@ -2,6 +2,7 @@
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import {
+  normalizeAutosaveDelay,
   normalizeUiFontSize,
   normalizeUiFontWeight,
   useAppStore,
@@ -31,6 +32,18 @@ const localeModel = computed({
 async function onAutosaveToggle() {
   await app.setAutosave(!app.settings.autosave);
 }
+
+/** 自动保存延迟档位(毫秒);按当前界面语言显示为秒 */
+const AUTOSAVE_DELAY_STEPS = [300, 500, 900, 1500, 3000, 5000];
+
+const autosaveDelayOptions = computed<{ value: string; label: string }[]>(() =>
+  AUTOSAVE_DELAY_STEPS.map((ms) => ({ value: String(ms), label: t("settings.autosaveDelayN", { n: (ms / 1000).toString() }) })),
+);
+
+const autosaveDelayModel = computed({
+  get: () => String(normalizeAutosaveDelay(app.settings.autosaveDelay)),
+  set: (v: string) => void app.setEditorPrefs({ autosaveDelay: Number(v) }),
+});
 
 /* ---------- 编辑器写作偏好(空白标记与键位) ---------- */
 
@@ -426,6 +439,14 @@ function openRelease(url: string) {
                       :class="app.settings.autosave ? 'translate-x-[22px]' : 'translate-x-[4px]'"
                     />
                   </button>
+                </div>
+                <!-- 自动保存延迟:仅在自动保存开启时出现,档位按停止输入后的落盘等待时间 -->
+                <div v-if="app.settings.autosave" class="settings-row" style="--i: 0">
+                  <div class="min-w-0">
+                    <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.autosaveDelay") }}</p>
+                    <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.autosaveDelayHint") }}</p>
+                  </div>
+                  <SelectMenu v-model="autosaveDelayModel" :options="autosaveDelayOptions" align="right" class="shrink-0" />
                 </div>
               </div>
 
