@@ -1,11 +1,14 @@
 <script setup lang="ts">
-/** 主题可视化配置面板 -- 由 theme.json 的 config schema 自动生成表单 */
+/** 主题可视化配置面板 -- 由 theme.json 的 config schema 自动生成表单;
+ *  末尾追加站点级「插件」分组(内置搜索/图片预览开关 + 用户导入的插件),对所有主题生效 */
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import type { ThemeField } from "@/ipc/types";
 import { navMaxOf, topNavItems, type NavPickerItem } from "@/lib/builder";
+import { normalizePlugins } from "@/lib/plugins";
 import { useSiteStore } from "@/stores/site";
 import { useThemeStore } from "@/stores/theme";
+import { useUiStore } from "@/stores/ui";
 import Modal from "@/components/Modal.vue";
 import SelectMenu from "@/components/SelectMenu.vue";
 import ColorPicker from "@/components/ColorPicker.vue";
@@ -14,6 +17,7 @@ import AppIcon from "@/components/AppIcon.vue";
 const { t } = useI18n();
 const theme = useThemeStore();
 const site = useSiteStore();
+const ui = useUiStore();
 
 function onField(field: ThemeField, value: string | number | boolean) {
   void theme.setConfigValue(field.key, value);
@@ -31,10 +35,14 @@ interface Section {
   fields: ThemeField[];
 }
 
-/** 全部分组(按 theme.json 中的出现顺序);字段没有分类时归入「其他」 */
+/** 站点插件分组(固定追加在所有主题配置之后,不属于任何 theme.json schema) */
+const PLUGINS_ID = "theme-cat-plugins";
+
+/** 全部分组(按 theme.json 中的出现顺序);字段没有分类时归入「其他」;插件分组始终尾随 */
 const sections = computed<Section[]>(() => {
   const fields = theme.activeMeta?.config ?? [];
-  if (!fields.some((f) => f.category)) return [];
+  const pluginSection: Section = { id: PLUGINS_ID, label: t("theme.pluginsCategory"), fields: [] };
+  if (!fields.some((f) => f.category)) return [pluginSection];
   const order: string[] = [];
   const groups = new Map<string, ThemeField[]>();
   for (const f of fields) {
@@ -45,25 +53,31 @@ const sections = computed<Section[]>(() => {
     }
     groups.get(label)!.push(f);
   }
-  return order.map((label, i) => ({ id: `theme-cat-${i}`, label, fields: groups.get(label)! }));
+  return [...order.map((label, i) => ({ id: `theme-cat-${i}`, label, fields: groups.get(label)! })), pluginSection];
 });
 
 /** 渲染分组:分类主题每组一个圆角边框容器;无分类的旧主题合成单个无标题组平铺 */
 const groupedRows = computed<{ id?: string; label?: string; fields: ThemeField[] }[]>(() => {
-  if (!sections.value.length) {
-    return [{ fields: (theme.activeMeta?.config ?? []).filter((f) => isVisible(f)) }];
+  const fields = theme.activeMeta?.config ?? [];
+  if (!fields.some((f) => f.category)) {
+    return [
+      { fields: fields.filter((f) => isVisible(f)) },
+      { id: PLUGINS_ID, label: t("theme.pluginsCategory"), fields: [] },
+    ];
   }
   const out: { id?: string; label?: string; fields: ThemeField[] }[] = [];
   for (const section of sections.value) {
-    const fields = section.fields.filter((f) => isVisible(f));
-    if (!fields.length) continue;
-    out.push({ id: section.id, label: section.label, fields });
+    const groupFields = section.fields.filter((f) => isVisible(f));
+    if (!groupFields.length && section.id !== PLUGINS_ID) continue;
+    out.push({ id: section.id, label: section.label, fields: groupFields });
   }
   return out;
 });
 
-/** 顶部快速跳转按钮:只列当前有可见配置的分类 */
-const navSections = computed(() => sections.value.filter((s) => s.fields.some((f) => isVisible(f))));
+/** 顶部快速跳转按钮:只列当前有可见配置的分类(插件分组恒在) */
+const navSections = computed(() =>
+  sections.value.filter((s) => s.id === PLUGINS_ID || s.fields.some((f) => isVisible(f))),
+);
 
 /* 悬浮分类栏:圆角矩形浮层,滚动时内容从其下方穿过。分组标题的让位距离
    按栏的「实际渲染高度」动态计算 —— 分类多换行、界面字号缩放、语言切换
@@ -246,6 +260,33 @@ function confirmPicker() {
   if (pickerField.value) onField(pickerField.value, [...draft.value].join("\n"));
   pickerOpen.value = false;
 }
+
+/* ---------- 站点插件:内置插件开关 + 用户导入的插件(站点级,所有主题全局生效) ---------- */
+
+const plugins = computed(() =>
+  site.config
+    ? normalizePlugins(site.config)
+    : { search: true, imgPreview: true, custom: [] },
+);
+
+function setBuiltin(key: "search" | "imgPreview", on: boolean) {
+  void site.savePlugins({ [key]: on });
+}
+
+async function importPlugin() {
+  const ok = await site.importPlugin();
+  if (ok) ui.toast(t("theme.pluginImported"), "success");
+}
+
+async function removePlugin(id: string, name: string) {
+  const ok = await ui.confirmDialog({
+    title: t("theme.pluginRemoveTitle"),
+    body: t("theme.pluginRemoveBody", { name }),
+    danger: true,
+    confirmText: t("theme.pluginRemove"),
+  });
+  if (ok) await site.removePlugin(id);
+}
 </script>
 
 <template>
@@ -267,7 +308,68 @@ function confirmPicker() {
     <section v-for="group in groupedRows" :key="group.id ?? '__flat__'" class="cat-group">
       <!-- 分组标题:面板顶部的分类按钮滚动到这里,跳转后短暂闪烁变色提示落点 -->
       <h3 v-if="group.id" :id="group.id" class="cat-head">{{ group.label }}</h3>
-      <div v-for="field in group.fields" :key="field.key" class="flex flex-col">
+
+      <!-- 站点插件分组:内置插件开关 + 用户导入的插件,站点级配置,对所有主题全局生效 -->
+      <template v-if="group.id === PLUGINS_ID">
+        <label class="flex cursor-pointer items-center gap-2">
+          <input
+            type="checkbox"
+            class="checkbox-input"
+            :checked="plugins.search"
+            @change="setBuiltin('search', ($event.target as HTMLInputElement).checked)"
+          />
+          <span class="text-[calc(13px*var(--ui-font-scale))] text-ink-2">{{ t("theme.pluginSearch") }}</span>
+        </label>
+        <p class="opt-hint">{{ t("theme.pluginSearchHint") }}</p>
+
+        <label class="flex cursor-pointer items-center gap-2">
+          <input
+            type="checkbox"
+            class="checkbox-input"
+            :checked="plugins.imgPreview"
+            @change="setBuiltin('imgPreview', ($event.target as HTMLInputElement).checked)"
+          />
+          <span class="text-[calc(13px*var(--ui-font-scale))] text-ink-2">{{ t("theme.pluginImgPreview") }}</span>
+        </label>
+        <p class="opt-hint">{{ t("theme.pluginImgPreviewHint") }}</p>
+
+        <div class="flex flex-col gap-1 border-t border-line pt-3">
+          <template v-if="plugins.custom.length">
+            <div
+              v-for="entry in plugins.custom"
+              :key="entry.id"
+              class="plugin-row"
+              :title="entry.files.join('\n')"
+            >
+              <input
+                type="checkbox"
+                class="checkbox-input"
+                :checked="entry.enabled"
+                @change="site.setPluginEnabled(entry.id, ($event.target as HTMLInputElement).checked)"
+              />
+              <span class="min-w-0 flex-1 truncate text-[calc(13px*var(--ui-font-scale))] text-ink-2">{{ entry.name }}</span>
+              <span class="shrink-0 text-[calc(11px*var(--ui-font-scale))] text-ink-3">
+                {{ t("theme.pluginFileCount", { n: entry.files.length }) }}
+              </span>
+              <button type="button" class="btn-icon h-6 w-6 shrink-0" :title="t('theme.pluginRemove')" @click="removePlugin(entry.id, entry.name)">
+                <AppIcon name="trash" :size="12" />
+              </button>
+            </div>
+          </template>
+          <p v-else class="text-[calc(13px*var(--ui-font-scale))] text-ink-3">{{ t("theme.pluginEmpty") }}</p>
+        </div>
+
+        <div>
+          <button type="button" class="btn btn-secondary" @click="importPlugin">
+            <AppIcon name="plus" :size="13" />
+            {{ t("theme.pluginImport") }}
+          </button>
+        </div>
+        <p class="opt-hint">{{ t("theme.pluginHint") }}</p>
+      </template>
+
+      <template v-else>
+        <div v-for="field in group.fields" :key="field.key" class="flex flex-col">
         <!-- 开关自带行内标签,不再重复渲染标题 -->
         <label v-if="field.type !== 'boolean'" class="field-label">{{ field.label }}</label>
 
@@ -376,7 +478,8 @@ function confirmPicker() {
         />
         <!-- 行为边界说明(来自 theme.json 的 hint):如「首页不显示」之类,在配置处即可见 -->
         <p v-if="field.hint" class="opt-hint">{{ field.hint }}</p>
-      </div>
+        </div>
+      </template>
     </section>
 
     <p v-if="!(theme.activeMeta?.config ?? []).length" class="text-[calc(13px*var(--ui-font-scale))] text-ink-3">
@@ -531,6 +634,13 @@ function confirmPicker() {
   padding: 5px 0;
   cursor: pointer;
   transition: opacity var(--duration-base) var(--ease-plain);
+}
+/* 插件列表行:启用开关 + 名称 + 文件数 + 删除 */
+.plugin-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
 }
 .navlist-row.off {
   opacity: 0.4;

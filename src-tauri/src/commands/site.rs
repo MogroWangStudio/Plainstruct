@@ -34,6 +34,9 @@ pub struct SiteConfig {
     /// 站点类型:docs / blog,缺省 docs(兼容旧 site.json)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub site_type: Option<String>,
+    /// 站点插件:内置插件开关与用户导入的插件列表(结构与前端 SitePluginsConfig 对应)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plugins: Option<serde_json::Value>,
     pub theme: SiteThemeRef,
 }
 
@@ -47,6 +50,7 @@ impl Default for SiteConfig {
             locale: None,
             title_format: None,
             site_type: None,
+            plugins: None,
             theme: SiteThemeRef {
                 id: "plain-light".into(),
                 source: "builtin".into(),
@@ -193,6 +197,8 @@ pub struct SiteConfigPatch {
     #[serde(default)]
     pub site_type: Option<String>,
     #[serde(default)]
+    pub plugins: Option<serde_json::Value>,
+    #[serde(default)]
     pub theme: Option<SiteThemeRef>,
 }
 
@@ -226,6 +232,8 @@ pub fn save_site_config(window: tauri::WebviewWindow, state: State<'_, AppState>
             Some(t) => Some(t),
             None => existing.site_type,
         },
+        // 插件配置由前端整体读写(完整对象),patch 携带时整体覆盖
+        plugins: patch.plugins.or(existing.plugins),
         theme: patch.theme.unwrap_or(existing.theme),
     };
     write_site_config_file(&root, &cfg)?;

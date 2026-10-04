@@ -36,7 +36,7 @@ function applyMock() {
   const paths = collectDocPaths(site.tree);
   if (!paths.length || !site.config || !theme.activeBundle) return;
   if (!paths.includes(mockPath)) mockPath = mockHomePath(paths);
-  const html = renderPreview(site.config, theme.activeBundle, site.tree, site.docsCache, mockPath, undefined, app.platform);
+  const html = renderPreview(site.config, theme.activeBundle, site.tree, site.docsCache, mockPath, undefined, app.platform, site.pluginContents);
   const doc = frame.value.contentDocument;
   if (!doc) return;
   doc.open();

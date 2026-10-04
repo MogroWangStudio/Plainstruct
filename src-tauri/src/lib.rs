@@ -193,6 +193,10 @@ pub fn run() {
             commands::remove_site_logo,
             commands::set_site_favicon,
             commands::remove_site_favicon,
+            // 站点插件
+            commands::import_site_plugin,
+            commands::delete_site_plugin,
+            commands::read_site_plugin_files,
             // 内容
             commands::list_tree,
             commands::save_doc_order,

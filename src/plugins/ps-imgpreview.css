@@ -1,0 +1,159 @@
+/* 素构 · 图片预览插件样式 -- 预览块排版 + 灯箱(毛玻璃工具条,空间一致的进出场) */
+
+/* ---------- 编辑器插入的图片预览块 ---------- */
+figure.ps-image {
+  margin: 2em auto;
+  text-align: center;
+}
+figure.ps-image img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+figure.ps-image figcaption {
+  margin-top: 8px;
+  font: 400 12.5px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: #8e8e93;
+}
+
+/* 可预览的正文图片:光标提示可点击(链接内的图片保持 pointer) */
+main img,
+article img {
+  cursor: zoom-in;
+}
+main a img,
+article a img {
+  cursor: pointer;
+}
+
+/* ---------- 灯箱 ---------- */
+#ps-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(12, 12, 13, 0.78);
+  -webkit-backdrop-filter: blur(10px) saturate(1.2);
+  backdrop-filter: blur(10px) saturate(1.2);
+  opacity: 0;
+  transition: opacity 0.28s ease;
+}
+#ps-lightbox.ps-open {
+  opacity: 1;
+}
+.ps-lb-img {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  max-width: 92vw;
+  max-height: 86vh;
+  border-radius: 6px;
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.5);
+  /* 进出场/复位:空间一致的长曲线;旋转与双击走 ps-lb-spring 的短曲线 */
+  transition:
+    transform 0.55s cubic-bezier(0.32, 0.72, 0, 1),
+    opacity 0.28s ease;
+  will-change: transform;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.ps-lb-img.ps-lb-spring {
+  transition: transform 0.38s cubic-bezier(0.3, 1.15, 0.5, 1);
+}
+.ps-lb-img.ps-lb-dragging {
+  transition: none;
+}
+
+/* ---------- 工具条:底部悬浮毛玻璃胶囊 ---------- */
+.ps-lb-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 26px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  background: rgba(40, 40, 43, 0.68);
+  -webkit-backdrop-filter: blur(18px) saturate(1.5);
+  backdrop-filter: blur(18px) saturate(1.5);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+  transform: translate(-50%, 8px);
+  opacity: 0;
+  transition:
+    transform 0.4s cubic-bezier(0.32, 0.72, 0, 1),
+    opacity 0.3s ease;
+}
+#ps-lightbox.ps-open .ps-lb-bar {
+  transform: translate(-50%, 0);
+  opacity: 1;
+}
+.ps-lb-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  height: 34px;
+  padding: 0 7px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: #e8e8ea;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    transform 0.12s ease-out;
+}
+.ps-lb-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+.ps-lb-btn:active {
+  transform: scale(0.92);
+}
+.ps-lb-btn:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.7);
+  outline-offset: 1px;
+}
+.ps-lb-scale {
+  min-width: 52px;
+  font: 500 12px/1 system-ui, -apple-system, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+.ps-lb-sep {
+  width: 1px;
+  height: 16px;
+  margin: 0 5px;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+@media (max-width: 640px) {
+  .ps-lb-bar {
+    bottom: 18px;
+  }
+  .ps-lb-img {
+    max-width: 96vw;
+    max-height: 78vh;
+  }
+}
+
+/* 减弱动态:不迁移,只做交叉淡入 */
+@media (prefers-reduced-motion: reduce) {
+  .ps-lb-img,
+  .ps-lb-bar,
+  #ps-lightbox {
+    transition: opacity 0.2s ease;
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  #ps-lightbox {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: rgba(12, 12, 13, 0.92);
+  }
+  .ps-lb-bar {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: #28282b;
+  }
+}

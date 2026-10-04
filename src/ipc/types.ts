@@ -98,6 +98,26 @@ export interface SiteThemeRef {
   config: Record<string, string | number | boolean>;
 }
 
+/** 用户导入的站点插件:文件存于 .plainstruct/plugins/<id>/,构建时拷入产物 */
+export interface SitePluginEntry {
+  /** 插件目录名(自动生成,避免重名) */
+  id: string;
+  /** 显示名(取首个导入文件的名称) */
+  name: string;
+  /** 插件目录内的文件名列表(.js/.css) */
+  files: string[];
+  enabled: boolean;
+}
+
+/** 站点插件配置:内置插件(搜索/图片预览)开关 + 用户导入的插件列表 */
+export interface SitePluginsConfig {
+  /** 内置搜索插件,缺省开启 */
+  search?: boolean;
+  /** 内置图片预览插件,缺省开启 */
+  imgPreview?: boolean;
+  custom?: SitePluginEntry[];
+}
+
 export interface SiteConfig {
   name: string;
   description?: string;
@@ -108,7 +128,16 @@ export interface SiteConfig {
   locale?: string; // 站点语言:生成页面的 <html lang>
   titleFormat?: string; // 浏览器标题格式,如 "{page} · {site}"
   siteType?: SiteType; // 站点类型,缺省 docs(兼容旧站点)
+  /** 站点插件(搜索/图片预览开关与用户导入的插件),缺省时全部内置插件开启 */
+  plugins?: SitePluginsConfig;
   theme: SiteThemeRef;
+}
+
+/** 插件文件内容(预览内联用):readSitePluginFiles 的返回单元 */
+export interface SitePluginFiles {
+  id: string;
+  name: string;
+  files: { name: string; content: string }[];
 }
 
 export interface TreeNode {

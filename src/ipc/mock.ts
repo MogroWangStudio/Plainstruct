@@ -9,6 +9,8 @@ import type {
   PublishPreflight,
   RecentSite,
   SiteConfig,
+  SitePluginEntry,
+  SitePluginFiles,
   SyncProgress,
   SyncResult,
   ThemeMeta,
@@ -34,6 +36,8 @@ let recent: RecentSite[] = [];
 let currentRoot: string | null = null;
 let siteCounter = 0;
 let buildFiles = new Map<string, string>();
+/** 站点插件(mock):root -> id -> { name, files } */
+const mockPlugins = new Map<string, Map<string, { name: string; files: Map<string, string> }>>();
 
 function lsGet<T>(key: string, fallback: T): T {
   try {
@@ -375,6 +379,60 @@ async readSiteConfig(): Promise<SiteConfig> {
     delete cfg.favicon;
     writeConfig(currentRoot!, cfg);
     return cfg;
+  },
+
+  /* ---------- 站点插件(mock 内存虚拟文件系统) ---------- */
+
+  async importSitePlugin(srcPaths: string[]): Promise<SitePluginEntry> {
+    if (!srcPaths.length) throw new Error("未选择插件文件");
+    const pluginsFor = (root: string) => {
+      let m = mockPlugins.get(root);
+      if (!m) {
+        m = new Map();
+        mockPlugins.set(root, m);
+      }
+      return m;
+    };
+    const store = pluginsFor(currentRoot!);
+    let id = "";
+    do {
+      id = `plugin-${Date.now() % 1_000_000}-${Math.floor(Math.random() * 9973)}`;
+    } while (store.has(id));
+    const files = new Map<string, string>();
+    let name = "";
+    for (const src of srcPaths) {
+      const original = src.split(/[\\/]/).pop() ?? "plugin.js";
+      let stored = original;
+      let i = 2;
+      const dot = original.lastIndexOf(".");
+      const stem = dot > 0 ? original.slice(0, dot) : original;
+      const ext = dot > 0 ? original.slice(dot) : "";
+      while (files.has(stored)) stored = `${stem}-${i++}${ext}`;
+      files.set(stored, `/* mock 插件文件 ${original} */`);
+      if (!name) name = stem || original;
+    }
+    store.set(id, { name, files });
+    return { id, name, files: [...files.keys()], enabled: true };
+  },
+
+  async deleteSitePlugin(id: string): Promise<void> {
+    mockPlugins.get(currentRoot!)?.delete(id);
+  },
+
+  async readSitePluginFiles(entries: SitePluginEntry[]): Promise<SitePluginFiles[]> {
+    const store = mockPlugins.get(currentRoot!);
+    if (!store) return [];
+    const out: SitePluginFiles[] = [];
+    for (const entry of entries) {
+      const plugin = store.get(entry.id);
+      if (!plugin) continue;
+      out.push({
+        id: entry.id,
+        name: entry.name,
+        files: [...plugin.files].map(([name, content]) => ({ name, content })),
+      });
+    }
+    return out;
   },
 
   async listTree(): Promise<TreeNode[]> {
@@ -767,4 +825,9 @@ export function mockPickZip(): string {
 
 export function mockPickImage(): string {
   return "C:/Pictures/logo.png";
+}
+
+export function mockPickPlugin(): string[] {
+  siteCounter++;
+  return [`C:/Downloads/plugin-${siteCounter}.js`];
 }

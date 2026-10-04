@@ -6,7 +6,7 @@ import { useI18n } from "vue-i18n";
 import { collectDocPaths } from "@/lib/builder";
 import { formatSize } from "@/lib/format";
 import { moveImageRefs, countImageRefs, findImageRefs, replaceImageRefs, type ImageRef } from "@/lib/imageRefs";
-import { basename, dirname } from "@/lib/paths";
+import { basename, dirname, ASSET_MIME } from "@/lib/paths";
 import { siteUrl } from "@/lib/preview";
 import { toCssPx } from "@/lib/scale";
 import { ipc } from "@/ipc/ipc";
@@ -169,8 +169,11 @@ function onItemDragStart(path: string, e: DragEvent) {
   dragPaths.value = [...selected.value];
   anchorPath.value = path;
   if (e.dataTransfer) {
-    e.dataTransfer.effectAllowed = "move";
+    // copyMove:文件夹之间是移动,拖入编辑器是复制;单张图片额外携带
+    // ASSET_MIME,编辑器据此插入规范的 markdown 引用(多选拖入不支持)
+    e.dataTransfer.effectAllowed = "copyMove";
     e.dataTransfer.setData("text/plain", dragPaths.value.join("\n"));
+    if (dragPaths.value.length === 1) e.dataTransfer.setData(ASSET_MIME, dragPaths.value[0]);
   }
 }
 

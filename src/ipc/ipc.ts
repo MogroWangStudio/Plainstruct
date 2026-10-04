@@ -8,6 +8,8 @@ import type {
   PagesBuildStatus,
   PublishPreflight,
   SiteConfig,
+  SitePluginEntry,
+  SitePluginFiles,
   SyncProgress,
   SyncResult,
   ThemeMeta,
@@ -17,7 +19,7 @@ import type {
   VerifyResult,
 } from "./types";
 import { Events, listen } from "./events";
-import { mock, mockPickDirectory, mockPickImage, mockPickZip } from "./mock";
+import { mock, mockPickDirectory, mockPickImage, mockPickPlugin, mockPickZip } from "./mock";
 const inTauri = "__TAURI_INTERNALS__" in window;
 
 async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
@@ -125,6 +127,23 @@ export const ipc = {
   },
   removeSiteFavicon(): Promise<SiteConfig> {
     return inTauri ? invoke<SiteConfig>("remove_site_favicon") : mock.removeSiteFavicon();
+  },
+
+  /* ---------- 站点插件 ---------- */
+  /** 导入插件文件(多选 .js/.css 合并为一个插件条目,复制进 .plainstruct/plugins/<id>/) */
+  importSitePlugin(srcPaths: string[]): Promise<SitePluginEntry> {
+    return inTauri
+      ? invoke<SitePluginEntry>("import_site_plugin", { srcPaths })
+      : mock.importSitePlugin(srcPaths);
+  },
+  deleteSitePlugin(id: string): Promise<void> {
+    return inTauri ? invoke<void>("delete_site_plugin", { id }) : mock.deleteSitePlugin(id);
+  },
+  /** 读取插件文件内容(预览内联用;构建走磁盘拷贝,不需要此命令) */
+  readSitePluginFiles(entries: SitePluginEntry[]): Promise<SitePluginFiles[]> {
+    return inTauri
+      ? invoke<SitePluginFiles[]>("read_site_plugin_files", { entries })
+      : mock.readSitePluginFiles(entries);
   },
 
   /* ---------- 内容 ---------- */
@@ -342,6 +361,16 @@ export const ipc = {
       filters: [{ name: "Plainstruct Theme", extensions: ["zip"] }],
     });
     return typeof file === "string" ? file : null;
+  },
+  /** 插件导入:多选 .js/.css(mock 环境返回示例路径走通流程) */
+  async pickPluginFiles(): Promise<string[] | null> {
+    if (!inTauri) return mockPickPlugin();
+    const { open } = await import("@tauri-apps/plugin-dialog");
+    const files = await open({
+      multiple: true,
+      filters: [{ name: "Plugin (JS/CSS)", extensions: ["js", "css"] }],
+    });
+    return Array.isArray(files) ? files : files ? [files] : null;
   },
   async pickZipDest(defaultName: string): Promise<string | null> {
     if (!inTauri) return `C:/Downloads/${defaultName}`;

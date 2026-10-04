@@ -15,7 +15,7 @@ import { useSiteStore } from "@/stores/site";
 import { useUiStore } from "@/stores/ui";
 import { ipc } from "@/ipc/ipc";
 import { applyFrontMatter, parseFrontMatter } from "@/lib/frontmatter";
-import { encodePath, stripExt, ASSET_MIME, assetRefPrefix } from "@/lib/paths";
+import { encodePath, stripExt, ASSET_MIME, assetRefPrefix, relPosix } from "@/lib/paths";
 import { registerCmView, unregisterCmView } from "@/lib/contextMenu";
 import AppIcon from "@/components/AppIcon.vue";
 import FrontMatterModal, { type FrontMatterForm } from "@/components/FrontMatterModal.vue";
@@ -359,18 +359,24 @@ function writeFrontMatter(form: FrontMatterForm) {
  * 插入图片:选取后统一复制进站点 asset 文件夹(自动建目录、重名加序号),
  * 在光标处插入按当前文档位置换算的相对路径(根级文档 asset/…,子目录 ../asset/…),
  * 构建与预览都能正确显示;光标落在 front-matter 内时移到其后插入,避免破坏元数据块;
- * 资产栏同步刷新,并以提示说明图片去向。
+ * 资产栏同步刷新,并以提示说明图片去向。asFigure 时以 <figure class="ps-image">
+ * 预览块包裹(带图注),配合站点图片预览插件可点击进入灯箱。
  */
-async function insertImage() {
+async function insertImages(asFigure: boolean) {
   if (!view) return;
   const files = await ipc.pickImages();
   if (!files?.length) return;
   try {
     const names = await site.importSiteImages(files);
     if (!names.length) return;
-    const markdown = names
-      .map((name) => `![${stripExt(name) || t("editor.toolbar.imageAlt")}](${encodePath(coverPrefix() + name)})`)
-      .join("\n");
+    const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    const pieces = names.map((name) => {
+      const alt = stripExt(name) || t("editor.toolbar.imageAlt");
+      return asFigure
+        ? `<figure class="ps-image">\n  <img src="${encodePath(coverPrefix() + name)}" alt="${esc(alt)}">\n  <figcaption>${esc(alt)}</figcaption>\n</figure>`
+        : `![${alt}](${encodePath(coverPrefix() + name)})`;
+    });
+    const markdown = pieces.join("\n");
     const { state } = view;
     const range = state.selection.main;
     const fmEnd = frontMatterEnd(state.doc);
@@ -384,6 +390,15 @@ async function insertImage() {
   } catch (e) {
     ui.toast(t("editor.imageImportFailed", { msg: ipc.errText(e) }), "error");
   }
+}
+
+async function insertImage() {
+  await insertImages(false);
+}
+
+/** 插入图片预览块:<figure class="ps-image"> 包裹的图片 + 图注 */
+async function insertImageFigure() {
+  await insertImages(true);
 }
 
 /* ---------- 对齐:HTML 嵌入块 <div align="…">,构建与预览的主题样式均支持 ---------- */
@@ -702,8 +717,11 @@ const assetDrop = EditorView.domEventHandlers({
     const asset = e.dataTransfer?.getData(ASSET_MIME);
     if (!asset) return false;
     e.preventDefault();
-    const depth = editor.activePath ? editor.activePath.split("/").length - 1 : 0;
-    const ref = assetRefPrefix(depth) + asset;
+    // 载荷本身已是 content/ 相对路径(含资产目录名,如 asset/foo.png),
+    // 直接换算「当前文档目录 → 该文件」的相对引用;旧实现重复拼接
+    // assetRefPrefix 导致路径多出一层 asset/,引用 404
+    const docDir = editor.activePath ? editor.activePath.split("/").slice(0, -1).join("/") : "";
+    const ref = relPosix(docDir, asset);
     const md = `![${stripExt(asset.split("/").pop() ?? "") || t("editor.toolbar.imageAlt")}](${encodePath(ref)})`;
     let pos = v.posAtCoords({ x: e.clientX, y: e.clientY }) ?? v.state.selection.main.head;
     const fmEnd = frontMatterEnd(v.state.doc);
@@ -872,6 +890,9 @@ defineExpose({
       </button>
       <button class="tb-btn" :title="t('editor.toolbar.image')" @click="insertImage">
         <AppIcon name="image" :size="15" />
+      </button>
+      <button class="tb-btn" :title="t('editor.toolbar.imageFigure')" @click="insertImageFigure">
+        <AppIcon name="maximize" :size="15" />
       </button>
       <button class="tb-btn" :title="t('editor.toolbar.imgAlignLeft')" @click="alignImage('left')">
         <AppIcon name="imgAlignLeft" :size="15" />

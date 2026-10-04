@@ -36,6 +36,7 @@ function computeHtml(): string {
     editor.activePath,
     editor.content,
     app.platform,
+    site.pluginContents,
   );
 }
 

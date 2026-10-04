@@ -1,12 +1,24 @@
 /** 构建管线 -- 读树 -> 渲染 Markdown -> 套主题 -> 写出 build/;
  *  renderPreview 与构建共用同一套解析,保证「预览即产出」。 */
 import { ipc } from "@/ipc/ipc";
-import type { BuildReport, BuildWarning, CopyItem, OutputFile, Platform, SiteConfig, SiteType, TreeNode } from "@/ipc/types";
+import type { BuildReport, BuildWarning, CopyItem, OutputFile, Platform, SiteConfig, SitePluginFiles, SiteType, TreeNode } from "@/ipc/types";
 import { parseFrontMatter } from "./frontmatter";
 import { renderMarkdown, decodeHref, splitHash, extractHeadings, type MdEnv } from "./markdown";
 import { basename, dirname, encodePath, isMarkdown, isAssetDirName, joinPosix, mdToHtml, relPosix, relPrefix, stripExt } from "./paths";
 import { compileTheme, mergeConfigDefaults, type NavItem, type PageContext, type PaginationInfo, type PostSummary, type ThemeBundle } from "./theme-engine";
 import { siteUrl } from "./preview";
+import {
+  builtinPluginOutputs,
+  htmlToText,
+  injectPluginTags,
+  inlinePreviewPlugins,
+  mdToText,
+  normalizePlugins,
+  pluginCopyItems,
+  pluginTags,
+  searchIndexTag,
+  type SearchPage,
+} from "./plugins";
 
 export interface DocMeta {
   path: string;
@@ -416,6 +428,8 @@ export function renderPreview(
   currentPath: string,
   currentBody: string | undefined,
   platform: Platform,
+  /** 用户插件的文件内容(站点打开时预载,预览通道内联注入) */
+  pluginContents: SitePluginFiles[] = [],
 ): string {
   const paths = collectDocPaths(tree);
   const docCache = { ...cache };
@@ -464,7 +478,41 @@ export function renderPreview(
     (cover) => siteUrl(platform, "content/" + cover),
     extras,
   );
-  return inlineThemeAssets(html, theme.files);
+  // 先内联主题资产,再追加插件:搜索数据内联在前,脚本在主题脚本之后执行
+  let out = inlineThemeAssets(html, theme.files);
+  const pluginTags = inlinePreviewPlugins(site, pluginContents);
+  if (pluginTags.length) {
+    const search = normalizePlugins(site).search ? [searchIndexTag(previewSearchPages(metas, tree))] : [];
+    out = injectPluginTags(out, [...search, ...pluginTags]);
+  }
+  return out;
+}
+
+/** 预览通道的搜索索引:全部文档 + 无 index.md 目录的目录页(与构建产物的收录范围一致) */
+function previewSearchPages(metas: Map<string, DocMeta>, tree: TreeNode[]): SearchPage[] {
+  const pages: SearchPage[] = [];
+  const hasIndex = new Set<string>();
+  for (const m of metas.values()) {
+    if (basename(m.path).toLowerCase() === "index.md") hasIndex.add(dirname(m.path).toLowerCase());
+    pages.push({ title: m.title, url: mdToHtml(m.path), desc: m.description, text: mdToText(m.body) });
+  }
+  const walk = (nodes: TreeNode[]) => {
+    for (const n of nodes) {
+      if (n.type === "dir" && !isAssetDir(n.path) && !hasIndex.has(n.path.toLowerCase())) {
+        const titles = (n.children ?? [])
+          .filter((c) => c.type === "file" && isMarkdown(c.path))
+          .map((c) => metas.get(c.path)?.title ?? stripExt(c.name));
+        pages.push({
+          title: n.name,
+          url: mdToHtml(`${n.path}/index.md`),
+          text: titles.join(" "),
+        });
+      }
+      if (n.children?.length) walk(n.children);
+    }
+  };
+  walk(tree);
+  return pages;
 }
 
 /** 构建站点。root 为发起构建时的站点根:落盘三命令携 root 交后端校验,
@@ -502,11 +550,20 @@ export async function buildSite(site: SiteConfig, theme: ThemeBundle, root: stri
   const totalPages = Math.max(1, Math.ceil(allPosts.length / perPage));
   const warnings: BuildWarning[] = [];
   const outputs: OutputFile[] = [];
+  /** 搜索索引条目随页面渲染同步收集(标题/描述/正文纯文本) */
+  const searchPages: SearchPage[] = [];
+  const emit = (path: string, html: string, title: string, desc?: string) => {
+    outputs.push({ path, content: html });
+    searchPages.push({ title, url: path, desc, text: htmlToText(html) });
+  };
 
   // 主题文本资源(css/js 等)落到 build 根
   for (const [path, content] of Object.entries(theme.files)) {
     if (path.startsWith("assets/")) outputs.push({ path, content });
   }
+  // 内置插件文件(只写启用的);用户插件从 .plainstruct/plugins/ 拷入产物
+  outputs.push(...builtinPluginOutputs(site));
+  assetCopies.push(...pluginCopyItems(site));
 
   // 站点图片(站点内 logo 与站点外 favicon):统一落在 build/assets 下供页面引用
   if (site.logo) {
@@ -533,7 +590,7 @@ export async function buildSite(site: SiteConfig, theme: ThemeBundle, root: stri
       undefined,
       docExtras,
     );
-    outputs.push({ path: mdToHtml(doc.path), content: html });
+    emit(mdToHtml(doc.path), html, doc.title, doc.description);
   }
 
   // 根目录:无 index.md 时自动生成首页,保证 index.html 始终存在;
@@ -550,12 +607,12 @@ export async function buildSite(site: SiteConfig, theme: ThemeBundle, root: stri
       body: isBlog ? "" : tocHtml(navRaw, ""),
     };
     const { html } = renderOnePage(site, config, render, navRaw, docMap, dirSet, home, warnings, undefined, undefined, undefined, homeExtras);
-    outputs.push({ path: "index.html", content: html });
+    emit("index.html", html, site.name, site.description);
   } else if (isBlog) {
     // 有 index.md:正文作为公告栏显示在文章流上方
     const homeDoc = metas.get(mdPaths.find((p) => p.toLowerCase() === "index.md")!)!;
     const { html } = renderOnePage(site, config, render, navRaw, docMap, dirSet, homeDoc, warnings, undefined, undefined, undefined, homeExtras);
-    outputs.push({ path: "index.html", content: html });
+    emit("index.html", html, homeDoc.title, homeDoc.description);
   }
 
   // 博客首页系列第 2..N 页(page/N/index.html)
@@ -576,7 +633,7 @@ export async function buildSite(site: SiteConfig, theme: ThemeBundle, root: stri
       undefined,
       blogHomeExtras(siteType, slice, n, totalPages),
     );
-    outputs.push({ path: `page/${n}/index.html`, content: html });
+    emit(`page/${n}/index.html`, html, site.name);
   }
 
   // 文件夹页:每个没有 index.md 的目录生成一个目录列表页(dir/index.html);资产目录除外
@@ -594,7 +651,19 @@ export async function buildSite(site: SiteConfig, theme: ThemeBundle, root: stri
   });
   for (const page of folderPages) {
     const { html } = renderOnePage(site, config, render, navRaw, docMap, dirSet, page, warnings, undefined, undefined, undefined, docExtras);
-    outputs.push({ path: mdToHtml(page.path), content: html });
+    emit(mdToHtml(page.path), html, page.title);
+  }
+
+  // 搜索索引(构建产物懒加载;预览通道为内联数据,见 renderPreview)
+  if (normalizePlugins(site).search) {
+    outputs.push({ path: "assets/ps-plugins/search-index.json", content: JSON.stringify({ pages: searchPages }) });
+  }
+
+  // 每页注入插件引用:样式与脚本按页面深度换算相对地址,置于 </body> 前
+  for (const out of outputs) {
+    if (out.path.endsWith(".html")) {
+      out.content = injectPluginTags(out.content, pluginTags(relPrefix(out.path), site));
+    }
   }
 
   await ipc.clearBuild(root);

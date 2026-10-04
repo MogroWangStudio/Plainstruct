@@ -1,7 +1,8 @@
 import { defineStore } from "pinia";
 import { ipc } from "@/ipc/ipc";
-import type { SiteConfig, TreeNode } from "@/ipc/types";
+import type { SiteConfig, SitePluginEntry, SitePluginFiles, TreeNode } from "@/ipc/types";
 import { collectDocPaths, type DocsCache } from "@/lib/builder";
+import { enabledPlugins, normalizePlugins } from "@/lib/plugins";
 import { dirname, isAssetDirName, isImageFile } from "@/lib/paths";
 import { useEditorStore } from "./editor";
 import { useBuilderStore } from "./builder";
@@ -17,6 +18,8 @@ interface State {
   treeLoading: boolean;
   /** 全部文档内容缓存(content/ 路径 -> 正文),预览与构建共用 */
   docsCache: DocsCache;
+  /** 用户插件的文件内容(预览通道内联注入;构建走磁盘拷贝,不用它) */
+  pluginContents: SitePluginFiles[];
 }
 
 export const useSiteStore = defineStore("site", {
@@ -27,6 +30,7 @@ export const useSiteStore = defineStore("site", {
     tree: [],
     treeLoading: false,
     docsCache: {},
+    pluginContents: [],
   }),
 
   getters: {
@@ -100,7 +104,7 @@ export const useSiteStore = defineStore("site", {
       editor.reset();
       useBuilderStore().reset();
       publish.reset();
-      await Promise.all([this.refreshTree(), theme.loadAll(), publish.load()]);
+      await Promise.all([this.refreshTree(), theme.loadAll(), publish.load(), this.refreshPluginContents()]);
       // 默认打开首页
       const index = this.findDoc("index.md");
       if (index) await editor.openDoc(index);
@@ -293,6 +297,52 @@ export const useSiteStore = defineStore("site", {
         void useBuilderStore().onSiteChanged();
       }
       return names;
+    },
+
+    /* ---------- 站点插件 ---------- */
+
+    /** 预载启用插件的文件内容(站点打开与插件增删、开关切换后调用) */
+    async refreshPluginContents() {
+      const entries = this.config ? enabledPlugins(this.config) : [];
+      this.pluginContents = entries.length ? await ipc.readSitePluginFiles(entries) : [];
+    },
+
+    /** 写回插件配置并触发防抖重建(产物与预览都依赖插件注入) */
+    async savePlugins(patch: { search?: boolean; imgPreview?: boolean; custom?: SitePluginEntry[] }) {
+      if (!this.config) return;
+      const current = normalizePlugins(this.config);
+      await this.saveConfig({
+        plugins: {
+          search: patch.search ?? current.search,
+          imgPreview: patch.imgPreview ?? current.imgPreview,
+          custom: patch.custom ?? current.custom,
+        },
+      });
+      await this.refreshPluginContents();
+      void useBuilderStore().onSiteChanged();
+    },
+
+    /** 导入插件文件(多选合并为一个条目);取消选择返回 false */
+    async importPlugin(): Promise<boolean> {
+      const paths = await ipc.pickPluginFiles();
+      if (!paths?.length) return false;
+      const entry = await ipc.importSitePlugin(paths);
+      const current = this.config ? normalizePlugins(this.config) : { search: true, imgPreview: true, custom: [] };
+      await this.savePlugins({ custom: [...current.custom, entry] });
+      return true;
+    },
+
+    async removePlugin(id: string) {
+      const current = this.config ? normalizePlugins(this.config) : { search: true, imgPreview: true, custom: [] };
+      await ipc.deleteSitePlugin(id);
+      await this.savePlugins({ custom: current.custom.filter((e) => e.id !== id) });
+    },
+
+    async setPluginEnabled(id: string, enabled: boolean) {
+      const current = this.config ? normalizePlugins(this.config) : { search: true, imgPreview: true, custom: [] };
+      await this.savePlugins({
+        custom: current.custom.map((e) => (e.id === id ? { ...e, enabled } : e)),
+      });
     },
   },
 });
