@@ -24,6 +24,8 @@ export function normalizePlugins(site: SiteConfig): {
   search: boolean;
   imgPreview: boolean;
   imgPreviewRequireMark: string;
+  searchStyle: "button" | "bar";
+  searchPosition: "bottom-right" | "bottom-left" | "topbar";
   custom: SitePluginEntry[];
 } {
   const p = site.plugins ?? {};
@@ -32,6 +34,8 @@ export function normalizePlugins(site: SiteConfig): {
     imgPreview: p.imgPreview ?? true,
     // 默认开启标记模式(内置约定类名);用户清空该字段则对所有正文图片生效
     imgPreviewRequireMark: typeof p.imgPreviewRequireMark === "string" ? p.imgPreviewRequireMark.trim() : IMG_PREVIEW_MARK,
+    searchStyle: p.searchStyle === "bar" ? "bar" : "button",
+    searchPosition: p.searchPosition === "bottom-left" || p.searchPosition === "topbar" ? p.searchPosition : "bottom-right",
     custom: Array.isArray(p.custom) ? p.custom : [],
   };
 }
@@ -76,7 +80,8 @@ export function pluginTags(prefix: string, site: SiteConfig): string[] {
       pluginScript(
         prefix,
         "assets/ps-plugins/ps-search.js",
-        ` data-index-url="${prefix}${encodePath("assets/ps-plugins/search-index.json")}" data-root-prefix="${prefix}"`,
+        ` data-index-url="${prefix}${encodePath("assets/ps-plugins/search-index.json")}" data-root-prefix="${prefix}"` +
+          ` data-style="${p.searchStyle}" data-position="${p.searchPosition}"`,
       ),
     );
   }
@@ -186,6 +191,10 @@ export function inlinePreviewPlugins(site: SiteConfig, contents: SitePluginFiles
       tags.push(`<script>window.__psImgRequireMark=${mark};</script>`);
     }
   }
-  if (p.search) tags.push(script(searchJs));
+  if (p.search) {
+    const cfg = JSON.stringify({ style: p.searchStyle, position: p.searchPosition }).replace(/</g, "\\u003c");
+    tags.push(`<script>window.__psSearchCfg=${cfg};</script>`);
+    tags.push(script(searchJs));
+  }
   return tags;
 }

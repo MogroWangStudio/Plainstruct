@@ -27,7 +27,7 @@
   <link rel="stylesheet" href="{{asset "assets/style.css"}}">
   <script>document.documentElement.classList.add("ps-js");</script>
 </head>
-  <body data-topbar-shape="{{config.topbarShape}}" data-topbar-ease="{{config.topbarEase}}" data-topbar-scroll-at="{{config.topbarScrollAt}}" class="blog font-{{config.bodyFont}}{{#if (eq config.pageTransition "淡入")}} ps-anim-fade{{/if}}{{#if (eq config.pageTransition "淡入上浮")}} ps-anim-rise{{/if}}{{#if (eq config.pageTransition "缩放浮现")}} ps-anim-zoom{{/if}}{{#if (eq config.pageTransition "滑入")}} ps-anim-slide{{/if}}{{#if (eq config.pageTransition "弹性浮现")}} ps-anim-spring{{/if}}{{#if (eq config.pageTransition "模糊聚焦")}} ps-anim-blur{{/if}}{{#if (eq config.pageTransition "翻页")}} ps-anim-flip{{/if}}{{#if (eq config.pageTransition "揭开")}} ps-anim-wipe{{/if}}"style="{{#if (eq config.bodyFont "custom")}}--ps-font-body: {{config.customFont}};{{/if}}{{#if config.cardShadowColor}}--ps-shadow-color: {{config.cardShadowColor}};{{/if}}{{#if config.cardShadowHoverColor}}--ps-shadow-hv-color: {{config.cardShadowHoverColor}};{{/if}}{{#if (eq config.cardShadow "自定义")}}--ps-shadow-custom: {{config.cardShadowX}}px {{config.cardShadowY}}px {{config.cardShadowBlur}}px {{config.cardShadowSpread}}px color-mix(in srgb, var(--ps-shadow-color, #000) {{config.cardShadowOpacity}}%, transparent);{{/if}}{{#if (eq config.cardShadowHover "自定义")}}--ps-shadow-hv-custom: {{config.cardShadowHoverX}}px {{config.cardShadowHoverY}}px {{config.cardShadowHoverBlur}}px {{config.cardShadowHoverSpread}}px color-mix(in srgb, var(--ps-shadow-hv-color, #000) {{config.cardShadowHoverOpacity}}%, transparent);{{/if}}{{#if (eq config.cardHoverEase "自定义")}}--ps-card-ease: cubic-bezier({{config.cardHoverEaseCustom}});{{/if}}--ps-card-dur: {{config.cardHoverDuration}}ms;" data-hv-logo="{{config.logoHover}}" data-hv-title="{{config.titleHover}}" data-hv-nav="{{config.navHover}}" data-shadow="{{config.cardShadow}}" data-shadow-hv="{{config.cardShadowHover}}" data-hv-card="{{config.cardHover}}" data-hv-ease="{{config.cardHoverEase}}" data-loading="{{config.loadingAnim}}" data-toc-style="{{config.tocStyle}}" data-toc-hover="{{config.tocHover}}">
+  <body data-topbar-shape="{{config.topbarShape}}" data-topbar-ease="{{config.topbarEase}}" data-topbar-scroll-at="{{config.topbarScrollAt}}" class="blog font-{{config.bodyFont}}{{#if (eq config.pageTransition "淡入")}} ps-anim-fade{{/if}}{{#if (eq config.pageTransition "淡入上浮")}} ps-anim-rise{{/if}}{{#if (eq config.pageTransition "缩放浮现")}} ps-anim-zoom{{/if}}{{#if (eq config.pageTransition "滑入")}} ps-anim-slide{{/if}}{{#if (eq config.pageTransition "弹性浮现")}} ps-anim-spring{{/if}}{{#if (eq config.pageTransition "模糊聚焦")}} ps-anim-blur{{/if}}{{#if (eq config.pageTransition "翻页")}} ps-anim-flip{{/if}}{{#if (eq config.pageTransition "揭开")}} ps-anim-wipe{{/if}}"style="{{#if (eq config.bodyFont "custom")}}--ps-font-body: {{config.customFont}};{{/if}}{{#if config.cardShadowColor}}--ps-shadow-color: {{config.cardShadowColor}};{{/if}}{{#if config.cardShadowHoverColor}}--ps-shadow-hv-color: {{config.cardShadowHoverColor}};{{/if}}{{#if (eq config.cardShadow "自定义")}}--ps-shadow-custom: {{config.cardShadowX}}px {{config.cardShadowY}}px {{config.cardShadowBlur}}px {{config.cardShadowSpread}}px color-mix(in srgb, var(--ps-shadow-color, #000) {{config.cardShadowOpacity}}%, transparent);{{/if}}{{#if (eq config.cardShadowHover "自定义")}}--ps-shadow-hv-custom: {{config.cardShadowHoverX}}px {{config.cardShadowHoverY}}px {{config.cardShadowHoverBlur}}px {{config.cardShadowHoverSpread}}px color-mix(in srgb, var(--ps-shadow-hv-color, #000) {{config.cardShadowHoverOpacity}}%, transparent);{{/if}}{{#if (eq config.cardHoverEase "自定义")}}--ps-card-ease: cubic-bezier({{config.cardHoverEaseCustom}});{{/if}}--ps-card-dur: {{config.cardHoverDuration}}ms;" data-hv-logo="{{config.logoHover}}" data-hv-title="{{config.titleHover}}" data-hv-nav="{{config.navHover}}" data-shadow="{{config.cardShadow}}" data-shadow-hv="{{config.cardShadowHover}}" data-hv-card="{{config.cardHover}}" data-hv-ease="{{config.cardHoverEase}}" data-loading="{{config.loadingAnim}}" data-toc-style="{{config.tocStyle}}" data-toc-hover="{{config.tocHover}}" data-toc-click="{{config.tocClickAnim}}" data-toc-click-ease="{{config.tocClickEase}}" data-toc-click-ease-custom="{{config.tocClickEaseCustom}}" data-toc-click-dur="{{config.tocClickDuration}}" data-backtop="{{config.showBackTop}}" data-backtop-pos="{{config.backTopPosition}}">
   {{#unless (eq config.loadingAnim "关闭")}}<div class="ps-loader" aria-hidden="true"><span class="ps-loader-spin"></span></div>{{/unless}}
   <header class="blog-topbar">
     <a class="blog-brand" href="{{asset "index.html"}}">
@@ -80,11 +80,83 @@
         e.preventDefault();
         var bar = document.querySelector(".blog-topbar");
         var gap = (bar ? bar.getBoundingClientRect().height : 0) + 24;
-        var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
         var top = target.getBoundingClientRect().top + (window.pageYOffset || 0) - gap;
-        window.scrollTo({ top: top < 0 ? 0 : top, behavior: reduce ? "auto" : "smooth" });
+        if (top < 0) top = 0;
+        var anim = document.body.getAttribute("data-toc-click") || "滑动";
+        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) anim = "无动画";
+        scrollWithAnim(top, anim);
         if (window.history && history.replaceState) history.replaceState(null, "", hash);
       });
+
+      /* ---------- 目录点按动画:滑动(贝塞尔缓动)/淡化过渡(正文淡出-跳转-淡入)/无动画 ---------- */
+      function bezierFn(x1, y1, x2, y2) {
+        var cx = 3 * x1, bx = 3 * (x2 - x1) - cx, ax = 1 - cx - bx;
+        var cy = 3 * y1, by = 3 * (y2 - y1) - cy, ay = 1 - cy - by;
+        function sx(t) { return ((ax * t + bx) * t + cx) * t; }
+        function sy(t) { return ((ay * t + by) * t + cy) * t; }
+        function dx(t) { return (3 * ax * t + 2 * bx) * t + cx; }
+        return function (p) {
+          var t = p;
+          for (var i = 0; i < 6; i++) {
+            var x = sx(t) - p;
+            if (Math.abs(x) < 1e-5) break;
+            var d = dx(t);
+            if (Math.abs(d) < 1e-6) break;
+            t -= x / d;
+          }
+          return sy(Math.min(1, Math.max(0, t)));
+        };
+      }
+      function easeOf() {
+        var map = {
+          "标准": [0.23, 1, 0.32, 1],
+          "缓出": [0, 0, 0.58, 1],
+          "缓入": [0.42, 0, 1, 1],
+          "线性": [0, 0, 1, 1],
+          "弹性": [0.3, 1.35, 0.45, 1],
+        };
+        var name = document.body.getAttribute("data-toc-click-ease") || "标准";
+        var v = map[name];
+        if (!v) {
+          var c = (document.body.getAttribute("data-toc-click-ease-custom") || "").split(",").map(Number);
+          v = c.length === 4 && c.every(function (n) { return isFinite(n); }) ? c : map["标准"];
+        }
+        return bezierFn(v[0], v[1], v[2], v[3]);
+      }
+      function tweenScroll(to, dur, ease) {
+        var from = window.pageYOffset || 0;
+        var t0 = performance.now();
+        function step(now) {
+          var p = dur > 0 ? Math.min(1, (now - t0) / dur) : 1;
+          window.scrollTo(0, from + (to - from) * ease(p));
+          if (p < 1) requestAnimationFrame(step);
+        }
+        requestAnimationFrame(step);
+      }
+      function scrollWithAnim(top, anim) {
+        if (anim === "无动画") {
+          window.scrollTo(0, top);
+          return;
+        }
+        var dur = parseInt(document.body.getAttribute("data-toc-click-dur") || "450", 10);
+        if (!isFinite(dur) || dur < 60) dur = 450;
+        if (anim === "淡化过渡") {
+          var main = document.querySelector(".blog-main") || document.querySelector("main") || document.body;
+          var half = Math.round(dur / 2);
+          main.style.transition = "opacity " + half + "ms cubic-bezier(0.23, 1, 0.32, 1)";
+          main.style.opacity = "0";
+          window.setTimeout(function () {
+            window.scrollTo(0, top);
+            main.style.opacity = "1";
+            window.setTimeout(function () {
+              main.style.transition = "";
+              main.style.opacity = "";
+            }, half + 60);
+          }, half);
+          return;
+        }
+        tweenScroll(top, dur, easeOf());
+      }
       var ticking = false;
       function update() {
         ticking = false;
@@ -99,12 +171,17 @@
         });
         if (activeId && byId[activeId]) byId[activeId].classList.add("current");
       }
-      window.addEventListener("scroll", function () {
+      var onScroll = function () {
         if (!ticking) {
           ticking = true;
           requestAnimationFrame(update);
         }
-      }, { passive: true });
+      };
+      /* 捕获级监听:视口与任何内部滚动容器的滚动都会触发;
+         load/resize 后补算(图片与字体加载会改变标题位置) */
+      document.addEventListener("scroll", onScroll, { passive: true, capture: true });
+      window.addEventListener("resize", onScroll, { passive: true });
+      window.addEventListener("load", onScroll);
       update();
     })();
   </script>
@@ -131,6 +208,68 @@
       };
       window.addEventListener("scroll", sync, { passive: true });
       sync();
+    })();
+  </script>
+  <script>
+    (function () {
+      /* 置顶按钮:下滚出现,点击平滑回顶;与搜索入口同角时竖列并排 */
+      if (document.body.getAttribute("data-backtop") !== "true") return;
+      var pos = document.body.getAttribute("data-backtop-pos") === "页面左下角" ? "ps-bl" : "ps-br";
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "ps-backtop " + pos;
+      btn.setAttribute("aria-label", "回到顶部");
+      btn.title = "回到顶部";
+      btn.innerHTML = '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M6 11l6-6 6 6"/></svg>';
+      document.body.appendChild(btn);
+      var visible = false;
+      function place() {
+        var corner = window.__psSearchCorner;
+        btn.classList.toggle("ps-stack", corner === (pos === "ps-br" ? "br" : "bl"));
+      }
+      var sync = function () {
+        var show = (window.scrollY || document.documentElement.scrollTop || 0) > 420;
+        if (show !== visible) {
+          visible = show;
+          btn.classList.toggle("is-visible", show);
+          place();
+        }
+      };
+      var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      btn.addEventListener("click", function () {
+        if (reduce) {
+          window.scrollTo(0, 0);
+          return;
+        }
+        var dur = parseInt(document.body.getAttribute("data-toc-click-dur") || "450", 10);
+        if (!isFinite(dur) || dur < 60) dur = 450;
+        var cx = 3 * 0.23, bx2 = 3 * (0.32 - 0.23) - cx, ax = 1 - cx - bx2;
+        var cy = 3 * 1, by2 = 3 * (1 - 1) - cy, ay = 1 - cy - by2;
+        var from = window.pageYOffset || 0;
+        var t0 = performance.now();
+        function sx(t) { return ((ax * t + bx2) * t + cx) * t; }
+        function sy(t) { return ((ay * t + by2) * t + cy) * t; }
+        function step(now) {
+          var p = Math.min(1, (now - t0) / dur);
+          var t = p, i, x, d;
+          for (i = 0; i < 6; i++) {
+            x = sx(t) - p;
+            if (Math.abs(x) < 1e-5) break;
+            d = (3 * ax * t + 2 * bx2) * t + cx;
+            if (Math.abs(d) < 1e-6) break;
+            t -= x / d;
+          }
+          window.scrollTo(0, from + (to0() - from) * sy(Math.min(1, Math.max(0, t))));
+          if (p < 1) requestAnimationFrame(step);
+        }
+        function to0() { return 0; }
+        requestAnimationFrame(step);
+      });
+      document.addEventListener("scroll", sync, { passive: true, capture: true });
+      window.addEventListener("ps-search-ready", place);
+      window.addEventListener("load", place);
+      sync();
+      place();
     })();
   </script>
 </body>

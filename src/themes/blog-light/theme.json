@@ -647,6 +647,56 @@
       "category": "目录与动效"
     },
     {
+      "key": "tocClickAnim",
+      "label": "目录点按跳转动画",
+      "type": "select",
+      "default": "滑动",
+      "options": [
+        "滑动",
+        "淡化过渡",
+        "无动画"
+      ],
+      "category": "目录与动效",
+      "hint": "点击目录项跳到对应标题时的页面过渡"
+    },
+    {
+      "key": "tocClickEase",
+      "label": "跳转动画曲线",
+      "type": "select",
+      "default": "标准",
+      "options": [
+        "标准",
+        "缓出",
+        "缓入",
+        "线性",
+        "弹性",
+        "自定义"
+      ],
+      "category": "目录与动效"
+    },
+    {
+      "key": "tocClickEaseCustom",
+      "label": "自定义曲线 (x1, y1, x2, y2)",
+      "type": "text",
+      "default": "0.23, 1, 0.32, 1",
+      "category": "目录与动效",
+      "visibleIf": {
+        "key": "tocClickEase",
+        "equals": "自定义"
+      }
+    },
+    {
+      "key": "tocClickDuration",
+      "label": "跳转动画时长",
+      "type": "number",
+      "default": 450,
+      "min": 120,
+      "max": 1000,
+      "step": 20,
+      "category": "目录与动效",
+      "hint": "单位 ms;淡化过渡为淡出与淡入各一半"
+    },
+    {
       "key": "showDate",
       "label": "显示文章日期",
       "type": "boolean",
@@ -675,6 +725,26 @@
       "default": true,
       "category": "内容显示",
       "hint": "文档配置头选择了 AIGC 声明时显示"
+    },
+    {
+      "key": "showBackTop",
+      "label": "显示置顶按钮",
+      "type": "boolean",
+      "default": true,
+      "category": "内容显示",
+      "hint": "页面下滚后出现,点击平滑回到顶部"
+    },
+    {
+      "key": "backTopPosition",
+      "label": "置顶按钮位置",
+      "type": "select",
+      "default": "右下角",
+      "options": [
+        "右下角",
+        "左下角"
+      ],
+      "category": "内容显示",
+      "hint": "与搜索入口同角时自动竖列并排"
     }
   ]
 }

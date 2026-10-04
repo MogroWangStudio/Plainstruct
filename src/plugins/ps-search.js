@@ -51,12 +51,32 @@
   }
 
   function build() {
-    var fab = el("button", "", document.body);
-    fab.id = "ps-search-fab";
-    fab.innerHTML = ICON;
-    fab.setAttribute("aria-label", T.openAria);
-    fab.addEventListener("click", show);
-    requestAnimationFrame(function () { fab.classList.add("ps-ready"); });
+    var host = document.body;
+    if (entryPosition === "top") {
+      // 顶栏最右侧:优先并入主题顶栏,找不到再固定右上角
+      var bar = document.querySelector(".blog-topbar, .ps-topbar, header");
+      if (bar) {
+        host = bar;
+      }
+    }
+    var entry;
+    if (entryStyle === "bar") {
+      // 长条文本框式:毛玻璃胶囊,点击即展开搜索面板
+      entry = el("button", "ps-search-entry ps-search-bar", host);
+      entry.innerHTML = ICON.replace('width="20" height="20"', 'width="15" height="15"') + "<span>" + T.placeholder + "</span>";
+    } else {
+      entry = el("button", "ps-search-entry ps-search-fab", host);
+      entry.innerHTML = ICON;
+    }
+    entry.id = "ps-search-fab";
+    if (entryPosition === "top" && host !== document.body) {
+      entry.classList.add("ps-in-topbar");
+    } else {
+      entry.classList.add(entryPosition === "bl" ? "ps-pos-bl" : entryPosition === "top" ? "ps-pos-top" : "ps-pos-br");
+    }
+    entry.setAttribute("aria-label", T.openAria);
+    entry.addEventListener("click", show);
+    requestAnimationFrame(function () { entry.classList.add("ps-ready"); });
 
     overlay = el("div", "", document.body);
     overlay.id = "ps-search-overlay";
@@ -247,7 +267,9 @@
     input.blur();
   }
 
-  /* ---------- 启动:数据源与根前缀来自注入的 script 标签 ---------- */
+  /* ---------- 启动:数据源/根前缀/入口形式与位置来自注入的 script 标签 ---------- */
+  var entryStyle = "button";   // button | bar
+  var entryPosition = "br";    // br | bl | top
   function start() {
     var me = document.currentScript;
     if (!me) {
@@ -257,8 +279,22 @@
     if (me) {
       indexUrl = me.getAttribute("data-index-url") || "";
       rootPrefix = me.getAttribute("data-root-prefix") || "";
+      entryStyle = me.getAttribute("data-style") === "bar" ? "bar" : "button";
+      var pos = me.getAttribute("data-position");
+      entryPosition = pos === "bottom-left" ? "bl" : pos === "topbar" ? "top" : "br";
     }
+    // 内联注入通道(mock 预览):壳层经 window.__psSearchCfg 传入
+    if (window.__psSearchCfg) {
+      if (window.__psSearchCfg.style === "bar") entryStyle = "bar";
+      if (window.__psSearchCfg.position === "bottom-left") entryPosition = "bl";
+      else if (window.__psSearchCfg.position === "topbar") entryPosition = "top";
+    }
+    // 供置顶按钮等同位元素协调避让
+    window.__psSearchCorner = entryPosition === "top" ? null : entryPosition;
     build();
+    try {
+      window.dispatchEvent(new Event("ps-search-ready"));
+    } catch (e) { /* 事件不可用时,同位元素靠 load 兜底 */ }
   }
 
   if (document.readyState === "loading") {

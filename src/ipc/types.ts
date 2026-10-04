@@ -121,6 +121,10 @@ export interface SitePluginsConfig {
   imgPreview?: boolean;
   /** 图片预览的 class 标记模式:设置后仅 class 含该标记(如 mws_ps_imgpreview)的图片可预览 */
   imgPreviewRequireMark?: string;
+  /** 搜索入口形式:button = 毛玻璃按钮(缺省),bar = 长条文本框 */
+  searchStyle?: "button" | "bar";
+  /** 搜索入口位置:bottom-right(缺省)/ bottom-left / topbar(顶栏最右侧) */
+  searchPosition?: "bottom-right" | "bottom-left" | "topbar";
   custom?: SitePluginEntry[];
 }
 

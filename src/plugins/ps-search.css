@@ -1,21 +1,16 @@
 /* 素构 · 站内搜索插件样式 -- 毛玻璃面板 + 中性层次,强调色随主题 --ps-accent */
-#ps-search-fab {
+/* ---------- 入口(按钮式 / 长条文本框式 × 右下 / 左下 / 顶栏) ---------- */
+.ps-search-entry {
   position: fixed;
-  right: 18px;
-  bottom: 18px;
   z-index: 9999;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
   padding: 0;
   border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 50%;
   background: rgba(255, 255, 255, 0.72);
   -webkit-backdrop-filter: blur(16px) saturate(1.6);
   backdrop-filter: blur(16px) saturate(1.6);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
   color: #555;
   cursor: pointer;
   opacity: 0;
@@ -26,25 +21,76 @@
     background-color 0.15s ease,
     color 0.15s ease;
 }
-#ps-search-fab.ps-ready {
+.ps-search-entry.ps-ready {
   opacity: 1;
   transform: none;
 }
-#ps-search-fab:hover {
+.ps-search-entry:hover {
   background: rgba(255, 255, 255, 0.9);
   color: #1d1d1f;
 }
-#ps-search-fab:active {
+.ps-search-entry:active {
   transform: scale(0.94);
   transition-duration: 0.08s;
 }
-html[data-ps-dark] #ps-search-fab {
+.ps-search-fab {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+}
+.ps-search-bar {
+  width: 240px;
+  height: 40px;
+  padding: 0 14px;
+  gap: 8px;
+  justify-content: flex-start;
+  border-radius: 999px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  font: 400 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.ps-search-bar span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ps-pos-br {
+  right: 18px;
+  bottom: 18px;
+}
+.ps-pos-bl {
+  left: 18px;
+  bottom: 18px;
+}
+.ps-pos-top {
+  right: 18px;
+  top: 18px;
+  bottom: auto;
+}
+/* 顶栏模式:并入主题顶栏,随布局排列,不再固定定位 */
+.ps-search-entry.ps-in-topbar {
+  position: static;
+  opacity: 1;
+  transform: none;
+  margin-left: auto;
+  flex-shrink: 0;
+  width: auto;
+  height: 32px;
+  padding: 0 12px;
+  gap: 6px;
+  border-radius: 999px;
+  box-shadow: none;
+}
+.ps-search-bar.ps-in-topbar {
+  width: 200px;
+}
+html[data-ps-dark] .ps-search-entry {
   border-color: rgba(255, 255, 255, 0.12);
   background: rgba(44, 44, 46, 0.72);
   color: #c7c7cc;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
 }
-html[data-ps-dark] #ps-search-fab:hover {
+html[data-ps-dark] .ps-search-entry:hover {
   background: rgba(58, 58, 60, 0.9);
   color: #f5f5f7;
 }
@@ -217,25 +263,31 @@ html[data-ps-dark] .ps-search-note {
   #ps-search-panel {
     max-height: 72vh;
   }
-  #ps-search-fab {
+  .ps-search-fab.ps-pos-br,
+  .ps-search-bar.ps-pos-br {
     right: 14px;
     bottom: 14px;
+  }
+  .ps-search-fab.ps-pos-bl,
+  .ps-search-bar.ps-pos-bl {
+    left: 14px;
+    bottom: 14px;
+  }
+  .ps-search-bar {
+    width: 200px;
   }
 }
 
 /* 减弱动态:仅保留透明度过渡 */
 @media (prefers-reduced-motion: reduce) {
-  #ps-search-fab,
+  .ps-search-entry,
   #ps-search-panel {
     transform: none;
     transition: opacity 0.2s ease;
   }
-  #ps-search-fab.ps-ready {
-    transform: none;
-  }
 }
 @media (prefers-reduced-transparency: reduce) {
-  #ps-search-fab,
+  .ps-search-entry,
   #ps-search-panel {
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
@@ -249,7 +301,7 @@ html[data-ps-dark] .ps-search-note {
   html[data-ps-dark] #ps-search-panel {
     background: #242426;
   }
-  html[data-ps-dark] #ps-search-fab {
+  html[data-ps-dark] .ps-search-entry {
     background: #2c2c2e;
   }
 }

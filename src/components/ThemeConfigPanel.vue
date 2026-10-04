@@ -266,7 +266,14 @@ function confirmPicker() {
 const plugins = computed(() =>
   site.config
     ? normalizePlugins(site.config)
-    : { search: true, imgPreview: true, imgPreviewRequireMark: "mws_ps_imgpreview", custom: [] },
+    : {
+        search: true,
+        imgPreview: true,
+        imgPreviewRequireMark: "mws_ps_imgpreview",
+        searchStyle: "button",
+        searchPosition: "bottom-right",
+        custom: [],
+      },
 );
 
 function setBuiltin(key: "search" | "imgPreview", on: boolean) {
@@ -326,6 +333,32 @@ async function removePlugin(id: string, name: string) {
           <span class="text-[calc(13px*var(--ui-font-scale))] text-ink-2">{{ t("theme.pluginSearch") }}</span>
         </label>
         <p class="opt-hint">{{ t("theme.pluginSearchHint") }}</p>
+
+        <label class="flex flex-col gap-1">
+          <span class="field-label">{{ t("theme.pluginSearchStyle") }}</span>
+          <SelectMenu
+            :model-value="plugins.searchStyle"
+            :options="[
+              { value: 'button', label: t('theme.pluginSearchStyleButton') },
+              { value: 'bar', label: t('theme.pluginSearchStyleBar') },
+            ]"
+            align="left"
+            @update:model-value="(v: string) => site.savePlugins({ searchStyle: v as 'button' | 'bar' })"
+          />
+        </label>
+        <label class="flex flex-col gap-1">
+          <span class="field-label">{{ t("theme.pluginSearchPosition") }}</span>
+          <SelectMenu
+            :model-value="plugins.searchPosition"
+            :options="[
+              { value: 'bottom-right', label: t('theme.pluginSearchPosBr') },
+              { value: 'bottom-left', label: t('theme.pluginSearchPosBl') },
+              { value: 'topbar', label: t('theme.pluginSearchPosTop') },
+            ]"
+            align="left"
+            @update:model-value="(v: string) => site.savePlugins({ searchPosition: v as 'bottom-right' | 'bottom-left' | 'topbar' })"
+          />
+        </label>
 
         <label class="flex cursor-pointer items-center gap-2">
           <input
