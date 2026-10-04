@@ -918,10 +918,9 @@ a.ps-home-link:hover {
 }
 
 
-/* ---------- 文档 meta:作者署名与 AIGC 声明(配置头 author/aigc,缺省不显示) ---------- */
+/* ---------- 文档 meta:作者署名与 AIGC 声明(配置头 author/aigc,随主题开关显示) ---------- */
 .ps-doc-author {
-  display: inline-block;
-  margin: 0 0 20px;
+  margin-left: 12px;
   font-size: 13px;
   color: var(--ps-ink-2);
 }
@@ -930,7 +929,6 @@ a.ps-home-link:hover {
 }
 .ps-aigc {
   display: inline-block;
-  margin: 0 0 20px;
   padding: 1px 10px;
   border: 1px solid var(--ps-line);
   border-radius: 999px;

@@ -21,6 +21,7 @@
     download: zh ? "下载图片" : "Download image",
     close: zh ? "关闭" : "Close",
     dialog: zh ? "图片预览" : "Image preview",
+    unknownSize: zh ? "未知" : "Unknown",
   };
 
   var MIN = 0.2;
@@ -43,9 +44,24 @@
   }
 
   /* ---------- 可预览判定:正文容器内的图片,排除链接/导航/小图标 ---------- */
+  // 标记模式:插件 script 带 data-require-mark 时,仅 class 含该标记(如
+  // mws_ps_imgpreview)的图片可点击预览;缺省对全部正文图片生效
+  var requireMark = "";
+  (function () {
+    var me = document.currentScript;
+    if (!me) {
+      var scripts = document.querySelectorAll("script[data-require-mark]");
+      me = scripts[scripts.length - 1] || null;
+    }
+    if (me) requireMark = (me.getAttribute("data-require-mark") || "").trim();
+  })();
+  // 内联注入通道(mock 预览):壳层经 window.__psImgRequireMark 传入标记
+  if (typeof window.__psImgRequireMark === "string") requireMark = window.__psImgRequireMark.trim();
+
   function zoomable(target) {
     var im = target && target.tagName === "IMG" ? target : null;
     if (!im || !im.getAttribute("src") || im.getAttribute("data-ps-nozoom") !== null) return false;
+    if (requireMark && (" " + im.className + " ").indexOf(" " + requireMark + " ") === -1) return false;
     if (im.closest("a, header, nav, footer, aside, button")) return false;
     if (!im.closest("main, article, .ps-main, .blog-main, .blog-post-body")) return false;
     var r = im.getBoundingClientRect();
@@ -95,7 +111,21 @@
     buildBar(overlay);
     document.body.appendChild(overlay);
 
+    // 背景滚动锁定:预览时移动端拖动只作用于图片 —— 锁定视口滚动与
+    // 页面里全部可滚动容器(触摸平移的目标链),关闭时恢复
+    lockedScroll = [];
+    var n = document.scrollingElement || document.documentElement;
+    lockedScroll.push({ el: n, y: n.scrollTop, x: n.scrollLeft });
     document.documentElement.style.overflow = "hidden";
+    var all = document.querySelectorAll("*");
+    for (var i = 0; i < all.length; i++) {
+      var cs = getComputedStyle(all[i]);
+      if (/(auto|scroll)/.test(cs.overflowY + cs.overflowX) && all[i].scrollHeight > all[i].clientHeight) {
+        lockedScroll.push({ el: all[i], y: all[i].scrollTop, x: all[i].scrollLeft });
+        all[i].style.overflow = "hidden";
+      }
+    }
+    buildMeta(overlay, im);
     document.addEventListener("keydown", onKey, true);
     overlay.addEventListener("mousedown", function (e) {
       if (e.target === overlay) close();
@@ -154,6 +184,10 @@
     var done = function () {
       overlay.remove();
       document.documentElement.style.overflow = "";
+      for (var i = 0; i < lockedScroll.length; i++) {
+        lockedScroll[i].el.style.overflow = "";
+      }
+      lockedScroll = [];
       if (sourceImg) sourceImg.style.visibility = "";
       sourceImg = null;
     };
@@ -174,8 +208,56 @@
     }
   }
 
+  /* ---------- 图片信息条:文件名 + 分辨率 + 文件大小 ---------- */
+  var lockedScroll = [];
+
+  function buildMeta(host, im) {
+    var name = decodeURIComponent((im.currentSrc || im.src).split("?")[0].split("#")[0].split("/").pop() || "");
+    var meta = document.createElement("div");
+    meta.className = "ps-lb-meta";
+    var parts = [name];
+    // 分辨率:等加载完成后回填(打开时通常已缓存)
+    var nat = im.naturalWidth + "×" + im.naturalHeight;
+    if (im.naturalWidth) parts.push(nat);
+    else {
+      parts.push(T.unknownSize);
+      var probe = new Image();
+      probe.onload = function () {
+        var dim = probe.naturalWidth + "×" + probe.naturalHeight;
+        meta.dataset.dim = dim;
+        refreshMeta(meta);
+      };
+      probe.src = im.currentSrc || im.src;
+    }
+    // 文件大小:同源资源用 HEAD 读 content-length(页面相对路径均同源);拿不到就不显示
+    var sameOrigin = true;
+    try {
+      sameOrigin = new URL(im.currentSrc || im.src, location.href).origin === location.origin;
+    } catch (e) { /* 解析失败按同源处理 */ }
+    if (sameOrigin && wFetch) {
+      wFetch(im.currentSrc || im.src, { method: "HEAD" })
+        .then(function (r) {
+          var len = parseInt(r.headers.get("content-length") || "", 10);
+          if (Number.isFinite(len) && len > 0) {
+            meta.dataset.size = len >= 1048576 ? (len / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(len / 1024)) + " KB";
+            refreshMeta(meta);
+          }
+        })
+        .catch(function () { /* 大小不可得,仅省略 */ });
+    }
+    function refreshMeta(m) {
+      var seg = [name];
+      if (m.dataset.dim) seg.push(m.dataset.dim);
+      if (m.dataset.size) seg.push(m.dataset.size);
+      m.textContent = seg.join(" · ");
+    }
+    meta.textContent = parts.join(" · ");
+    host.appendChild(meta);
+  }
+
   /* ---------- 工具条 ---------- */
   var scaleBtn = null;
+  var wFetch = typeof window.fetch === "function" ? window.fetch.bind(window) : null;
   function buildBar(host) {
     var bar = document.createElement("div");
     bar.className = "ps-lb-bar";

@@ -659,6 +659,22 @@
       "type": "boolean",
       "default": true,
       "category": "内容显示"
+    },
+    {
+      "key": "showAuthor",
+      "label": "显示作者署名",
+      "type": "boolean",
+      "default": true,
+      "category": "内容显示",
+      "hint": "文档配置头填写了 author 时显示"
+    },
+    {
+      "key": "showAigc",
+      "label": "显示 AIGC 声明",
+      "type": "boolean",
+      "default": true,
+      "category": "内容显示",
+      "hint": "文档配置头选择了 AIGC 声明时显示"
     }
   ]
 }

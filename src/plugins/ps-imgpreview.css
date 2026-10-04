@@ -127,9 +127,42 @@ article a img {
   background: rgba(255, 255, 255, 0.18);
 }
 
+/* ---------- 信息条:文件名 · 分辨率 · 文件大小 ---------- */
+.ps-lb-meta {
+  position: fixed;
+  left: 50%;
+  bottom: 76px;
+  max-width: min(86vw, 640px);
+  padding: 5px 14px;
+  border-radius: 999px;
+  background: rgba(40, 40, 43, 0.6);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  backdrop-filter: blur(14px) saturate(1.4);
+  color: rgba(235, 235, 240, 0.85);
+  font: 400 12px/1.5 system-ui, -apple-system, sans-serif;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transform: translate(-50%, 6px);
+  opacity: 0;
+  transition:
+    transform 0.4s cubic-bezier(0.32, 0.72, 0, 1),
+    opacity 0.3s ease;
+  pointer-events: none;
+}
+#ps-lightbox.ps-open .ps-lb-meta {
+  transform: translate(-50%, 0);
+  opacity: 1;
+}
+
 @media (max-width: 640px) {
   .ps-lb-bar {
     bottom: 18px;
+  }
+  .ps-lb-meta {
+    bottom: 68px;
+    max-width: 92vw;
   }
   .ps-lb-img {
     max-width: 96vw;
@@ -152,6 +185,11 @@ article a img {
     background: rgba(12, 12, 13, 0.92);
   }
   .ps-lb-bar {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: #28282b;
+  }
+  .ps-lb-meta {
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
     background: #28282b;

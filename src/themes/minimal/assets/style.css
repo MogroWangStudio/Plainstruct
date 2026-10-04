@@ -1401,10 +1401,9 @@ body[data-toc-hover="底色"] .blog-toc-item a:focus-visible {
 }
 
 
-/* ---------- 文章 meta:作者署名与 AIGC 声明(配置头 author/aigc,缺省不显示) ---------- */
+/* ---------- 文章 meta:作者署名与 AIGC 声明(配置头 author/aigc,随主题开关显示) ---------- */
 .blog-post-author {
-  display: inline-block;
-  margin-top: 10px;
+  margin-left: 12px;
   font-size: 13px;
   color: var(--ps-ink-2);
 }
@@ -1413,7 +1412,6 @@ body[data-toc-hover="底色"] .blog-toc-item a:focus-visible {
 }
 .ps-aigc {
   display: inline-block;
-  margin-top: 10px;
   padding: 1px 10px;
   border: 1px solid var(--ps-line);
   border-radius: 999px;

@@ -308,13 +308,14 @@ export const useSiteStore = defineStore("site", {
     },
 
     /** 写回插件配置并触发防抖重建(产物与预览都依赖插件注入) */
-    async savePlugins(patch: { search?: boolean; imgPreview?: boolean; custom?: SitePluginEntry[] }) {
+    async savePlugins(patch: { search?: boolean; imgPreview?: boolean; imgPreviewRequireMark?: string; custom?: SitePluginEntry[] }) {
       if (!this.config) return;
       const current = normalizePlugins(this.config);
       await this.saveConfig({
         plugins: {
           search: patch.search ?? current.search,
           imgPreview: patch.imgPreview ?? current.imgPreview,
+          imgPreviewRequireMark: patch.imgPreviewRequireMark ?? current.imgPreviewRequireMark,
           custom: patch.custom ?? current.custom,
         },
       });

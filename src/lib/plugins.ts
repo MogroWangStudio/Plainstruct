@@ -20,12 +20,14 @@ export const BUILTIN_PLUGIN_FILES: Record<string, string> = {
 export function normalizePlugins(site: SiteConfig): {
   search: boolean;
   imgPreview: boolean;
+  imgPreviewRequireMark: string;
   custom: SitePluginEntry[];
 } {
   const p = site.plugins ?? {};
   return {
     search: p.search ?? true,
     imgPreview: p.imgPreview ?? true,
+    imgPreviewRequireMark: typeof p.imgPreviewRequireMark === "string" ? p.imgPreviewRequireMark.trim() : "",
     custom: Array.isArray(p.custom) ? p.custom : [],
   };
 }
@@ -61,7 +63,10 @@ export function pluginTags(prefix: string, site: SiteConfig): string[] {
       );
     }
   }
-  if (p.imgPreview) tags.push(pluginScript(prefix, "assets/ps-plugins/ps-imgpreview.js"));
+  if (p.imgPreview) {
+    const mark = p.imgPreviewRequireMark ? ` data-require-mark="${p.imgPreviewRequireMark.replace(/"/g, "&quot;")}"` : "";
+    tags.push(pluginScript(prefix, "assets/ps-plugins/ps-imgpreview.js", mark));
+  }
   if (p.search) {
     tags.push(
       pluginScript(
@@ -169,7 +174,14 @@ export function inlinePreviewPlugins(site: SiteConfig, contents: SitePluginFiles
       tags.push(file.name.toLowerCase().endsWith(".css") ? style(file.content) : script(file.content));
     }
   }
-  if (p.imgPreview) tags.push(script(imgPreviewJs));
+  if (p.imgPreview) {
+    // 内联无 data 属性载体:标记模式由紧随其后的初始化脚本设置
+    tags.push(script(imgPreviewJs));
+    if (p.imgPreviewRequireMark) {
+      const mark = JSON.stringify(p.imgPreviewRequireMark).replace(/</g, "\\u003c");
+      tags.push(`<script>window.__psImgRequireMark=${mark};</script>`);
+    }
+  }
   if (p.search) tags.push(script(searchJs));
   return tags;
 }

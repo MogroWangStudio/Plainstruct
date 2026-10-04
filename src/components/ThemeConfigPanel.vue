@@ -266,11 +266,16 @@ function confirmPicker() {
 const plugins = computed(() =>
   site.config
     ? normalizePlugins(site.config)
-    : { search: true, imgPreview: true, custom: [] },
+    : { search: true, imgPreview: true, imgPreviewRequireMark: "", custom: [] },
 );
 
 function setBuiltin(key: "search" | "imgPreview", on: boolean) {
   void site.savePlugins({ [key]: on });
+}
+
+/** 图片预览的 class 标记模式(如 mws_ps_imgpreview);留空对所有正文图片生效 */
+function setImgPreviewMark(mark: string) {
+  void site.savePlugins({ imgPreviewRequireMark: mark.trim() });
 }
 
 async function importPlugin() {
@@ -332,6 +337,19 @@ async function removePlugin(id: string, name: string) {
           <span class="text-[calc(13px*var(--ui-font-scale))] text-ink-2">{{ t("theme.pluginImgPreview") }}</span>
         </label>
         <p class="opt-hint">{{ t("theme.pluginImgPreviewHint") }}</p>
+
+        <!-- 图片预览的 class 标记模式:设置后仅带该 class 的图片可预览 -->
+        <label class="flex flex-col gap-1">
+          <span class="field-label">{{ t("theme.pluginImgPreviewMark") }}</span>
+          <input
+            class="input !w-64"
+            type="text"
+            :value="plugins.imgPreviewRequireMark"
+            :placeholder="t('theme.pluginImgPreviewMarkPlaceholder')"
+            @change="setImgPreviewMark(($event.target as HTMLInputElement).value)"
+          />
+          <p class="opt-hint">{{ t("theme.pluginImgPreviewMarkHint") }}</p>
+        </label>
 
         <div class="flex flex-col gap-1 border-t border-line pt-3">
           <template v-if="plugins.custom.length">

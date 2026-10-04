@@ -119,6 +119,8 @@ export interface SitePluginsConfig {
   search?: boolean;
   /** 内置图片预览插件,缺省开启 */
   imgPreview?: boolean;
+  /** 图片预览的 class 标记模式:设置后仅 class 含该标记(如 mws_ps_imgpreview)的图片可预览 */
+  imgPreviewRequireMark?: string;
   custom?: SitePluginEntry[];
 }
 
