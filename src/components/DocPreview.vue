@@ -9,7 +9,6 @@ import { useUiStore } from "@/stores/ui";
 import { useAppStore } from "@/stores/app";
 import { ipc } from "@/ipc/ipc";
 import { renderPreview } from "@/lib/builder";
-import { scrollToAnchor } from "@/lib/preview";
 import { joinPosix, stripExt } from "@/lib/paths";
 
 const { t } = useI18n();
@@ -52,7 +51,6 @@ function applyHtml(next: string) {
   doc.close();
   win.scrollTo(0, savedScroll);
   attachClickHandlers();
-  attachScrollBehavior();
 }
 
 function schedule() {
@@ -87,34 +85,23 @@ onMounted(() => {
   else frame.value?.addEventListener("load", init, { once: true });
 });
 
-/** 站内链接 -> 打开对应文档;外链 -> 系统浏览器;
- *  按钮/无法在预览中打开的链接 -> 提示仅供预览 */
+/** 站内链接 -> 打开对应文档;外链 -> 系统浏览器。
+ *  页面脚本已在预览中运行(主题交互、目录高亮、搜索/灯箱插件与产物一致),
+ *  锚点与按钮交给页面自身脚本处理,宿主只接管会脱离预览的导航 */
 function attachClickHandlers() {
   const doc = frame.value?.contentDocument;
   if (!doc) return;
   doc.addEventListener("click", (e) => {
     const el = e.target as HTMLElement | null;
     const anchor = el?.closest("a");
-    // 按钮元素(主题的抽屉开关/折叠按钮等)在预览中无交互
-    if (!anchor) {
-      if (el?.closest("button,[role='button']")) {
-        e.preventDefault();
-        ui.toast(t("build.previewOnly"), "info");
-      }
-      return;
-    }
+    if (!anchor) return;
     const href = anchor.getAttribute("href") ?? "";
     if (/^https?:/i.test(href)) {
       e.preventDefault();
       void ipc.openExternal(href);
       return;
     }
-    if (href.startsWith("#")) {
-      // 目录/页内锚点:预览 iframe 不执行其中脚本,由宿主代为滚动到标题
-      e.preventDefault();
-      scrollToAnchor(doc, href);
-      return;
-    }
+    if (href.startsWith("#")) return; // 页内锚点:页面脚本/原生跳转自理
     e.preventDefault();
     const target = anchor.getAttribute("data-doc") ?? resolveInternal(href);
     const node = target ? site.findDoc(target) : null;
@@ -125,19 +112,6 @@ function attachClickHandlers() {
     // 站内链接但预览无法呈现(如分页页 page/N)
     ui.toast(t("build.previewOnly"), "info");
   });
-}
-
-/** 预览 iframe 不执行主题脚本,这里补上「滚动后顶栏变形」的等效行为,
- *  使顶栏形态与变形后宽度在编辑器预览里也能看到 */
-function attachScrollBehavior() {
-  const win = frame.value?.contentWindow;
-  const doc = frame.value?.contentDocument;
-  if (!win || !doc) return;
-  const bar = doc.querySelector(".blog-topbar");
-  if (!bar) return;
-  const sync = () => bar.classList.toggle("is-scrolled", (win.scrollY || 0) > 24);
-  win.addEventListener("scroll", sync, { passive: true });
-  sync();
 }
 
 /** 无 data-doc 的相对链接(主题模板生成的 .html 链接/文件夹链接)解析为文档路径 */
@@ -167,12 +141,12 @@ defineExpose({ scrollToRatio });
 </script>
 
 <template>
-  <!-- sandbox 保留同源(宿主可写入/滚动/拦截点击),但禁用其中脚本:
-       markdown 裸 HTML 与主题 JS 不在应用特权上下文执行 -->
+  <!-- 同源沙箱:宿主可写入/滚动/拦截导航;allow-scripts 让页面脚本
+       (主题交互、目录高亮、搜索/灯箱插件)照常运行,预览行为与产物一致 -->
   <iframe
     ref="frame"
     class="doc-preview h-full w-full border-0"
     title="preview"
-    sandbox="allow-same-origin"
+    sandbox="allow-same-origin allow-scripts"
   />
 </template>

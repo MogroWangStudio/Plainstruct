@@ -3,6 +3,7 @@ import { ipc } from "@/ipc/ipc";
 import type { SiteConfig, SitePluginEntry, SitePluginFiles, TreeNode } from "@/ipc/types";
 import { collectDocPaths, type DocsCache } from "@/lib/builder";
 import { enabledPlugins, normalizePlugins } from "@/lib/plugins";
+import { remapDocRefsForMove } from "@/lib/imageRefs";
 import { dirname, isAssetDirName, isImageFile } from "@/lib/paths";
 import { useEditorStore } from "./editor";
 import { useBuilderStore } from "./builder";
@@ -223,7 +224,10 @@ export const useSiteStore = defineStore("site", {
     },
 
     async renameItem(path: string, newName: string) {
+      // 目录重命名会改变其子树内文档的目录前缀,文内相对引用需换算(文件改名目录不变,无须处理)
+      const movedDocs = this.findDoc(path)?.type === "dir" ? this.mdDocsUnder(path) : [];
       const newPath = await ipc.renameItem(path, newName);
+      await this.remapMovedDocs([{ from: path, to: newPath }], movedDocs);
       await this.refreshTree();
       const editor = useEditorStore();
       const active = editor.activePath;
@@ -235,7 +239,9 @@ export const useSiteStore = defineStore("site", {
     },
 
     async moveItem(src: string, destDir: string) {
+      const movedDocs = this.mdDocsUnder(src);
       const newPath = await ipc.moveItem(src, destDir);
+      await this.remapMovedDocs([{ from: src, to: newPath }], movedDocs);
       await this.refreshTree();
       const editor = useEditorStore();
       const active = editor.activePath;
@@ -248,12 +254,14 @@ export const useSiteStore = defineStore("site", {
 
     /** 批量移动(资产页多选拖放):逐个落盘后只刷新一次树,返回旧新路径对 */
     async moveItems(srcs: string[], destDir: string): Promise<{ from: string; to: string }[]> {
+      const movedDocs = srcs.flatMap((src) => this.mdDocsUnder(src));
       const moved: { from: string; to: string }[] = [];
       for (const src of srcs) {
         if (dirname(src) === destDir) continue;
         moved.push({ from: src, to: await ipc.moveItem(src, destDir) });
       }
       if (!moved.length) return moved;
+      await this.remapMovedDocs(moved, movedDocs);
       await this.refreshTree();
       const editor = useEditorStore();
       const active = editor.activePath;
@@ -262,6 +270,45 @@ export const useSiteStore = defineStore("site", {
         if (hit) editor.activePath = hit.to + active.slice(hit.from.length);
       }
       return moved;
+    },
+
+    /** 移动/重命名前收集受影响的 md 文档(自身或子树内;树尚是旧路径) */
+    mdDocsUnder(path: string): string[] {
+      const out: string[] = [];
+      const walk = (nodes: TreeNode[]) => {
+        for (const n of nodes) {
+          if (n.path === path || n.path.startsWith(`${path}/`)) {
+            if (n.type === "file" && /\.md$/i.test(n.name)) out.push(n.path);
+            if (n.children?.length) walk(n.children);
+          }
+        }
+      };
+      walk(this.tree);
+      return out;
+    },
+
+    /** 文档(或目录)挪了位置后,把文内相对引用(图片/封面/站内链接)
+     *  换算到新目录并落盘;当前打开且未保存的文档同步改写编辑器内容 */
+    async remapMovedDocs(moves: { from: string; to: string }[], docPaths: string[]) {
+      const editor = useEditorStore();
+      for (const oldPath of docPaths) {
+        const move = moves.find((m) => oldPath === m.from || oldPath.startsWith(`${m.from}/`));
+        if (!move || move.from === move.to) continue;
+        const newPath = move.to + oldPath.slice(move.from.length);
+        // 打开中的文档以编辑器内容为准(可能含未保存修改);改写后同步 savedContent
+        // 并直接落盘到新路径,避免自动保存把旧内容写回已移走的旧路径
+        const base = editor.activePath === oldPath ? editor.content : this.docsCache[oldPath];
+        if (base === undefined) continue;
+        const next = remapDocRefsForMove(oldPath, newPath, base);
+        if (next === base) continue;
+        if (editor.activePath === oldPath) {
+          editor.externalReplace = true;
+          editor.content = next;
+          editor.savedContent = next;
+        }
+        await ipc.saveDoc(newPath, next);
+        this.docsCache = { ...this.docsCache, [newPath]: next };
+      }
     },
 
     /** 批量删除(资产页多选):同样只刷新一次树 */

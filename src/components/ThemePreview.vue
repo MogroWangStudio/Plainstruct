@@ -9,7 +9,6 @@ import { useAppStore } from "@/stores/app";
 import { useUiStore } from "@/stores/ui";
 import { ipc } from "@/ipc/ipc";
 import { renderPreview, collectDocPaths } from "@/lib/builder";
-import { scrollToAnchor } from "@/lib/preview";
 import { joinPosix, stripExt } from "@/lib/paths";
 import type { ThemeBundle } from "@/lib/theme-engine";
 import type { ThemeMeta } from "@/ipc/types";
@@ -71,11 +70,11 @@ function apply() {
   doc.close();
   // document.open 会清空文档及其监听,每次写入后重新挂接
   attachLinks();
-  attachScrollBehavior();
 }
 
-/** 站内链接 -> 就地切换预览页面;外链 -> 系统浏览器;
- *  按钮/无法呈现的页面(分页页等) -> 提示仅供预览。
+/** 站内链接 -> 就地切换预览页面;外链 -> 系统浏览器。
+ *  页面脚本已在预览中运行(主题交互/目录高亮/插件与产物一致),
+ *  锚点与按钮交给页面自理,宿主只接管会脱离预览的导航:
  *  不拦截的话,iframe 会脱离 about:blank 导航到应用自身 origin 上
  *  不存在的路径,预览就此白屏且不自愈 */
 function attachLinks() {
@@ -84,25 +83,14 @@ function attachLinks() {
   doc.addEventListener("click", (e) => {
     const el = e.target as HTMLElement | null;
     const anchor = el?.closest("a");
-    if (!anchor) {
-      if (el?.closest("button,[role='button']")) {
-        e.preventDefault();
-        ui.toast(t("build.previewOnly"), "info");
-      }
-      return;
-    }
+    if (!anchor) return;
     const href = anchor.getAttribute("href") ?? "";
     if (/^https?:/i.test(href)) {
       e.preventDefault();
       void ipc.openExternal(href);
       return;
     }
-    if (href.startsWith("#")) {
-      // 目录/页内锚点:预览 iframe 不执行其中脚本,由宿主代为滚动到标题
-      e.preventDefault();
-      scrollToAnchor(doc, href);
-      return;
-    }
+    if (href.startsWith("#")) return; // 页内锚点:页面脚本/原生跳转自理
     e.preventDefault();
     const target = resolveInternal(href);
     if (target && collectDocPaths(site.tree).includes(target)) {
@@ -112,19 +100,6 @@ function attachLinks() {
     }
     ui.toast(t("build.previewOnly"), "info");
   });
-}
-
-/** 预览 iframe 不执行主题脚本,这里补上「滚动后顶栏变形」的等效行为:
- *  顶栏形态与变形后宽度才能在预览里即时看到(与构建产物一致) */
-function attachScrollBehavior() {
-  const win = frame.value?.contentWindow;
-  const doc = frame.value?.contentDocument;
-  if (!win || !doc) return;
-  const bar = doc.querySelector(".blog-topbar");
-  if (!bar) return;
-  const sync = () => bar.classList.toggle("is-scrolled", (win.scrollY || 0) > 24);
-  win.addEventListener("scroll", sync, { passive: true });
-  sync();
 }
 
 /** 相对链接(主题模板生成的 .html 链接/文件夹链接)按当前预览页面解析为文档路径 */
@@ -184,7 +159,6 @@ onMounted(() => {
 </script>
 
 <template>
-  <!-- sandbox 保留同源(宿主可写入并拦截点击),但禁用其中脚本:
-       第三方主题模板与 JS 不在应用特权上下文执行 -->
-  <iframe ref="frame" class="theme-preview h-full w-full border-0" title="theme preview" sandbox="allow-same-origin" />
+  <!-- 同源沙箱:宿主可写入并拦截导航;allow-scripts 让主题脚本(交互/目录高亮)照常运行 -->
+  <iframe ref="frame" class="theme-preview h-full w-full border-0" title="theme preview" sandbox="allow-same-origin allow-scripts" />
 </template>

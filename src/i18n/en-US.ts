@@ -116,6 +116,8 @@ export default {
     fmAuthor: "Author",
     fmAuthorPlaceholder: "Shown on the document page; empty to hide",
     fmAigc: "AIGC declaration",
+    fmHidden: "Hide document",
+    fmHiddenHint: "Hidden from the post stream, sidebar navigation and search index; reachable only via direct link. Custom top-bar navigation can still show it.",
     aigcHidden: "Hide AIGC declaration",
     aigcNone: "No AIGC content",
     aigcPresent: "Contains AIGC content",

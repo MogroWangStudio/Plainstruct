@@ -116,6 +116,8 @@ export default {
     fmAuthor: "作者署名",
     fmAuthorPlaceholder: "显示在文档页的作者名,留空不显示",
     fmAigc: "AIGC 声明",
+    fmHidden: "隐藏文档",
+    fmHiddenHint: "勾选后不进入文章流与侧栏导航、不被搜索索引收录,仅可通过链接访问;博客顶栏自定义导航仍可勾选展示。",
     aigcHidden: "不显示 AIGC 声明",
     aigcNone: "无任何 AIGC",
     aigcPresent: "存在 AIGC",

@@ -32,6 +32,8 @@ export interface DocMeta {
   author?: string;
   /** AIGC 声明(配置头 aigc: none/present;缺省不显示) */
   aigc?: string;
+  /** 隐藏文档:不进文章流/导航/搜索索引,页面仍生成(仅可通过链接访问) */
+  hidden?: boolean;
   body: string;
 }
 
@@ -41,6 +43,8 @@ interface RawNav {
   children: RawNav[];
   /** 文件夹项(配置面板的顶栏导航选择列表据此区分) */
   dir?: boolean;
+  /** 隐藏文档:不进侧栏导航/目录页/上一下一篇,顶栏自定义导航仍可选用 */
+  hidden?: boolean;
 }
 
 export type DocsCache = Record<string, string>;
@@ -86,6 +90,7 @@ function buildMetas(paths: string[], cache: DocsCache): Map<string, DocMeta> {
       cover: data.cover,
       author: data.author,
       aigc: data.aigc,
+      hidden: data.hidden === true,
       body: stripLeadingTitle(body, title),
     });
   }
@@ -116,7 +121,7 @@ function dateKey(date: string): { y: number; m: number; d: number; raw: string }
 /** 博客文章流:排除各级 index.md,有 date 的按日期倒序在前,无 date 的按标题排在后 */
 function buildPosts(metas: Map<string, DocMeta>): PostSummary[] {
   const posts = [...metas.values()]
-    .filter((m) => basename(m.path).toLowerCase() !== "index.md")
+    .filter((m) => !m.hidden && basename(m.path).toLowerCase() !== "index.md")
     .map((m) => ({
       title: m.title,
       htmlPath: mdToHtml(m.path),
@@ -162,6 +167,8 @@ function buildNav(nodes: TreeNode[], metas: Map<string, DocMeta>): RawNav[] {
           : mdToHtml(node.path ? `${node.path}/index.md` : "index.md"),
         children,
         dir: true,
+        // 落地页被隐藏时,文件夹入口同样从侧栏/目录页隐去
+        hidden: indexMeta?.hidden === true || undefined,
       });
     } else if (isMarkdown(node.path) && node.path.toLowerCase() !== "index.md") {
       // 根级 index.md 即站点首页(站点名入口),不重复出现在导航
@@ -170,6 +177,7 @@ function buildNav(nodes: TreeNode[], metas: Map<string, DocMeta>): RawNav[] {
         title: meta?.title ?? stripExt(node.name),
         htmlPath: mdToHtml(node.path),
         children: [],
+        hidden: meta?.hidden === true || undefined,
       });
     }
   }
@@ -191,9 +199,11 @@ function escapeHtml(s: string): string {
 
 /** 自动目录页的 TOC HTML -- 站点首页与文件夹页共用(该目录没有 index.md 时) */
 function tocHtml(raw: RawNav[], fromDir: string): string {
+  // 目录列表页不展示隐藏文档(仍可通过直接链接访问)
   const items = (list: RawNav[]): string =>
-    list.length
+    list.filter((item) => !item.hidden).length
       ? `<ul class="ps-home-list">${list
+          .filter((item) => !item.hidden)
           .map((item) => {
             const head = item.htmlPath
               ? `<a class="ps-home-link" href="${encodePath(relPosix(fromDir, item.htmlPath))}">${escapeHtml(item.title)}</a>`
@@ -212,6 +222,13 @@ function flattenNav(raw: RawNav[]): RawNav[] {
     out.push(...flattenNav(item.children));
   }
   return out;
+}
+
+/** 文档站侧栏导航:递归剔除隐藏文档(顶栏自定义导航不走这里,可保留勾选的隐藏文档) */
+function navForSidebar(raw: RawNav[]): RawNav[] {
+  return raw
+    .filter((item) => !item.hidden)
+    .map((item) => (item.children.length ? { ...item, children: navForSidebar(item.children) } : item));
 }
 
 /** 浏览器标签页标题:按站点 titleFormat 拼接 {page}/{site},首页只显示站点名 */
@@ -263,10 +280,12 @@ export function blogTopNav(config: Record<string, string | number | boolean>, ra
     .split("\n")
     .map((s) => s.trim())
     .filter(Boolean);
-  const chosen =
-    String(config.navMode ?? "") === "自定义" && picked.length
-      ? flattenNav(raw).filter((item) => item.htmlPath !== undefined && picked.includes(item.htmlPath))
-      : raw;
+  const custom = String(config.navMode ?? "") === "自定义" && picked.length;
+  const chosen = custom
+    ? // 自定义模式:按选择保留(隐藏文档被明确勾选时仍可展示在顶栏)
+      flattenNav(raw).filter((item) => item.htmlPath !== undefined && picked.includes(item.htmlPath))
+    : // 默认模式:隐去隐藏文档
+      raw.filter((item) => !item.hidden);
   return chosen.slice(0, navMaxOf(config));
 }
 
@@ -324,7 +343,9 @@ function renderOnePage(
   const htmlPath = mdToHtml(doc.path);
   const outDir = dirname(htmlPath);
   const prefix = relPrefix(htmlPath);
-  const flat = flattenNav(navRaw);
+  // 上/下篇沿导航顺序但跳过隐藏文档;文档站侧栏同样隐去隐藏文档
+  // (博客顶栏由 blogTopNav 决定,自定义勾选的隐藏文档仍可展示)
+  const flat = flattenNav(navRaw).filter((n) => !n.hidden);
   const idx = flat.findIndex((n) => n.htmlPath === htmlPath);
   const prev = idx > 0 ? flat[idx - 1] : undefined;
   const next = idx >= 0 && idx < flat.length - 1 ? flat[idx + 1] : undefined;
@@ -388,8 +409,9 @@ function renderOnePage(
       toc: isBlog && !pagination ? extractHeadings(doc.body) : undefined,
       pagination,
     },
-    // 博客顶栏按主题配置裁剪(自定义选择 + 数量上限);上/下篇与面包屑仍按完整导航树计算
-    nav: navForPage(isBlog ? blogTopNav(config, navRaw) : navRaw, htmlPath, outDir),
+    // 博客顶栏按主题配置裁剪(自定义选择 + 数量上限);文档站侧栏隐去隐藏文档;
+    // 上/下篇与面包屑仍按完整导航树计算
+    nav: navForPage(isBlog ? blogTopNav(config, navRaw) : navForSidebar(navRaw), htmlPath, outDir),
     prev: prev ? { title: prev.title, url: encodePath(relPosix(outDir, prev.htmlPath!)) } : undefined,
     next: next ? { title: next.title, url: encodePath(relPosix(outDir, next.htmlPath!)) } : undefined,
     posts: isBlog
@@ -512,6 +534,7 @@ function previewSearchPages(metas: Map<string, DocMeta>, tree: TreeNode[]): Sear
   const hasIndex = new Set<string>();
   for (const m of metas.values()) {
     if (basename(m.path).toLowerCase() === "index.md") hasIndex.add(dirname(m.path).toLowerCase());
+    if (m.hidden) continue; // 隐藏文档不入搜索数据
     pages.push({ title: m.title, url: mdToHtml(m.path), desc: m.description, text: mdToText(m.body) });
   }
   const walk = (nodes: TreeNode[]) => {
@@ -568,11 +591,11 @@ export async function buildSite(site: SiteConfig, theme: ThemeBundle, root: stri
   const totalPages = Math.max(1, Math.ceil(allPosts.length / perPage));
   const warnings: BuildWarning[] = [];
   const outputs: OutputFile[] = [];
-  /** 搜索索引条目随页面渲染同步收集(标题/描述/正文纯文本) */
+  /** 搜索索引条目随页面渲染同步收集(标题/描述/正文纯文本);隐藏文档不入索引 */
   const searchPages: SearchPage[] = [];
-  const emit = (path: string, html: string, title: string, desc?: string) => {
+  const emit = (path: string, html: string, title: string, desc?: string, indexable = true) => {
     outputs.push({ path, content: html });
-    searchPages.push({ title, url: path, desc, text: htmlToText(html) });
+    if (indexable) searchPages.push({ title, url: path, desc, text: htmlToText(html) });
   };
 
   // 主题文本资源(css/js 等)落到 build 根
@@ -608,7 +631,7 @@ export async function buildSite(site: SiteConfig, theme: ThemeBundle, root: stri
       undefined,
       docExtras,
     );
-    emit(mdToHtml(doc.path), html, doc.title, doc.description);
+    emit(mdToHtml(doc.path), html, doc.title, doc.description, !doc.hidden);
   }
 
   // 根目录:无 index.md 时自动生成首页,保证 index.html 始终存在;

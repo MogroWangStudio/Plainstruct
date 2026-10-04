@@ -322,7 +322,7 @@ function frontMatterEnd(doc: Text): number | null {
 /* ---------- 配置头可视化编辑:表单弹窗(FrontMatterModal),确认后就地写回 ---------- */
 
 const fmOpen = ref(false);
-const fmInitial: FrontMatterForm = reactive({ title: "", description: "", date: "", cover: "", author: "", aigc: "" });
+const fmInitial: FrontMatterForm = reactive({ title: "", description: "", date: "", cover: "", author: "", aigc: "", hidden: false });
 
 /** 当前文档位置引用站点资产的路径前缀(根级 asset/…,子目录 ../asset/…) */
 function coverPrefix(): string {
@@ -347,6 +347,7 @@ function openFmEditor() {
   fmInitial.cover = parsed.data.cover ?? "";
   fmInitial.author = parsed.data.author ?? "";
   fmInitial.aigc = parsed.data.aigc ?? "";
+  fmInitial.hidden = parsed.data.hidden === true;
   fmOpen.value = true;
 }
 

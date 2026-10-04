@@ -13,6 +13,8 @@ export interface ImageRef {
 
 /** Markdown 图片语法:![alt](src "title") */
 const MD_IMAGE = /!\[([^\]]*)\]\(\s*([^)\s]+)(?:\s+"[^"]*")?\s*\)/g;
+/** Markdown 链接语法:[text](target) —— 图片是其特例(前缀 !),换算时幂等 */
+const MD_LINK = /\[([^\]]*)\]\(\s*([^)\s]+)(?:\s+"[^"]*")?\s*\)/g;
 /** 内联 HTML 图片:<img src="..."> */
 const HTML_IMAGE = /<img\b[^>]*\bsrc=["']([^"']+)["']/gi;
 /** front-matter 块(--- 包围的配置头) */
@@ -86,6 +88,44 @@ export function moveImageRefs(
   const newRaw = encodePath(relPosix(dirname(docPath), newPath));
   for (const { raw } of refs) {
     if (newRaw !== raw) out = out.split(raw).join(newRaw);
+  }
+  return out;
+}
+
+/** 文档自身移动/重命名目录后,把文内的相对引用换算到新位置:
+ *  覆盖 Markdown 图片、内联 <img>、front-matter 封面图与站内链接
+ *  (它们都以「相对本文档目录」解析,文档挪了目录写法必须跟着换算)。
+ *  外链/data:/锚点跳过;换算与渲染管线同一套 relPosix。 */
+export function remapDocRefsForMove(oldPath: string, newPath: string, content: string): string {
+  const oldDir = dirname(oldPath);
+  const newDir = dirname(newPath);
+  if (oldDir === newDir) return content;
+  const remap = (raw: string): string => {
+    if (/^(https?:|data:|mailto:|#)/i.test(raw)) return raw;
+    const target = splitHash(raw)[0];
+    if (!target) return raw;
+    const resolved = joinPosix(oldDir, decodeHref(target));
+    if (resolved.startsWith("..")) return raw; // 出根的写法保持原样
+    return encodePath(relPosix(newDir, resolved)) + raw.slice(target.length);
+  };
+  let out = content;
+  for (const m of content.matchAll(MD_IMAGE)) {
+    const next = remap(m[2]);
+    if (next !== m[2]) out = out.split(m[2]).join(next);
+  }
+  for (const m of content.matchAll(HTML_IMAGE)) {
+    const next = remap(m[1]);
+    if (next !== m[1]) out = out.split(m[1]).join(next);
+  }
+  const cover = coverRefsOf(content)[0];
+  if (cover) {
+    const next = remap(cover);
+    if (next !== cover) out = out.split(cover).join(next);
+  }
+  // 站内 md 链接(不含图片;图片上方已换算):[text](target) 的 target 非锚点/外链时换算
+  for (const m of content.matchAll(MD_LINK)) {
+    const next = remap(m[2]);
+    if (next !== m[2]) out = out.split(m[2]).join(next);
   }
   return out;
 }

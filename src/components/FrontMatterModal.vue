@@ -20,6 +20,8 @@ export interface FrontMatterForm {
   author: string;
   /** AIGC 声明:空 = 不显示声明,none = 无任何 AIGC,present = 存在 AIGC */
   aigc: "" | "none" | "present";
+  /** 隐藏文档:不进文章流/导航/搜索索引,仅可通过链接访问 */
+  hidden: boolean;
 }
 
 const props = defineProps<{
@@ -39,7 +41,7 @@ const { t } = useI18n();
 const site = useSiteStore();
 const ui = useUiStore();
 
-const form = reactive<FrontMatterForm>({ title: "", description: "", date: "", cover: "", author: "", aigc: "" });
+const form = reactive<FrontMatterForm>({ title: "", description: "", date: "", cover: "", author: "", aigc: "", hidden: false });
 
 /** AIGC 声明三档;选「不显示」时写回不落字段 */
 const aigcOptions = computed(() => [
@@ -103,6 +105,16 @@ async function importCover() {
         <span class="field-label">{{ t("editor.fmAigc") }}</span>
         <SelectMenu v-model="form.aigc" :options="aigcOptions" align="left" />
       </label>
+      <label class="flex cursor-pointer items-center gap-2">
+        <input
+          type="checkbox"
+          class="checkbox-input"
+          :checked="form.hidden"
+          @change="form.hidden = ($event.target as HTMLInputElement).checked"
+        />
+        <span class="text-[calc(13px*var(--ui-font-scale))] text-ink-2">{{ t("editor.fmHidden") }}</span>
+      </label>
+      <p class="opt-hint">{{ t("editor.fmHiddenHint") }}</p>
       <label class="flex flex-col gap-1">
         <span class="field-label">{{ t("editor.fmCover") }}</span>
         <div class="flex gap-2">
