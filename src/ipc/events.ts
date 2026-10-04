@@ -6,6 +6,8 @@ export const Events = {
   PublishLog: "plainstruct://publish-log",
   CloseRequested: "plainstruct://close-requested",
   PreviewRebuilt: "plainstruct://preview-rebuilt",
+  /** 刷新动画偏好变化(仅前端 emit/listen,Rust 侧作常量镜像) */
+  PreviewAnimSetting: "plainstruct://preview-anim-setting",
 } as const;
 
 export type SyncProgressEvent = typeof Events.SyncProgress;

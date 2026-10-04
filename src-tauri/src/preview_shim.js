@@ -391,6 +391,30 @@
     return { x: ((last.x - first.x) / dt) * 1000, y: ((last.y - first.y) / dt) * 1000 };
   }
 
+  /* ---------- 刷新动画抑制:壳层开启「刷新时禁用动画」后,刷新不再重播进场/加载动画 ---------- */
+
+  // 偏好经壳层 anim 消息写入 sessionStorage:刷新后的新文档在解析早期(首帧绘制前)
+  // 即可读到标记,赶在 CSS 动画首帧前停用;正常导航(点击链接/后退前进)与发布后的
+  // 站点不含标记,行为不变。
+  function suppressReloadAnim() {
+    var marked = false;
+    try {
+      marked = sessionStorage.getItem("psNoReloadAnim") === "1";
+    } catch (e) {
+      /* 忽略 */
+    }
+    if (!marked || navType() !== "reload") return;
+    var style = document.createElement("style");
+    style.id = "ps-noanim";
+    // 只停 animation(进场动画与加载转圈)并隐藏加载覆盖层,保留 transition(悬停反馈),
+    // 刷新后的页面交互不受影响
+    style.textContent =
+      ".ps-noanim, .ps-noanim *, .ps-noanim *::before, .ps-noanim *::after { animation: none !important; }" +
+      ".ps-loader { display: none !important; }";
+    document.documentElement.classList.add("ps-noanim");
+    (document.head || document.documentElement).appendChild(style);
+  }
+
   /* ---------- 壳层消息:模式切换与历史导航 ---------- */
 
   // 移动模式的触点光标:圆形指尖样式替代系统箭头,模拟触摸屏幕。
@@ -429,6 +453,14 @@
         pan = null;
       }
       if (mode !== "mobile" && gesture) endGesture(false); // 切模式打断进行中的手势
+    } else if (d.type === "anim") {
+      // 刷新动画偏好:写入会话标记,刷新后的新文档据此在首帧前停用进场动画
+      try {
+        if (d.disabled) sessionStorage.setItem("psNoReloadAnim", "1");
+        else sessionStorage.removeItem("psNoReloadAnim");
+      } catch (err) {
+        /* 会话存储不可用时按未标记处理 */
+      }
     } else if (d.type === "history" && typeof d.delta === "number") {
       history.go(d.delta); // delta 0 = 刷新当前页
     }
@@ -457,6 +489,7 @@
   });
 
   reportPage();
+  suppressReloadAnim(); // 尽早执行:赶在首帧绘制前停用刷新场景的进场/加载动画
   window.addEventListener("pageshow", reportPage); // 含 bfcache 恢复的后退/前进
   window.addEventListener("popstate", reportPage);
   window.addEventListener("hashchange", reportPage);

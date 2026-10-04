@@ -226,6 +226,8 @@ function previewShellUrl(app: ReturnType<typeof useAppStore>, title: string): st
     fontScale: String(normalizeUiFontSize(app.settings.uiFontSize)),
     fontWeight: String(normalizeUiFontWeight(app.settings.uiFontWeight)),
     title,
+    // 刷新动画偏好初值;窗口打开期间的变更经 PreviewAnimSetting 事件即时同步
+    noAnim: app.settings.disableRefreshAnim ? "1" : "0",
   });
   return `preview.html?${params.toString()}`;
 }

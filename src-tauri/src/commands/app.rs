@@ -104,6 +104,7 @@ pub(crate) fn settings_defaults() -> Value {
         "locale": "zh-CN",
         "autosave": true,
         "autosaveDelay": 900,
+        "disableRefreshAnim": false,
         "theme": "system",
         "uiFont": "system",
         "uiFontSize": 1,

@@ -33,6 +33,11 @@ async function onAutosaveToggle() {
   await app.setAutosave(!app.settings.autosave);
 }
 
+/** 刷新时禁用动画:独立预览窗口因自动重建刷新页面时不再重播页面动画 */
+async function onDisableRefreshAnimToggle() {
+  await app.setEditorPrefs({ disableRefreshAnim: !(app.settings.disableRefreshAnim ?? false) });
+}
+
 /** 自动保存延迟档位(毫秒);按当前界面语言显示为秒 */
 const AUTOSAVE_DELAY_STEPS = [300, 500, 900, 1500, 3000, 5000];
 
@@ -447,6 +452,25 @@ function openRelease(url: string) {
                     <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.autosaveDelayHint") }}</p>
                   </div>
                   <SelectMenu v-model="autosaveDelayModel" :options="autosaveDelayOptions" align="right" class="shrink-0" />
+                </div>
+                <!-- 刷新时禁用动画:写作时独立预览窗口随自动重建反复刷新,页面动画会反复重播 -->
+                <div class="settings-row" style="--i: 0">
+                  <div class="min-w-0">
+                    <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.disableRefreshAnim") }}</p>
+                    <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.disableRefreshAnimHint") }}</p>
+                  </div>
+                  <button
+                    class="relative inline-flex h-6 w-10 shrink-0 items-center rounded-full transition-colors"
+                    :class="(app.settings.disableRefreshAnim ?? false) ? 'bg-accent' : 'bg-line-strong'"
+                    role="switch"
+                    :aria-checked="app.settings.disableRefreshAnim ?? false"
+                    @click="onDisableRefreshAnimToggle"
+                  >
+                    <span
+                      class="inline-block h-4 w-4 rounded-full bg-surface shadow-sm transition-transform"
+                      :class="(app.settings.disableRefreshAnim ?? false) ? 'translate-x-[22px]' : 'translate-x-[4px]'"
+                    />
+                  </button>
                 </div>
               </div>
 

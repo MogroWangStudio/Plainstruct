@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { ipc } from "@/ipc/ipc";
+import { ipc, inTauri } from "@/ipc/ipc";
 import { Events, listen } from "@/ipc/events";
 import type {
   AppSettings,
@@ -41,13 +41,14 @@ export interface AppearanceSettings {
   editorFontCustom?: string;
 }
 
-/** 编辑器写作偏好(空白标记、键位与自动保存延迟) */
+/** 编辑器写作偏好(空白标记、键位、自动保存行为与预览刷新动画) */
 export interface EditorPrefs {
   editorWhitespace?: boolean;
   editorBreakKey?: EditorBreakKey;
   editorIndentKey?: EditorIndentKey;
   editorIndentWidth?: number;
   autosaveDelay?: number;
+  disableRefreshAnim?: boolean;
 }
 
 /** 常用字体栈(与素构站点主题一致) */
@@ -142,6 +143,7 @@ export const useAppStore = defineStore("app", {
           locale: "zh-CN",
           autosave: true,
           autosaveDelay: AUTOSAVE_DELAY_DEFAULT,
+          disableRefreshAnim: false,
           theme: "system",
           uiFont: "system",
           uiFontSize: 1,
@@ -377,6 +379,15 @@ export const useAppStore = defineStore("app", {
         settings: { ...this.settings, ...patch },
       };
       await ipc.saveSettings(patch);
+      // 刷新动画偏好即时同步给独立预览窗口(窗口开着也生效;未开或 mock 下静默)
+      if (inTauri && patch.disableRefreshAnim !== undefined) {
+        try {
+          const { emitTo } = await import("@tauri-apps/api/event");
+          await emitTo("site-preview", Events.PreviewAnimSetting, { disabled: patch.disableRefreshAnim });
+        } catch {
+          /* 预览窗口未开时目标不存在,忽略 */
+        }
+      }
     },
 
     /** 把主题与字体落到 html 根节点(data-theme + 字体变量 + 缩放/字重) */

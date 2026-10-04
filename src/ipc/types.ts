@@ -24,6 +24,8 @@ export interface AppSettings {
   autosave: boolean;
   /** 自动保存延迟:停止输入后多久落盘(毫秒,300–5000,缺省 900) */
   autosaveDelay?: number;
+  /** 刷新时禁用动画:独立预览窗口因自动重建刷新页面时不再播放页面进场/加载动画 */
+  disableRefreshAnim?: boolean;
   theme?: AppTheme;
   uiFont?: UiFontMode;
   uiFontCustom?: string;

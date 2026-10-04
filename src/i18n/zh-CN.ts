@@ -482,6 +482,8 @@ export default {
     autosaveDelay: "自动保存延迟",
     autosaveDelayHint: "停止输入后等待多久自动落盘;手动保存(⌘/Ctrl+S)不受影响。",
     autosaveDelayN: "{n} 秒",
+    disableRefreshAnim: "刷新时禁用动画",
+    disableRefreshAnimHint: "独立预览窗口因自动重建而刷新页面时,不再重播页面进场与加载动画,阅读不被打扰;发布后的站点不受影响。",
     sectionWriting: "写作",
     editorWhitespace: "显示空白标记",
     editorWhitespaceHint: "在编辑器中标记硬换行(¶)与首行缩进(⇥)。",

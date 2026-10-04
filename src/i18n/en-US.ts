@@ -482,6 +482,8 @@ export default {
     autosaveDelay: "Autosave delay",
     autosaveDelayHint: "How long to wait after you stop typing before changes are saved; manual save (\u2318/Ctrl+S) is unaffected.",
     autosaveDelayN: "{n} s",
+    disableRefreshAnim: "Disable animations on refresh",
+    disableRefreshAnimHint: "When the preview window reloads after an automatic rebuild, page entrance and loading animations are skipped so reading stays undisturbed; published sites are unaffected.",
     sectionWriting: "Writing",
     editorWhitespace: "Show whitespace marks",
     editorWhitespaceHint: "Mark hard breaks (¶) and first-line indents (⇥) in the editor.",
