@@ -8,6 +8,3 @@ pub const CLOSE_REQUESTED: &str = "plainstruct://close-requested";
 /// 构建完成通知独立预览窗口原位刷新(仅前端 emit/listen,Rust 侧作常量镜像)
 #[allow(dead_code)]
 pub const PREVIEW_REBUILT: &str = "plainstruct://preview-rebuilt";
-/// 刷新动画偏好变化(仅前端 emit/listen,Rust 侧作常量镜像)
-#[allow(dead_code)]
-pub const PREVIEW_ANIM_SETTING: &str = "plainstruct://preview-anim-setting";

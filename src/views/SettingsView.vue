@@ -2,6 +2,8 @@
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import {
+  AUTOSAVE_DELAY_MAX,
+  AUTOSAVE_DELAY_MIN,
   normalizeAutosaveDelay,
   normalizeUiFontSize,
   normalizeUiFontWeight,
@@ -38,16 +40,15 @@ async function onDisableRefreshAnimToggle() {
   await app.setEditorPrefs({ disableRefreshAnim: !(app.settings.disableRefreshAnim ?? false) });
 }
 
-/** 自动保存延迟档位(毫秒);按当前界面语言显示为秒 */
-const AUTOSAVE_DELAY_STEPS = [300, 500, 900, 1500, 3000, 5000];
-
-const autosaveDelayOptions = computed<{ value: string; label: string }[]>(() =>
-  AUTOSAVE_DELAY_STEPS.map((ms) => ({ value: String(ms), label: t("settings.autosaveDelayN", { n: (ms / 1000).toString() }) })),
-);
-
+/** 自动保存延迟滑块(毫秒);显示值按当前界面语言换算为秒 */
 const autosaveDelayModel = computed({
-  get: () => String(normalizeAutosaveDelay(app.settings.autosaveDelay)),
-  set: (v: string) => void app.setEditorPrefs({ autosaveDelay: Number(v) }),
+  get: () => normalizeAutosaveDelay(app.settings.autosaveDelay),
+  set: (v: number) => void app.setEditorPrefs({ autosaveDelay: v }),
+});
+
+const autosaveDelaySeconds = computed(() => {
+  const n = autosaveDelayModel.value / 1000;
+  return Number.isInteger(n) ? String(n) : n.toFixed(1);
 });
 
 /* ---------- 编辑器写作偏好(空白标记与键位) ---------- */
@@ -445,13 +446,24 @@ function openRelease(url: string) {
                     />
                   </button>
                 </div>
-                <!-- 自动保存延迟:仅在自动保存开启时出现,档位按停止输入后的落盘等待时间 -->
+                <!-- 自动保存延迟:仅在自动保存开启时出现,滑块控制停止输入后的落盘等待时间 -->
                 <div v-if="app.settings.autosave" class="settings-row" style="--i: 0">
-                  <div class="min-w-0">
-                    <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.autosaveDelay") }}</p>
+                  <div class="min-w-0 flex-1">
+                    <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">
+                      {{ t("settings.autosaveDelay") }}
+                      <span class="ml-1 font-normal text-ink-3">{{ t("settings.autosaveDelayN", { n: autosaveDelaySeconds }) }}</span>
+                    </p>
                     <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.autosaveDelayHint") }}</p>
+                    <input
+                      v-model.number="autosaveDelayModel"
+                      type="range"
+                      class="range-input mt-2 w-full max-w-64"
+                      :min="AUTOSAVE_DELAY_MIN"
+                      :max="AUTOSAVE_DELAY_MAX"
+                      :step="100"
+                      :aria-label="t('settings.autosaveDelay')"
+                    />
                   </div>
-                  <SelectMenu v-model="autosaveDelayModel" :options="autosaveDelayOptions" align="right" class="shrink-0" />
                 </div>
                 <!-- 刷新时禁用动画:写作时独立预览窗口随自动重建反复刷新,页面动画会反复重播 -->
                 <div class="settings-row" style="--i: 0">

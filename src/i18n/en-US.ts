@@ -112,6 +112,7 @@ export default {
     emptyTitle: "Start writing",
     emptyBody: "Pick or create a document from the left.",
     saving: "Saving…",
+    autosaveIn: "Autosaving in {s}s",
     saved: "Saved",
     unsaved: "Unsaved changes",
     saveNow: "Save now",

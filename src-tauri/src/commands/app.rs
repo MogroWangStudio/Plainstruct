@@ -61,6 +61,16 @@ pub fn read_app_data(state: &AppState) -> AppData {
     read_app_data_at(&state.app_data())
 }
 
+/// 「刷新时禁用动画」设置(site:// 预览注入用);每次页面响应读一次,
+/// app.json 不足 1KB,预览刷新频率下开销可忽略;缺字段按关闭处理
+pub fn refresh_anim_disabled(state: &AppState) -> bool {
+    read_app_data(state)
+        .settings
+        .get("disableRefreshAnim")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
+}
+
 pub fn read_app_data_at(dir: &Path) -> AppData {
     let file = dir.join("app.json");
     std::fs::read_to_string(&file)

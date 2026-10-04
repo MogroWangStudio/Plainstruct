@@ -198,13 +198,6 @@ function readMode(): Mode {
   }
 }
 
-/* ---------- 刷新动画偏好:初值随窗口创建参数携带,变更经事件即时同步 ---------- */
-const noAnim = ref(params.get("noAnim") === "1");
-
-function sendAnim() {
-  postToSite({ type: "anim", disabled: noAnim.value });
-}
-
 /* ---------- shim 回报的页面状态 ---------- */
 interface PageMsg {
   source: "ps-shim";
@@ -274,7 +267,6 @@ function sendHistory(delta: number) {
 
 function onFrameLoad() {
   sendMode(); // 每次页面载入后同步一次模式(shim 随新文档重置)
-  sendAnim(); // 刷新动画偏好同样随每次载入同步(shim 据此维护刷新标记)
   // 后退入场动画可能先于/晚于 load 到达,两种顺序都不打断
   if (!entrancePending && !gestureAnim) gestureP.value = 0;
 }
@@ -430,7 +422,6 @@ async function winAction(action: "minimize" | "toggleMaximize" | "close") {
 
 let resizeObserver: ResizeObserver | null = null;
 let unlistenRebuilt: (() => void) | null = null;
-let unlistenAnim: (() => void) | null = null;
 
 onMounted(() => {
   void nextTick(measurePill);
@@ -454,14 +445,6 @@ onMounted(() => {
       } catch {
         /* 监听失败不影响预览 */
       }
-      try {
-        unlistenAnim = await listen<{ disabled: boolean }>(Events.PreviewAnimSetting, (p) => {
-          noAnim.value = p.disabled;
-          sendAnim(); // 当前页面立即更新刷新标记,下次刷新即按新偏好执行
-        });
-      } catch {
-        /* 监听失败不影响预览 */
-      }
     })();
   }
 });
@@ -470,7 +453,6 @@ onBeforeUnmount(() => {
   resizeObserver?.disconnect();
   window.removeEventListener("message", onWindowMessage);
   unlistenRebuilt?.();
-  unlistenAnim?.();
   stopGesture();
 });
 </script>

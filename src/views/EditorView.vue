@@ -181,6 +181,10 @@ onBeforeUnmount(() => {
 
           <span class="flex items-center gap-1.5 text-[calc(12px*var(--ui-font-scale))] text-ink-3">
             <template v-if="editor.saving">{{ t("editor.saving") }}</template>
+            <!-- 自动保存倒计时:输入后延迟落盘的剩余时间,随设置可调 -->
+            <template v-else-if="editor.autosaveCountdown !== null">
+              {{ t("editor.autosaveIn", { s: (editor.autosaveCountdown / 1000).toFixed(1) }) }}
+            </template>
             <template v-else-if="!editor.dirty">
               <AppIcon name="check" :size="13" class="text-ink-3" />
               {{ t("editor.saved") }}

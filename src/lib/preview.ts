@@ -1,9 +1,12 @@
 /** 站点预览 URL -- site:// 自定义协议的平台差异封装 */
 import type { Platform } from "@/ipc/types";
 
-/** Windows WebView2 将自定义协议映射为 http://site.localhost/,macOS 为 site://localhost/ */
+/** Windows WebView2 将自定义协议映射为 http://site.localhost/,macOS 为 site://localhost/;
+ *  浏览器 mock 无协议通道,返回空基座 —— 资源走相对路径,由 dev server 的静态目录提供 */
 export function protocolBase(platform: Platform): string {
-  return platform === "macos" ? "site://localhost/" : "http://site.localhost/";
+  if (platform === "macos") return "site://localhost/";
+  if (platform === "browser") return "";
+  return "http://site.localhost/";
 }
 
 /** 站点根内相对路径 -> 可访问 URL(用于构建预览与编辑器预览里的资源) */

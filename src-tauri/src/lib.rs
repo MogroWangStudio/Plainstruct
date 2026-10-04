@@ -53,8 +53,10 @@ const PREVIEW_SHIM: &str = include_str!("preview_shim.js");
 
 /// 向 HTML 响应注入预览脚本:插在 </body> 前(大小写不敏感地取最后一处),
 /// 找不到锚点时整体追加;已含注入标记的页面原样返回,保证幂等。
+/// no_anim 时在脚本前先置标记,shim 据此在首帧绘制前停用页面进场/加载动画
+/// —— 对 site:// 的所有预览窗口生效(独立窗口、构建页与编辑器相关 iframe)。
 /// 非 UTF-8 的响应不注入(构建产物 HTML 均为 UTF-8,此分支只是兜底)。
-fn inject_preview_shim(bytes: Vec<u8>) -> Vec<u8> {
+fn inject_preview_shim(bytes: Vec<u8>, no_anim: bool) -> Vec<u8> {
     let text = match std::str::from_utf8(&bytes) {
         Ok(t) => t,
         Err(_) => return bytes,
@@ -62,7 +64,8 @@ fn inject_preview_shim(bytes: Vec<u8>) -> Vec<u8> {
     if text.contains("__psPreviewShim") {
         return bytes;
     }
-    let snippet = format!("<script>{PREVIEW_SHIM}</script>");
+    let flag = if no_anim { "<script>window.__psNoAnim=true;</script>" } else { "" };
+    let snippet = format!("{flag}<script>{PREVIEW_SHIM}</script>");
     // to_ascii_lowercase 保持字节长度不变,小写副本里的下标可直接用于原文本
     let anchor = text.to_ascii_lowercase().rfind("</body>");
     let mut out = Vec::with_capacity(bytes.len() + snippet.len());
@@ -143,7 +146,11 @@ fn handle_site<R: tauri::Runtime>(
         Ok(bytes) => {
             let mime = mime_for(&target.to_string_lossy());
             // HTML 页面注入预览脚本(幂等);其余类型原样返回
-            let body = if mime.starts_with("text/html") { inject_preview_shim(bytes) } else { bytes };
+            let body = if mime.starts_with("text/html") {
+                inject_preview_shim(bytes, commands::app::refresh_anim_disabled(&state))
+            } else {
+                bytes
+            };
             serve_response(StatusCode::OK, mime, body)
         }
         Err(_) => serve_response(StatusCode::NOT_FOUND, "text/plain; charset=utf-8", Vec::new()),

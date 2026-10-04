@@ -24,9 +24,14 @@ interface State {
   saving: boolean;
   mode: EditorMode;
   headings: Heading[];
+  /** 自动保存倒计时:距落盘的剩余毫秒(null = 无倒计时,自动保存关闭或已就绪) */
+  autosaveCountdown: number | null;
 }
 
 let autosaveTimer: ReturnType<typeof setTimeout> | null = null;
+/** 自动保存倒计时的目标时刻与显示节拍(100ms 粒度,仅倒计时期间运行) */
+let autosaveDeadline = 0;
+let countdownTimer: ReturnType<typeof setInterval> | null = null;
 /** 在飞保存的 Promise:保存期间到达的新请求等它结束后重试 */
 let savingPromise: Promise<void> = Promise.resolve();
 /** openDoc 请求序号:快速连续打开文档时只让最后一次请求生效 */
@@ -34,6 +39,16 @@ let openSeq = 0;
 /** 当前文档的 CodeMirror 实例:全局撤销/重做按钮经此驱动编辑器历史。
  *  用模块级 shallowRef 而非 store state:避免 Pinia 深层响应式代理 CodeMirror 实例 */
 const cmViewRef = shallowRef<EditorView | null>(null);
+
+/** 停止倒计时显示(保存/重开文档/关闭自动保存时);store 由调用方传入 */
+function stopCountdown(store: { autosaveCountdown: number | null }) {
+  if (countdownTimer) {
+    clearInterval(countdownTimer);
+    countdownTimer = null;
+  }
+  autosaveDeadline = 0;
+  store.autosaveCountdown = null;
+}
 
 export const useEditorStore = defineStore("editor", {
   state: (): State => ({
@@ -43,6 +58,7 @@ export const useEditorStore = defineStore("editor", {
     content: "",
     savedContent: "",
     saving: false,
+    autosaveCountdown: null,
     mode: "split",
     headings: [],
   }),
@@ -89,6 +105,7 @@ export const useEditorStore = defineStore("editor", {
     reset() {
       if (autosaveTimer) clearTimeout(autosaveTimer);
       autosaveTimer = null;
+      stopCountdown(this);
       openSeq++; // 使在飞的 openDoc 结果过期
       this.$reset();
     },
@@ -122,15 +139,45 @@ export const useEditorStore = defineStore("editor", {
     onInput(text: string) {
       this.content = text;
       this.headings = extractHeadings(text);
-      if (!useAppStore().settings.autosave) return;
+      if (!useAppStore().settings.autosave) {
+        stopCountdown(this);
+        return;
+      }
       if (autosaveTimer) clearTimeout(autosaveTimer);
-      // 停止输入后延迟落盘:延迟可在设置中调整(历史数据缺省 900ms)
+      // 停止输入后延迟落盘:延迟可在设置中调整(历史数据缺省 900ms);
+      // 保存状态区同步显示剩余时间的倒计时
+      const delay = normalizeAutosaveDelay(useAppStore().settings.autosaveDelay);
       autosaveTimer = setTimeout(() => {
+        stopCountdown(this);
         void this.save();
-      }, normalizeAutosaveDelay(useAppStore().settings.autosaveDelay));
+      }, delay);
+      autosaveDeadline = Date.now() + delay;
+      this.autosaveCountdown = delay;
+      if (!countdownTimer) {
+        countdownTimer = setInterval(() => {
+          const left = autosaveDeadline - Date.now();
+          if (left <= 0) {
+            // 到点:显示清零,落盘由挂起的 setTimeout 负责
+            stopCountdown(this);
+            return;
+          }
+          if (!useAppStore().settings.autosave) {
+            // 保存期间关闭了自动保存:连挂起的定时保存一并取消
+            if (autosaveTimer) {
+              clearTimeout(autosaveTimer);
+              autosaveTimer = null;
+            }
+            stopCountdown(this);
+            return;
+          }
+          this.autosaveCountdown = left;
+        }, 100);
+      }
     },
 
     async save(): Promise<void> {
+      // 手动保存即清掉倒计时(内容落盘后状态区回到「已保存」)
+      stopCountdown(this);
       if (!this.activePath || this.content === this.savedContent) return;
       // 已有保存在飞:等它结束后再存一次,保证飞行期间的输入也被落盘
       if (this.saving) {

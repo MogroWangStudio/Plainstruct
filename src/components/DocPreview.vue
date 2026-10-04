@@ -37,6 +37,7 @@ function computeHtml(): string {
     editor.content,
     app.platform,
     site.pluginContents,
+    app.settings.disableRefreshAnim ?? false,
   );
 }
 

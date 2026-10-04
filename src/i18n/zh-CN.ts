@@ -112,6 +112,7 @@ export default {
     emptyTitle: "开始写作",
     emptyBody: "从左侧选择或新建一篇文档。",
     saving: "保存中…",
+    autosaveIn: "{s} 秒后自动保存",
     saved: "已保存",
     unsaved: "有未保存的修改",
     saveNow: "立即保存",

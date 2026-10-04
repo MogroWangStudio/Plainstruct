@@ -430,6 +430,8 @@ export function renderPreview(
   platform: Platform,
   /** 用户插件的文件内容(站点打开时预载,预览通道内联注入) */
   pluginContents: SitePluginFiles[] = [],
+  /** 「刷新时禁用动画」:mock 预览的页面加载不重播进场/加载动画(Tauri 产物由注入 shim 负责) */
+  suppressAnim = false,
 ): string {
   const paths = collectDocPaths(tree);
   const docCache = { ...cache };
@@ -485,7 +487,15 @@ export function renderPreview(
     const search = normalizePlugins(site).search ? [searchIndexTag(previewSearchPages(metas, tree))] : [];
     out = injectPluginTags(out, [...search, ...pluginTags]);
   }
+  if (suppressAnim) out = suppressPageAnimTag(out);
   return out;
+}
+
+/** mock 预览的动画抑制样式(与注入 shim 的 ps-noanim 同款) */
+function suppressPageAnimTag(html: string): string {
+  const style = `<style id="ps-noanim">*, *::before, *::after { animation: none !important; } .ps-loader { display: none !important; }</style>`;
+  const idx = html.lastIndexOf("</head>");
+  return idx >= 0 ? html.slice(0, idx) + style + html.slice(idx) : style + html;
 }
 
 /** 预览通道的搜索索引:全部文档 + 无 index.md 目录的目录页(与构建产物的收录范围一致) */
