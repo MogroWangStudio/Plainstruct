@@ -3,8 +3,15 @@
  * 交互:右下角入口 + ⌘/Ctrl+K;↑↓ 选择、Enter 打开、Esc 关闭;高亮片段来自正文匹配。 */
 (function () {
   "use strict";
-  if (window.__psSearch) return;
-  window.__psSearch = true;
+  // 防重入以「标记元素」为标志:预览的 document.write 重写会复用同一个
+  // document 对象(window 与 document 都不变,任何挂在二者上的标志都会把
+  // 重写后的新页面挡在门外),但 DOM 会被清空 —— 标记元素随重写消失,
+  // 据此判定是否需要重新初始化。
+  if (document.getElementById("ps-search-init")) return;
+  var initMark = document.createElement("div");
+  initMark.id = "ps-search-init";
+  initMark.style.display = "none";
+  (document.body || document.documentElement).appendChild(initMark);
 
   var lang = (document.documentElement.lang || "zh-CN").toLowerCase();
   var zh = lang.indexOf("zh") === 0;

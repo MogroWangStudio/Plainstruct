@@ -62,10 +62,17 @@ html[data-ps-dark] #ps-search-fab:hover {
   -webkit-backdrop-filter: blur(8px) saturate(1.4);
   backdrop-filter: blur(8px) saturate(1.4);
   opacity: 0;
-  transition: opacity 0.22s ease;
+  /* 关闭态必须彻底移出命中测试:全屏遮罩即使透明也会拦下整页点击 */
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 0.22s ease,
+    visibility 0.22s;
 }
 #ps-search-overlay.ps-open {
   opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
 }
 #ps-search-panel {
   display: flex;

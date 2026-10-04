@@ -7,8 +7,10 @@
  *  编辑器内嵌预览不会收到激活消息,注入后保持沉默,行为不受影响。 */
 (function () {
   "use strict";
-  if (window.__psPreviewShim) return;
-  window.__psPreviewShim = true;
+  // 防重入以 document 为标志:预览刷新/重写文档时 window 复用而 document 新建,
+  // 若用 window 布尔标志,新文档会被旧标志挡住,触摸镜像与侧滑返回从此失效
+  if (window.__psPreviewShim === document) return;
+  window.__psPreviewShim = document;
 
   var EDGE = 28;          // 左缘手势判定区宽度(px)
   var EDGE_SAFE = 8;      // 手势区上/下留白(px)

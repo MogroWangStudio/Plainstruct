@@ -3,8 +3,13 @@
  * 拖拽 1:1 平移并带惯性,±90° 旋转,同源下载;Esc/背景点击关闭。 */
 (function () {
   "use strict";
-  if (window.__psImgPreview) return;
-  window.__psImgPreview = true;
+  // 防重入以「标记元素」为标志:预览的 document.write 重写复用同一个
+  // document 对象,但 DOM 被清空 —— 标记元素随重写消失,据此重新初始化
+  if (document.getElementById("ps-imgpreview-init")) return;
+  var initMark = document.createElement("div");
+  initMark.id = "ps-imgpreview-init";
+  initMark.style.display = "none";
+  (document.body || document.documentElement).appendChild(initMark);
 
   var lang = (document.documentElement.lang || "zh-CN").toLowerCase();
   var zh = lang.indexOf("zh") === 0;
@@ -143,6 +148,8 @@
   function close() {
     if (!opened) return;
     opened = false;
+    pointers.clear();
+    drag = null;
     document.removeEventListener("keydown", onKey, true);
     var done = function () {
       overlay.remove();
@@ -233,10 +240,13 @@
   }
 
   var pointers = new Map();
-  var drag = null; // { baseX, baseY, st0, samples, moved, downT, downX, downY, pinch0, pinchDist0 }
+  var drag = null; // { baseX, baseY, st0, samples, moved, locked, downT, downX, downY, downTarget, pinch0, pinchDist0 }
   var lastTap = 0;
 
   function onDown(e) {
+    // 工具条上的按下完全豁免:不登记指针、不捕获 —— 按钮的 pointer 事件
+    // 保持原生路径,click 正常派发(此前立即捕获把点击重定向到了遮罩,按钮全部失效)
+    if (e.target.closest && e.target.closest(".ps-lb-bar")) return;
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pointers.size === 1) {
       drag = {
@@ -245,16 +255,17 @@
         st0: { scale: st.scale, tx: st.tx, ty: st.ty },
         samples: [{ t: e.timeStamp, x: e.clientX, y: e.clientY }],
         moved: false,
+        locked: false,
         downT: e.timeStamp,
         downX: e.clientX,
         downY: e.clientY,
+        // 捕获后后续事件的 target 会被重定向到遮罩,按下时的原始目标留作点击判定
+        downTarget: e.target,
       };
-      overlay.setPointerCapture(e.pointerId);
       overlay.addEventListener("pointermove", onMove);
       overlay.addEventListener("pointerup", onUp);
       overlay.addEventListener("pointercancel", onUp);
-      setMode("ps-lb-dragging");
-    } else if (pointers.size === 2) {
+    } else if (pointers.size === 2 && drag) {
       var pts = [...pointers.values()];
       drag.pinch0 = st.scale;
       drag.pinchDist0 = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
@@ -262,9 +273,8 @@
   }
 
   function onMove(e) {
-    if (!pointers.has(e.pointerId)) return;
+    if (!pointers.has(e.pointerId) || !drag) return;
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (!drag) return;
     var pts = [...pointers.values()];
     if (pts.length >= 2 && drag.pinchDist0) {
       // 双指:中点为缩放中心,距离比驱动倍率
@@ -280,7 +290,18 @@
     }
     var dx = e.clientX - drag.baseX;
     var dy = e.clientY - drag.baseY;
-    if (Math.abs(dx) + Math.abs(dy) > 8) drag.moved = true;
+    if (!drag.locked) {
+      // 越过位移阈值才锁定手势并捕获指针:点击/双击不被劫持,按钮与图片各归其位
+      if (Math.abs(dx) + Math.abs(dy) <= 8) return;
+      drag.locked = true;
+      drag.moved = true;
+      try {
+        overlay.setPointerCapture(e.pointerId);
+      } catch (err) {
+        /* 捕获失败按未捕获继续 */
+      }
+      setMode("ps-lb-dragging");
+    }
     st.tx = drag.st0.tx + dx;
     st.ty = drag.st0.ty + dy;
     apply();
@@ -291,7 +312,7 @@
   function onUp(e) {
     pointers.delete(e.pointerId);
     if (pointers.size > 0) {
-      if (pointers.size === 1) {
+      if (pointers.size === 1 && drag) {
         // 双指抬起一指:以剩余指为新的拖拽起点,手势连续不跳变
         var rest = [...pointers.values()][0];
         drag.baseX = rest.x;
@@ -306,10 +327,11 @@
     overlay.removeEventListener("pointercancel", onUp);
     var d = drag;
     drag = null;
+    if (!d) return;
 
-    if (d && !d.moved && e.timeStamp - d.downT < 400) {
-      // 未移动的点击:双击图片切换 100% ↔ 250%(以点击点为中心);背景单击由 mousedown 关闭
-      if (e.target === img) {
+    if (!d.locked && e.timeStamp - d.downT < 400) {
+      // 未移动的点击:双击图片切换 100% ↔ 250%(以点击处为中心);背景单击由 mousedown 关闭
+      if (d.downTarget === img) {
         var now2 = e.timeStamp;
         if (now2 - lastTap < 320) {
           setMode("ps-lb-spring");
@@ -338,7 +360,7 @@
 
     // 拖拽释放:交接释放速度做惯性衰减
     setMode("ps-lb-spring");
-    if (d && d.samples.length >= 2) {
+    if (d.samples.length >= 2) {
       var a = d.samples[d.samples.length - 2];
       var b = d.samples[d.samples.length - 1];
       var dt = b.t - a.t;
