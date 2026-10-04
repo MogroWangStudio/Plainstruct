@@ -56,9 +56,11 @@ article a img {
   max-height: 86vh;
   border-radius: 6px;
   box-shadow: 0 22px 70px rgba(0, 0, 0, 0.5);
-  /* 进出场/复位:空间一致的长曲线;旋转与双击走 ps-lb-spring 的短曲线 */
+  /* 进出场/复位:空间一致的长曲线;阴影随归位逐渐淡去,与飞行同曲线;
+     旋转与双击走 ps-lb-spring 的短曲线 */
   transition:
     transform 0.55s cubic-bezier(0.32, 0.72, 0, 1),
+    box-shadow 0.55s cubic-bezier(0.32, 0.72, 0, 1),
     opacity 0.28s ease;
   will-change: transform;
   user-select: none;

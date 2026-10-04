@@ -155,6 +155,7 @@
         st.tx = 0;
         st.ty = 0;
         st.rot = 0;
+        img.style.boxShadow = "none"; // 从源图的无阴影状态起飞
         apply();
         var from = im.getBoundingClientRect();
         var baseW = img.offsetWidth || 1;
@@ -167,6 +168,7 @@
         apply();
         img.getBoundingClientRect();
         setMode(null);
+        img.style.boxShadow = ""; // 阴影随升空逐渐浮现
         st.scale = 1;
         st.tx = 0;
         st.ty = 0;
@@ -212,6 +214,8 @@
       st.tx = back.left + back.width / 2 - window.innerWidth / 2;
       st.ty = back.top + back.height / 2 - window.innerHeight / 2;
       st.rot = Math.round(st.rot / 360) * 360;
+      // 阴影随归位逐渐淡去(过渡由 CSS 同曲线接管),落地时与页面融为一体
+      img.style.boxShadow = "none";
       apply();
       window.setTimeout(done, 580);
     } else {
