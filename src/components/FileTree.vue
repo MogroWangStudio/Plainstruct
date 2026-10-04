@@ -363,7 +363,7 @@ function findNodeByPath(path: string): TreeNode | null {
 
 const fmOpen = ref(false);
 const fmTarget = ref("");
-const fmInitial = reactive<FrontMatterForm>({ title: "", description: "", date: "", cover: "" });
+const fmInitial = reactive<FrontMatterForm>({ title: "", description: "", date: "", cover: "", author: "", aigc: "" });
 
 /** 打开配置头表单:当前打开的文档取编辑器内容(含未保存修改),其余读磁盘版本 */
 async function openFmEditor(node: TreeNode) {
@@ -377,6 +377,8 @@ async function openFmEditor(node: TreeNode) {
   fmInitial.description = parsed.data.description ?? "";
   fmInitial.date = parsed.data.date ?? "";
   fmInitial.cover = parsed.data.cover ?? "";
+  fmInitial.author = parsed.data.author ?? "";
+  fmInitial.aigc = parsed.data.aigc ?? "";
   fmOpen.value = true;
 }
 

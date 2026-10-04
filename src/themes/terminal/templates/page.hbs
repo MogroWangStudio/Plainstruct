@@ -1,6 +1,7 @@
 <article class="ps-doc">
   {{#if page.title}}<h1 class="ps-doc-title">{{page.title}}</h1>{{/if}}
   {{#if config.showDate}}{{#if page.date}}<time class="ps-doc-date">{{page.date}}</time>{{/if}}{{/if}}
+  {{#if page.author}}<span class="ps-doc-author">{{page.author}}</span>{{/if}}{{#if page.aigc}}<span class="ps-aigc" data-aigc="{{page.aigc}}">{{#if (eq page.aigc "present")}}本文由 AI 辅助生成{{else}}本文无任何 AIGC 内容{{/if}}</span>{{/if}}
   {{#if page.description}}<p class="ps-doc-desc">{{page.description}}</p>{{/if}}
   <div class="ps-doc-body">{{{page.content}}}</div>
   <nav class="ps-pager">

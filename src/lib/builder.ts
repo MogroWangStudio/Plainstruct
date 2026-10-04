@@ -28,6 +28,10 @@ export interface DocMeta {
   date?: string;
   /** 封面图:文档中的原始写法(相对本文档路径或外链 URL) */
   cover?: string;
+  /** 作者署名(配置头 author,缺省不显示) */
+  author?: string;
+  /** AIGC 声明(配置头 aigc: none/present;缺省不显示) */
+  aigc?: string;
   body: string;
 }
 
@@ -80,6 +84,8 @@ function buildMetas(paths: string[], cache: DocsCache): Map<string, DocMeta> {
       description: data.description,
       date: data.date,
       cover: data.cover,
+      author: data.author,
+      aigc: data.aigc,
       body: stripLeadingTitle(body, title),
     });
   }
@@ -374,6 +380,8 @@ function renderOnePage(
       fullTitle: pageTitle(site, doc.title),
       crumbs: crumbsFor(navRaw, htmlPath),
       date: doc.date,
+      author: doc.author,
+      aigc: doc.aigc,
       // 博客首页系列(含 page/N)由模板渲染文章流
       isHome: htmlPath === "index.html" || !!pagination || undefined,
       // 博客文章页的页内目录;标题 id 与渲染管线同源(extractHeadings 复用 slugify),锚点一致

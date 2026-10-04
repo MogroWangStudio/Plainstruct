@@ -9,12 +9,17 @@ import { assetRefPrefix } from "@/lib/paths";
 import Modal from "./Modal.vue";
 import AppIcon from "./AppIcon.vue";
 import DateTimePicker from "./DateTimePicker.vue";
+import SelectMenu from "./SelectMenu.vue";
 
 export interface FrontMatterForm {
   title: string;
   description: string;
   date: string;
   cover: string;
+  /** 作者署名;空 = 不显示 */
+  author: string;
+  /** AIGC 声明:空 = 不显示声明,none = 无任何 AIGC,present = 存在 AIGC */
+  aigc: "" | "none" | "present";
 }
 
 const props = defineProps<{
@@ -34,7 +39,14 @@ const { t } = useI18n();
 const site = useSiteStore();
 const ui = useUiStore();
 
-const form = reactive<FrontMatterForm>({ title: "", description: "", date: "", cover: "" });
+const form = reactive<FrontMatterForm>({ title: "", description: "", date: "", cover: "", author: "", aigc: "" });
+
+/** AIGC 声明三档;选「不显示」时写回不落字段 */
+const aigcOptions = computed(() => [
+  { value: "", label: t("editor.aigcHidden") },
+  { value: "none", label: t("editor.aigcNone") },
+  { value: "present", label: t("editor.aigcPresent") },
+]);
 
 watch(
   () => props.open,
@@ -82,6 +94,14 @@ async function importCover() {
       <label class="flex flex-col gap-1">
         <span class="field-label">{{ t("editor.fmDate") }}</span>
         <DateTimePicker v-model="form.date" />
+      </label>
+      <label class="flex flex-col gap-1">
+        <span class="field-label">{{ t("editor.fmAuthor") }}</span>
+        <input v-model="form.author" class="input" type="text" :placeholder="t('editor.fmAuthorPlaceholder')" />
+      </label>
+      <label class="flex flex-col gap-1">
+        <span class="field-label">{{ t("editor.fmAigc") }}</span>
+        <SelectMenu v-model="form.aigc" :options="aigcOptions" align="left" />
       </label>
       <label class="flex flex-col gap-1">
         <span class="field-label">{{ t("editor.fmCover") }}</span>

@@ -66,6 +66,10 @@ export interface PageContext {
     crumbs?: string[];
     /** front-matter 中的发布日期,原样输出 */
     date?: string;
+    /** front-matter 中的作者署名,缺省不显示 */
+    author?: string;
+    /** front-matter 中的 AIGC 声明(none/present),缺省不显示 */
+    aigc?: string;
     /** 当前页是否站点根 index(博客主题据此渲染文章流) */
     isHome?: boolean;
     /** 页内标题大纲(博客主题文章页的 TOC 侧栏) */

@@ -1,5 +1,8 @@
 /** 素构识别的配置头字段(写回时以表单值为准重建这些行) */
-export const FM_KEYS = ["title", "description", "date", "order", "cover"];
+export const FM_KEYS = ["title", "description", "date", "order", "cover", "author", "aigc"];
+
+/** AIGC 声明:present = 存在 AIGC,none = 无任何 AIGC;缺省(不写字段)即不显示声明 */
+export type AigcDeclaration = "none" | "present";
 
 /**
  * 把表单值写回文档内容:识别字段以表单为准(留空不写),用户手写的其它行原样保留;
@@ -7,13 +10,15 @@ export const FM_KEYS = ["title", "description", "date", "order", "cover"];
  */
 export function applyFrontMatter(
   content: string,
-  values: { title?: string; description?: string; date?: string; cover?: string },
+  values: { title?: string; description?: string; date?: string; cover?: string; author?: string; aigc?: AigcDeclaration | "" },
 ): string {
   const fields = [
     ...(values.title?.trim() ? [`title: ${values.title.trim()}`] : []),
     ...(values.description?.trim() ? [`description: ${values.description.trim()}`] : []),
     ...(values.date?.trim() ? [`date: ${values.date.trim()}`] : []),
     ...(values.cover?.trim() ? [`cover: ${values.cover.trim()}`] : []),
+    ...(values.author?.trim() ? [`author: ${values.author.trim()}`] : []),
+    ...(values.aigc === "none" || values.aigc === "present" ? [`aigc: ${values.aigc}`] : []),
   ];
   const m = content.match(/^---\r?\n([\s\S]*?)\r?\n(?:---|\.\.\.)(?:\r?\n|$)/);
   if (!m) {
@@ -35,6 +40,10 @@ export interface FrontMatter {
   date?: string;
   /** 封面图(博客文章流展示):图片路径(相对本文档)或外链 URL */
   cover?: string;
+  /** 作者署名(文档页展示;缺省不显示) */
+  author?: string;
+  /** AIGC 声明:缺省不显示 */
+  aigc?: AigcDeclaration;
 }
 
 export interface ParsedDoc {
@@ -67,6 +76,11 @@ export function parseFrontMatter(src: string): ParsedDoc {
       if (Number.isFinite(n)) data.order = n;
     } else if (key === "description") data.description = value;
     else if (key === "date") data.date = value;
+    else if (key === "author") data.author = value;
+    else if (key === "aigc") {
+      // 只认两档声明;缺省与非法值都不显示
+      if (value === "none" || value === "present") data.aigc = value;
+    }
   }
   // 结束围栏缺失时视为普通正文,不吞内容
   if (end === -1) return { data: {}, body: src };
