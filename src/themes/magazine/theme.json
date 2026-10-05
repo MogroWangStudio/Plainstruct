@@ -97,6 +97,18 @@
       "category": "顶栏与导航"
     },
     {
+      "key": "topbarShapeWidthPctM",
+      "label": "移动端顶栏变形后宽度(%)",
+      "type": "number",
+      "default": 90,
+      "min": 50,
+      "max": 100,
+      "step": 5,
+      "visibleIf": { "key": "topbarShape", "oneOf": ["药丸", "圆角矩形"] },
+      "category": "顶栏与导航",
+      "hint": "窗口宽度 ≤640px 时以百分比替代桌面端像素值"
+    },
+    {
       "key": "topbarEase",
       "label": "顶栏变形曲线",
       "type": "select",
@@ -300,28 +312,8 @@
       "category": "布局",
       "hint": "窗口宽度 ≤640px 时的卡片并排列数"
     },
-    {
-      "key": "cardFontSizePc",
-      "label": "卡片流字号(px)",
-      "type": "number",
-      "default": 17,
-      "min": 13,
-      "max": 22,
-      "step": 1,
-      "category": "布局",
-      "hint": "文章卡片的标题/日期/描述随此字号等比缩放"
-    },
-    {
-      "key": "cardFontSizeM",
-      "label": "移动端卡片流字号(px)",
-      "type": "number",
-      "default": 17,
-      "min": 12,
-      "max": 20,
-      "step": 1,
-      "category": "布局",
-      "hint": "窗口宽度 ≤640px 时生效"
-    },
+
+
     {
       "key": "coverHeight",
       "label": "封面图高度(px)",
@@ -395,6 +387,28 @@
       "step": 1,
       "category": "布局",
       "hint": "主页「卡片流按分类分组」时每组最多展示的篇数,0 = 不限制;超出时组尾出现「查看更多」进入该分类页"
+    },
+    {
+      "key": "cardFontSizePc",
+      "label": "卡片流字号(px)",
+      "type": "number",
+      "default": 17,
+      "min": 13,
+      "max": 22,
+      "step": 1,
+      "category": "卡片外观",
+      "hint": "文章卡片的标题/日期/描述随此字号等比缩放"
+    },
+    {
+      "key": "cardFontSizeM",
+      "label": "移动端卡片流字号(px)",
+      "type": "number",
+      "default": 17,
+      "min": 12,
+      "max": 20,
+      "step": 1,
+      "category": "卡片外观",
+      "hint": "窗口宽度 ≤640px 时生效"
     },
     {
       "key": "cardShadow",

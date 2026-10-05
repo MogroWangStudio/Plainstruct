@@ -21,6 +21,12 @@ body[data-cover-fixed="true"][data-cover-ratio="1:1"] .blog-entry-cover-empty {
   aspect-ratio: 1 / 1;
 }
 
+/* 卡片流字号:卡片文本(标题/日期/描述,主题内均为 em)随此基准等比缩放,
+   桌面/移动端(≤640px,layout 覆盖块重设变量)分别生效 */
+.blog-entry {
+  font-size: var(--ps-card-fs, 16px);
+}
+
 /* 主页分类卡片流:组标题可点击进入分类落地页,组内复用文章卡片流 */
 .blog-group {
   margin-top: 40px;
