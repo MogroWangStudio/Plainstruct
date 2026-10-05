@@ -653,6 +653,48 @@ async fn github_sync_inner(app: &AppHandle, state: &AppState, cfg: GithubConfig)
         );
     }
 
+    // 4.5 Pages 基础设施文件保留:CNAME / .nojekyll 不属于构建产物,而发布 tree 是
+    //    不带 base_tree 的精确替换 —— 产物之外的一切都会从发布分支上移除。
+    //    deploy-from-branch 模式下分支根目录的 CNAME 就是自定义域名的事实来源,
+    //    被清后下一次 Pages 构建会把域名设置一并清空。三层兜底:
+    //    产物自带 CNAME 以产物为准;否则复用云端分支的 CNAME blob(增量对比已取过
+    //    全量 tree,零额外请求);连分支都没有时按 Pages 设置的 cname 恢复。
+    //    .nojekyll 仅在云端已有时原样保留(素构产物无下划线路径,不主动新建)。
+    if !files.iter().any(|(p, _)| p == "CNAME") {
+        if let Some(sha) = remote_shas.get("CNAME") {
+            tree_items.push(json!({ "path": "CNAME", "mode": "100644", "type": "blob", "sha": sha }));
+            emit_log(app, "info", "已保留云端的自定义域名(CNAME)");
+        } else if let Ok((pages_status, pages_body)) =
+            request(&http, reqwest::Method::GET, &repo_api(&cfg, "/pages"), &cfg.token, None).await
+        {
+            let cname = pages_body["cname"].as_str().map(str::trim).unwrap_or("");
+            if pages_status == 200 && !cname.is_empty() {
+                if let Ok((blob_status, blob)) = request(
+                    &http,
+                    reqwest::Method::POST,
+                    &repo_api(&cfg, "/git/blobs"),
+                    &cfg.token,
+                    Some(json!({ "content": B64.encode(format!("{cname}\n")), "encoding": "base64" })),
+                )
+                .await
+                {
+                    if blob_status == 201 {
+                        if let Some(sha) = blob["sha"].as_str() {
+                            tree_items.push(json!({ "path": "CNAME", "mode": "100644", "type": "blob", "sha": sha }));
+                            emit_log(app, "info", format!("已按 Pages 设置恢复自定义域名:{cname}"));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if !files.iter().any(|(p, _)| p == ".nojekyll") {
+        if let Some(sha) = remote_shas.get(".nojekyll") {
+            tree_items.push(json!({ "path": ".nojekyll", "mode": "100644", "type": "blob", "sha": sha }));
+            emit_log(app, "info", "已保留云端的 .nojekyll");
+        }
+    }
+
     // 5. tree(不带 base_tree = 精确替换,自动清理已删除文件)-> commit -> 更新 ref
     let changed = files.len() - reused;
     emit_log(
