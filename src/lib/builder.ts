@@ -19,6 +19,24 @@ import {
   searchIndexTag,
   type SearchPage,
 } from "./plugins";
+import psBlogJs from "@/plugins/ps-blog.js?raw";
+
+/** 站点行为运行时:head 引导(ps-js,首帧前标记 JS 可用)+ body 末尾行为脚本
+ *  (目录高亮/点按动画/顶栏/置顶/加载指示)。组页时注入而非写死在主题模板:
+ *  构建产物与预览同源生效,自定义主题的旧模板快照同样获得最新行为与修复。 */
+const PS_BOOT_TAG = '<script>document.documentElement.classList.add("ps-js");</script>\n';
+const PS_BEHAVIOR_TAG = `<script>\n${psBlogJs}\n</script>\n`;
+
+function injectSiteBehavior(html: string): string {
+  let out = html;
+  const headEnd = out.lastIndexOf("</head>");
+  if (headEnd >= 0) out = out.slice(0, headEnd) + PS_BOOT_TAG + out.slice(headEnd);
+  else out = PS_BOOT_TAG + out;
+  const bodyEnd = out.lastIndexOf("</body>");
+  if (bodyEnd >= 0) out = out.slice(0, bodyEnd) + PS_BEHAVIOR_TAG + out.slice(bodyEnd);
+  else out += PS_BEHAVIOR_TAG;
+  return out;
+}
 
 export interface DocMeta {
   path: string;
@@ -428,7 +446,7 @@ function renderOnePage(
       : undefined,
     config,
   };
-  return { ...ctx, html: render(ctx) };
+  return { ...ctx, html: injectSiteBehavior(render(ctx)) };
 }
 
 /**
