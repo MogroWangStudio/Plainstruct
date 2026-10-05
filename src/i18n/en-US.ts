@@ -398,6 +398,15 @@ export default {
       navlist: "Nav picker",
     },
   },
+  linkInsert: {
+    title: "Insert Link",
+    url: "Link URL",
+    text: "Display text",
+    textPlaceholder: "Leave empty to use the selection",
+    blank: "Open in a new tab",
+    blankHint: "Adds target=\"_blank\" to the link; recommended for external URLs. Keep it off for in-site links.",
+    insert: "Insert",
+  },
   imageInsert: {
     title: "Insert image",
     source: "Image source",
@@ -417,6 +426,7 @@ export default {
     alignRight: "Right",
     width: "Width",
     height: "Height",
+    sizeHint: "With unit: 80%, 640px; a bare number is treated as a percentage. Leave empty to skip.",
     klass: "Image class",
     classHint: "Works with site plugins: mws_ps_imgpreview enables the image preview plugin (click for lightbox).",
     insert: "Insert",

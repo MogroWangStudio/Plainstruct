@@ -7,7 +7,8 @@ import { Compartment, EditorState, type Extension, type Text, RangeSetBuilder } 
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { highlightSelectionMatches, searchKeymap } from "@codemirror/search";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
-import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
+import { HighlightStyle, syntaxHighlighting, syntaxTree } from "@codemirror/language";
+import type { SyntaxNode } from "@lezer/common";
 import { tags as tg } from "@lezer/highlight";
 import { useEditorStore } from "@/stores/editor";
 import { useAppStore } from "@/stores/app";
@@ -16,11 +17,11 @@ import { useUiStore } from "@/stores/ui";
 import { ipc } from "@/ipc/ipc";
 import { applyFrontMatter, parseFrontMatter } from "@/lib/frontmatter";
 import { encodePath, stripExt, ASSET_MIME, assetRefPrefix, relPosix } from "@/lib/paths";
-import { IMG_PREVIEW_MARK } from "@/lib/plugins";
 import { registerCmView, unregisterCmView } from "@/lib/contextMenu";
 import AppIcon from "@/components/AppIcon.vue";
 import FrontMatterModal, { type FrontMatterForm } from "@/components/FrontMatterModal.vue";
 import ImageInsertModal, { type ImageInsertResult, type ImageInsertSource } from "@/components/ImageInsertModal.vue";
+import LinkInsertModal, { type LinkInsertResult } from "@/components/LinkInsertModal.vue";
 
 const { t } = useI18n();
 const editor = useEditorStore();
@@ -301,14 +302,28 @@ function setHeading(level: number) {
 
 /* ---------- 插入类 ---------- */
 
+/** 链接插入弹窗:URL、显示文本(预填选区)与「在新窗口打开」 */
+const linkOpen = ref(false);
+const linkInitialText = ref("");
+
 function insertLink() {
   if (!view) return;
-  const { state } = view;
-  const range = state.selection.main;
-  const text = state.sliceDoc(range.from, range.to) || t("editor.toolbar.linkText");
-  const insert = `[${text}](https://)`;
-  const urlFrom = range.from + text.length + 3;
-  commit(range.from, range.to, insert, urlFrom, urlFrom + 8);
+  const range = view.state.selection.main;
+  linkInitialText.value = view.state.sliceDoc(range.from, range.to);
+  linkOpen.value = true;
+}
+
+/** 弹窗确认:属性块 {: target="_blank"} 由渲染管线转写为 target + noopener;
+ *  URL 中的空格转义为 %20(括号会破坏 Markdown 链接语法,原样保留由用户自行编码) */
+function onLinkConfirm(r: LinkInsertResult) {
+  linkOpen.value = false;
+  if (!view) return;
+  const range = view.state.selection.main;
+  const text = r.text || linkInitialText.value || t("editor.toolbar.linkText");
+  const url = r.url.replace(/ /g, "%20");
+  const suffix = r.blank ? '{: target="_blank"}' : "";
+  const insert = `[${text}](${url})${suffix}`;
+  commit(range.from, range.to, insert, range.from + insert.length, range.from + insert.length);
 }
 
 /** 文档开头 --- 包围块(front-matter)的结束位置(闭合围栏行尾);不含 front-matter 的文档返回 null */
@@ -378,26 +393,24 @@ function escHtml(s: string): string {
 }
 
 /**
- * 插入图片(批量路径):选取后统一复制进站点 asset 文件夹(自动建目录、重名加序号),
+ * 插入图片(选取路径):复制进站点 asset 文件夹(自动建目录、重名加序号),
  * 在光标处插入按当前文档位置换算的相对路径(根级文档 asset/…,子目录 ../asset/…),
  * 构建与预览都能正确显示;光标落在 front-matter 内时移到其后插入,避免破坏元数据块;
- * 资产栏同步刷新,并以提示说明图片去向。asFigure 时以 <figure class="ps-image">
- * 预览块包裹(带图注),配合站点图片预览插件可点击进入灯箱。
+ * 资产栏同步刷新,并以提示说明图片去向。
  */
-async function insertImages(asFigure: boolean, preFiles?: string[]) {
+async function insertImages(preFiles?: string[]) {
   if (!view) return;
   const files = preFiles ?? (await ipc.pickImages());
   if (!files?.length) return;
   try {
     const names = await site.importSiteImages(files);
     if (!names.length) return;
-    const pieces = names.map((name) => {
-      const alt = stripExt(name) || t("editor.toolbar.imageAlt");
-      return asFigure
-        ? `<figure class="ps-image">\n  <img class="${IMG_PREVIEW_MARK}" src="${encodePath(coverPrefix() + name)}" alt="${escHtml(alt)}">\n  <figcaption>${escHtml(alt)}</figcaption>\n</figure>`
-        : `![${alt}](${encodePath(coverPrefix() + name)})`;
-    });
-    const markdown = pieces.join("\n");
+    const markdown = names
+      .map((name) => {
+        const alt = stripExt(name) || t("editor.toolbar.imageAlt");
+        return `![${alt}](${encodePath(coverPrefix() + name)})`;
+      })
+      .join("\n");
     const { from, to, lead } = computeInsertRange();
     const insert = lead + markdown;
     commit(from, to, insert, from + insert.length, from + insert.length);
@@ -434,7 +447,7 @@ async function insertImage() {
     imageModalOpen.value = true;
     return;
   }
-  await insertImages(false, files);
+  await insertImages(files);
 }
 
 /** 弹窗取消:清空暂存的来源与插入位置,不插入任何内容 */
@@ -482,9 +495,50 @@ async function onImageInsertConfirm(r: ImageInsertResult) {
   }
 }
 
-/** 插入图片预览块:<figure class="ps-image"> 包裹的图片 + 图注 */
-async function insertImageFigure() {
-  await insertImages(true);
+/* ---------- 格式按钮激活态:光标/选区所在处的语法标记驱动 ---------- */
+
+const activeFormats = ref(new Set<string>());
+
+/** 解析光标位置向上的语法树,收集所在格式(标题级别/加粗/斜体/删除线/行内代码/引用/列表/代码块) */
+function updateActiveFormats() {
+  if (!view) return;
+  const set = new Set<string>();
+  let node: SyntaxNode | null = syntaxTree(view.state).resolveInner(view.state.selection.main.head, -1);
+  while (node && node.name !== "Document") {
+    switch (node.name) {
+      case "StrongEmphasis":
+        set.add("bold");
+        break;
+      case "Emphasis":
+        set.add("italic");
+        break;
+      case "Strikethrough":
+        set.add("strike");
+        break;
+      case "InlineCode":
+        set.add("inlineCode");
+        break;
+      case "FencedCode":
+      case "CodeBlock":
+        set.add("codeBlock");
+        break;
+      case "Blockquote":
+        set.add("quote");
+        break;
+      case "BulletList":
+        set.add("bullet");
+        break;
+      case "OrderedList":
+        set.add("ordered");
+        break;
+      default: {
+        const hm = node.name.match(/^ATXHeading([1-6])$/);
+        if (hm) set.add(`h${hm[1]}`);
+      }
+    }
+    node = node.parent;
+  }
+  activeFormats.value = set;
 }
 
 /* ---------- 对齐:HTML 嵌入块 <div align="…">,构建与预览的主题样式均支持 ---------- */
@@ -832,6 +886,7 @@ onMounted(() => {
         EditorView.lineWrapping,
         EditorView.updateListener.of((u) => {
           if (u.docChanged) editor.onInput(u.state.doc.toString());
+          if (u.docChanged || u.selectionSet) updateActiveFormats();
         }),
       ],
     }),
@@ -841,6 +896,7 @@ onMounted(() => {
   registerCmView(host.value!, view);
   // 登记到全局 store:侧边栏的全局撤销/重做按钮经 store 驱动编辑器历史
   editor.registerView(view);
+  updateActiveFormats();
 });
 
 // 外部写回(新建文档配置头、资产页重命名联动):把 store 的新内容同步进 CodeMirror
@@ -893,26 +949,26 @@ defineExpose({
 
 <template>
   <div class="flex h-full min-h-0 flex-col bg-surface">
-    <!-- 格式工具栏:按钮溢出时自动换行,不出现横向滚动条 -->
+    <!-- 格式工具栏:按钮溢出时自动换行,不出现横向滚动条;光标所在格式亮起对应按钮 -->
     <div class="flex shrink-0 flex-wrap content-start items-center gap-0.5 border-b border-line px-2 py-[5px]">
-      <button class="tb-btn tb-text" :title="t('editor.toolbar.heading', { n: 1, mod })" @click="setHeading(1)">H1</button>
-      <button class="tb-btn tb-text" :title="t('editor.toolbar.heading', { n: 2, mod })" @click="setHeading(2)">H2</button>
-      <button class="tb-btn tb-text" :title="t('editor.toolbar.heading', { n: 3, mod })" @click="setHeading(3)">H3</button>
+      <button class="tb-btn tb-text" :class="{ 'is-active': activeFormats.has('h1') }" :title="t('editor.toolbar.heading', { n: 1, mod })" @click="setHeading(1)">H1</button>
+      <button class="tb-btn tb-text" :class="{ 'is-active': activeFormats.has('h2') }" :title="t('editor.toolbar.heading', { n: 2, mod })" @click="setHeading(2)">H2</button>
+      <button class="tb-btn tb-text" :class="{ 'is-active': activeFormats.has('h3') }" :title="t('editor.toolbar.heading', { n: 3, mod })" @click="setHeading(3)">H3</button>
       <span class="tb-sep" />
-      <button class="tb-btn tb-text font-bold" :title="t('editor.toolbar.bold', { mod })" @click="wrapSelection('**')">B</button>
-      <button class="tb-btn tb-text italic" :title="t('editor.toolbar.italic', { mod })" @click="wrapSelection('*')">I</button>
-      <button class="tb-btn tb-text line-through" :title="t('editor.toolbar.strikethrough', { mod })" @click="wrapSelection('~~')">S</button>
-      <button class="tb-btn" :title="t('editor.toolbar.inlineCode', { mod })" @click="wrapSelection('`')">
+      <button class="tb-btn tb-text font-bold" :class="{ 'is-active': activeFormats.has('bold') }" :title="t('editor.toolbar.bold', { mod })" @click="wrapSelection('**')">B</button>
+      <button class="tb-btn tb-text italic" :class="{ 'is-active': activeFormats.has('italic') }" :title="t('editor.toolbar.italic', { mod })" @click="wrapSelection('*')">I</button>
+      <button class="tb-btn tb-text line-through" :class="{ 'is-active': activeFormats.has('strike') }" :title="t('editor.toolbar.strikethrough', { mod })" @click="wrapSelection('~~')">S</button>
+      <button class="tb-btn" :class="{ 'is-active': activeFormats.has('inlineCode') }" :title="t('editor.toolbar.inlineCode', { mod })" @click="wrapSelection('`')">
         <AppIcon name="code" :size="15" />
       </button>
       <span class="tb-sep" />
-      <button class="tb-btn" :title="t('editor.toolbar.quote', { mod })" @click="toggleQuote">
+      <button class="tb-btn" :class="{ 'is-active': activeFormats.has('quote') }" :title="t('editor.toolbar.quote', { mod })" @click="toggleQuote">
         <AppIcon name="quote" :size="15" />
       </button>
-      <button class="tb-btn" :title="t('editor.toolbar.bulletList', { mod })" @click="toggleBullet">
+      <button class="tb-btn" :class="{ 'is-active': activeFormats.has('bullet') }" :title="t('editor.toolbar.bulletList', { mod })" @click="toggleBullet">
         <AppIcon name="listBullet" :size="15" />
       </button>
-      <button class="tb-btn" :title="t('editor.toolbar.orderedList', { mod })" @click="toggleOrdered">
+      <button class="tb-btn" :class="{ 'is-active': activeFormats.has('ordered') }" :title="t('editor.toolbar.orderedList', { mod })" @click="toggleOrdered">
         <AppIcon name="listOrdered" :size="15" />
       </button>
       <button class="tb-btn" :title="t('editor.toolbar.taskList', { mod })" @click="toggleTask">
@@ -925,9 +981,6 @@ defineExpose({
       <button class="tb-btn" :title="t('editor.toolbar.image')" @click="insertImage">
         <AppIcon name="image" :size="15" />
       </button>
-      <button class="tb-btn" :title="t('editor.toolbar.imageFigure')" @click="insertImageFigure">
-        <AppIcon name="maximize" :size="15" />
-      </button>
       <button class="tb-btn" :title="t('editor.toolbar.imgAlignLeft')" @click="alignImage('left')">
         <AppIcon name="imgAlignLeft" :size="15" />
       </button>
@@ -937,7 +990,7 @@ defineExpose({
       <button class="tb-btn" :title="t('editor.toolbar.imgAlignRight')" @click="alignImage('right')">
         <AppIcon name="imgAlignRight" :size="15" />
       </button>
-      <button class="tb-btn" :title="t('editor.toolbar.codeBlock', { mod })" @click="toggleCodeBlock">
+      <button class="tb-btn" :class="{ 'is-active': activeFormats.has('codeBlock') }" :title="t('editor.toolbar.codeBlock', { mod })" @click="toggleCodeBlock">
         <AppIcon name="squareCode" :size="15" />
       </button>
       <span class="tb-sep" />
@@ -982,6 +1035,9 @@ defineExpose({
       @cancel="fmOpen = false"
     />
 
+    <!-- 插入链接:地址、显示文本与「在新窗口打开」 -->
+    <LinkInsertModal :open="linkOpen" :initial-text="linkInitialText" @confirm="onLinkConfirm" @cancel="linkOpen = false" />
+
     <!-- 插入图片配置:方式(Markdown/HTML 嵌入)、站点内路径与 HTML 对齐/尺寸/class -->
     <ImageInsertModal :open="imageModalOpen" :source="imageSource" @confirm="onImageInsertConfirm" @cancel="onImageInsertCancel" />
   </div>
@@ -1010,6 +1066,11 @@ defineExpose({
 .tb-btn:hover {
   background: var(--color-surface-2);
   color: var(--color-ink);
+}
+/* 激活态:光标/选区正处于该格式中(强调色淡底) */
+.tb-btn.is-active {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
 }
 .tb-text {
   font-family: var(--font-sans);

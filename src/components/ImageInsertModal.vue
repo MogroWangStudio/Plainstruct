@@ -1,7 +1,8 @@
 <script setup lang="ts">
 /** 插入图片配置弹窗:Markdown 图片 / HTML 代码嵌入两种方式;
- *  HTML 嵌入可再设置对齐、宽高(百分比或像素)与 class(如 mws_ps_imgpreview
- *  可配合站点图片预览插件)。本地文件在确认后按用户选择的目标路径复制进站点。 */
+ *  HTML 嵌入可再设置对齐、宽高(如 80%、640px,裸数字按百分比)与 class
+ *  (如 mws_ps_imgpreview 可配合站点图片预览插件)。本地文件在确认后按
+ *  用户选择的目标路径复制进站点。 */
 import { computed, reactive, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import Modal from "./Modal.vue";
@@ -39,10 +40,8 @@ const state = reactive({
   dest: "",
   alt: "",
   align: "none" as ImageInsertResult["align"],
-  widthValue: "",
-  widthUnit: "%",
-  heightValue: "",
-  heightUnit: "%",
+  width: "",
+  height: "",
   klass: "",
 });
 
@@ -55,10 +54,8 @@ watch(
     state.dest = `asset/${name}`;
     state.alt = name.replace(/\.[a-z0-9]+$/i, "");
     state.align = "none";
-    state.widthValue = "";
-    state.widthUnit = "%";
-    state.heightValue = "";
-    state.heightUnit = "%";
+    state.width = "";
+    state.height = "";
     state.klass = "";
   },
 );
@@ -75,19 +72,17 @@ const alignOptions = computed(() => [
   { value: "left", label: t("imageInsert.alignLeft") },
   { value: "right", label: t("imageInsert.alignRight") },
 ]);
-const unitOptions = computed(() => [
-  { value: "%", label: "%" },
-  { value: "px", label: "px" },
-]);
 
-/** 尺寸属性值:数值合法时按单位输出(像素取整),留空或非法 = 不设置 */
-function sizeAttr(value: string, unit: string): string {
-  const v = value.trim();
-  if (!v || !/^\d+(\.\d+)?$/.test(v)) return "";
-  return unit === "px" ? String(Math.round(Number(v))) : `${v}%`;
+/** 尺寸属性值:接受 80、80%、640px(单位可省,缺省百分比),非法或留空 = 不设置 */
+function sizeAttr(raw: string): string {
+  const v = raw.trim();
+  if (!v) return "";
+  const m = v.match(/^(\d+(?:\.\d+)?)\s*(%|px)?$/i);
+  if (!m) return "";
+  return (m[2] ?? "%").toLowerCase() === "px" ? String(Math.round(Number(m[1]))) : `${m[1]}%`;
 }
-const widthAttr = computed(() => sizeAttr(state.widthValue, state.widthUnit));
-const heightAttr = computed(() => sizeAttr(state.heightValue, state.heightUnit));
+const widthAttr = computed(() => sizeAttr(state.width));
+const heightAttr = computed(() => sizeAttr(state.height));
 
 /** 站内路径校验:非空且不含空段/上跳段(与导入命令的拒绝规则一致) */
 const destValid = computed(() => {
@@ -153,19 +148,14 @@ function confirm() {
         <div class="grid grid-cols-2 gap-3">
           <label class="flex flex-col gap-1">
             <span class="field-label">{{ t("imageInsert.width") }}</span>
-            <div class="flex gap-1.5">
-              <input v-model="state.widthValue" class="input min-w-0 flex-1" type="text" inputmode="decimal" placeholder="—" />
-              <SelectMenu v-model="state.widthUnit" :options="unitOptions" class="w-[74px] shrink-0" align="left" />
-            </div>
+            <input v-model="state.width" class="input" type="text" inputmode="decimal" placeholder="80%" />
           </label>
           <label class="flex flex-col gap-1">
             <span class="field-label">{{ t("imageInsert.height") }}</span>
-            <div class="flex gap-1.5">
-              <input v-model="state.heightValue" class="input min-w-0 flex-1" type="text" inputmode="decimal" placeholder="—" />
-              <SelectMenu v-model="state.heightUnit" :options="unitOptions" class="w-[74px] shrink-0" align="left" />
-            </div>
+            <input v-model="state.height" class="input" type="text" inputmode="decimal" placeholder="auto" />
           </label>
         </div>
+        <p class="opt-hint">{{ t("imageInsert.sizeHint") }}</p>
         <label class="flex flex-col gap-1">
           <span class="field-label">{{ t("imageInsert.class") }}</span>
           <input v-model="state.klass" class="input mono" type="text" spellcheck="false" placeholder="mws_ps_imgpreview" />

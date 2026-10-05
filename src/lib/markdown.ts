@@ -183,7 +183,8 @@ md.core.ruler.after("plainstruct-tasks", "plainstruct-links", (state) => {
       continue;
     }
     if (block.type !== "inline" || !block.children) continue;
-    for (const t of block.children) {
+    const children = block.children;
+    for (const t of children) {
       if (t.type === "link_open") {
         const hrefIdx = t.attrIndex("href");
         if (hrefIdx < 0) continue;
@@ -202,6 +203,25 @@ md.core.ruler.after("plainstruct-tasks", "plainstruct-links", (state) => {
         }
       } else if (t.type === "html_inline") {
         t.content = rewriteHtmlImages(t.content, env);
+      }
+    }
+    /* 链接属性块(kramdown 风格):紧跟链接的 `{: target="_blank"}` 应用到该链接,
+       渲染为 target + noopener,属性块文本从输出中移除;其他属性/写法不识别 */
+    for (let i = 1; i < children.length; i++) {
+      const child = children[i];
+      // 属性块须紧跟链接(token 开头);同一 token 里可继续跟普通文本
+      if (child.type !== "text") continue;
+      const attr = child.content.match(/^\{:\s*target\s*=\s*["']?_blank["']?\s*\}\s?/);
+      if (!attr || children[i - 1].type !== "link_close") continue;
+      for (let j = i - 2; j >= 0; j--) {
+        if (children[j].type === "link_close") break;
+        if (children[j].type === "link_open") {
+          children[j].attrSet("target", "_blank");
+          children[j].attrSet("rel", "noopener noreferrer");
+          child.content = child.content.slice(attr[0].length);
+          if (!child.content) child.hidden = true;
+          break;
+        }
       }
     }
   }

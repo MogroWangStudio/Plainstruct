@@ -398,6 +398,15 @@ export default {
       navlist: "导航选择",
     },
   },
+  linkInsert: {
+    title: "插入链接",
+    url: "链接地址",
+    text: "显示文本",
+    textPlaceholder: "留空用选中文本",
+    blank: "在新窗口打开",
+    blankHint: "为目标链接添加 target=\"_blank\",站外链接推荐;站内链接请保持关闭。",
+    insert: "插入",
+  },
   imageInsert: {
     title: "插入图片",
     source: "图片来源",
@@ -417,6 +426,7 @@ export default {
     alignRight: "右对齐",
     width: "宽度",
     height: "高度",
+    sizeHint: "可带单位:80%、640px;裸数字按百分比处理,留空不设置。",
     klass: "图片 class",
     classHint: "与站点插件呼应:填 mws_ps_imgpreview 可配合图片预览插件(点击进灯箱)。",
     insert: "插入",
