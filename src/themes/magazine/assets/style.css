@@ -217,7 +217,7 @@ body:not([data-hv-nav="无"]) .blog-nav a:hover {
 .blog-entry-date {
   display: block;
   margin: 0 0 6px;
-  font-size: 12px;
+  font-size: 0.7059em;
   letter-spacing: 0.12em;
   color: var(--ps-ink-3);
   text-align: right;
@@ -226,7 +226,7 @@ body:not([data-hv-nav="无"]) .blog-nav a:hover {
 
 .blog-entry-title {
   margin: 0;
-  font-size: 23px;
+  font-size: 1.3529em;
   font-weight: 650;
   letter-spacing: 0;
   line-height: 1.45;
@@ -259,7 +259,7 @@ body:not([data-hv-nav="无"]) .blog-nav a:hover {
 
 .blog-entry-desc {
   margin: 8px 0 0;
-  font-size: 14.5px;
+  font-size: 0.8529em;
   font-style: italic;
   line-height: 1.8;
   color: var(--ps-ink-2);

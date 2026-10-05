@@ -62,8 +62,9 @@
   if (typeof window.__psImgRequireMark === "string") requireMark = window.__psImgRequireMark.trim();
 
   /* 标记模式下的光标:未带标记的图片不提示可预览(悬停光标不变),带标记的
-     仍显 zoom-in,链接内图片保持 pointer。注入到主题样式之后,优先级按
-     文档顺序压过默认的 main img 规则 */
+     仍显 zoom-in,链接内图片保持 pointer。样式必须插到本文档末尾 —— 插件的
+     CSS 链接注入在 </body> 前,插到 head 会因文档顺序被「main img { cursor:
+     zoom-in }」压过,光标修正失效 */
   var markToken = requireMark.replace(/[^A-Za-z0-9_-]/g, "");
   if (markToken) {
     var cursorStyle = document.createElement("style");
@@ -72,7 +73,7 @@
       "main img,article img{cursor:auto}" +
       "main img." + markToken + ",main ." + markToken + " img,article img." + markToken + ",article ." + markToken + " img{cursor:zoom-in}" +
       "main a img,article a img{cursor:pointer}";
-    (document.head || document.documentElement).appendChild(cursorStyle);
+    (document.body || document.head || document.documentElement).appendChild(cursorStyle);
   }
 
   /* 移动端禁用网页缩放:双指捏合与双击放大交给灯箱内部手势,页面本身的

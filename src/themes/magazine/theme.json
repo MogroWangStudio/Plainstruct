@@ -57,6 +57,17 @@
       "category": "顶栏与导航"
     },
     {
+      "key": "topbarWidthPctM",
+      "label": "移动端顶栏宽度(%)",
+      "type": "number",
+      "default": 92,
+      "min": 50,
+      "max": 100,
+      "step": 5,
+      "category": "顶栏与导航",
+      "hint": "窗口宽度 ≤640px 时生效"
+    },
+    {
       "key": "topbarShape",
       "label": "顶栏滚动形态",
       "type": "select",
@@ -165,6 +176,14 @@
       "default": true,
       "hint": "顶栏导航末尾出现「归档」链接,进入全站归档页(所有非隐藏文章,支持列表/分类/卡片流三种视图切换)",
       "category": "顶栏与导航"
+    },
+    {
+      "key": "topbarMobileMenu",
+      "label": "移动端顶栏显示目录按钮",
+      "type": "boolean",
+      "default": false,
+      "category": "顶栏与导航",
+      "hint": "开启后窗口宽度 ≤640px 时顶栏导航收进目录按钮,点击展开导航与归档入口;顶栏过满时使用"
     },
     {
       "key": "navHover",
@@ -280,6 +299,28 @@
       "step": 1,
       "category": "布局",
       "hint": "窗口宽度 ≤640px 时的卡片并排列数"
+    },
+    {
+      "key": "cardFontSizePc",
+      "label": "卡片流字号(px)",
+      "type": "number",
+      "default": 17,
+      "min": 13,
+      "max": 22,
+      "step": 1,
+      "category": "布局",
+      "hint": "文章卡片的标题/日期/描述随此字号等比缩放"
+    },
+    {
+      "key": "cardFontSizeM",
+      "label": "移动端卡片流字号(px)",
+      "type": "number",
+      "default": 17,
+      "min": 12,
+      "max": 20,
+      "step": 1,
+      "category": "布局",
+      "hint": "窗口宽度 ≤640px 时生效"
     },
     {
       "key": "coverHeight",
@@ -849,7 +890,7 @@
       "key": "footerBuildFormat",
       "label": "构建信息格式",
       "type": "text",
-      "default": "{version} · 构建于 {date} {time}",
+      "default": "构建于 {date} {time}",
       "tokens": ["{version}", "{date}", "{time}"],
       "visibleIf": { "key": "footerBuild", "equals": true },
       "category": "页脚",

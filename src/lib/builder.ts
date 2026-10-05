@@ -153,8 +153,9 @@ function dateKey(date: string): { y: number; m: number; d: number; raw: string }
   return g ? { y: +g[1], m: +g[2], d: +g[3], raw: "" } : { y: 0, m: 0, d: 0, raw: date };
 }
 
-/** 博客文章流:排除各级 index.md,有 date 的按日期倒序在前,无 date 的按标题排在后 */
-function buildPosts(metas: Map<string, DocMeta>): PostSummary[] {
+/** 博客文章流:排除各级 index.md,有 date 的按日期倒序在前,无 date 的按标题排在后。
+ *  mtimeMap(htmlPath 小写 -> 源文档修改时间毫秒)为卡片附 updated,供页内按更新日期排序 */
+function buildPosts(metas: Map<string, DocMeta>, mtimeMap?: Map<string, number>): PostSummary[] {
   const posts = [...metas.values()]
     .filter((m) => !m.hidden && basename(m.path).toLowerCase() !== "index.md")
     .map((m) => ({
@@ -163,6 +164,7 @@ function buildPosts(metas: Map<string, DocMeta>): PostSummary[] {
       date: m.date,
       description: m.description,
       cover: coverOf(m),
+      updated: mtimeMap?.get(mdToHtml(m.path).toLowerCase()),
     }));
   const withDate = posts
     .filter((p) => p.date)
@@ -438,6 +440,17 @@ function htmlToMdMap(metas: Map<string, DocMeta>): Map<string, string> {
   return new Map([...metas.values()].map((m) => [mdToHtml(m.path), m.path]));
 }
 
+/** 内容树文件节点的修改时间映射(htmlPath 小写 -> mtime 毫秒),供卡片按更新日期排序 */
+function mtimeMapOf(tree: TreeNode[]): Map<string, number> {
+  const map = new Map<string, number>();
+  walkTree(tree, (n) => {
+    if (n.type === "file" && isMarkdown(n.path) && typeof n.mtime === "number") {
+      map.set(mdToHtml(n.path).toLowerCase(), n.mtime);
+    }
+  });
+  return map;
+}
+
 /** 页脚友情链接解析:每行「名称|链接|图标地址(可选)」,忽略坏行与缺链接的行 */
 function parseFooterLinks(raw: string | number | boolean | undefined): { name: string; url: string; icon?: string }[] {
   return String(raw ?? "")
@@ -449,14 +462,14 @@ function parseFooterLinks(raw: string | number | boolean | undefined): { name: s
     .map((p) => ({ name: p[0], url: p[1], icon: p[2] || undefined }));
 }
 
-/** 构建信息:应用版本 + 本次构建/预览时刻的日期与时间,按主题「构建信息格式」
- *  替换令牌得到成品文案({version}/{date}/{time},未知令牌原样保留) */
+/** 构建信息:本次构建/预览时刻的日期与时间,按主题「构建信息格式」
+ *  替换令牌得到成品文案({date}/{time}/{version},未知令牌原样保留) */
 function buildInfoOf(config: Record<string, string | number | boolean>): PageContext["page"]["build"] {
   const now = new Date();
   const pad = (n: number) => String(n).padStart(2, "0");
   const date = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
   const time = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
-  const fmt = String(config.footerBuildFormat ?? "").trim() || "{version} · 构建于 {date} {time}";
+  const fmt = String(config.footerBuildFormat ?? "").trim() || "构建于 {date} {time}";
   return {
     version: __APP_VERSION__,
     date,
@@ -708,9 +721,11 @@ export function renderPreview(
   if (!doc) return "";
   const siteType = site.siteType ?? "docs";
   // 博客根 index 预览第 1 页文章流(按主页配置头裁剪);其余文档页不带分页数据
+  // (子文件夹 index.md 的「正文 + 卡片流」页面由 renderSpecialPreview 渲染,
+  //  DocPreview 对该路径直接走 special 通道)
   let extras: BlogHomeExtras = { siteType };
   if (siteType === "blog" && currentPath.toLowerCase() === "index.md") {
-    extras = blogHomeExtrasFor(siteType, buildPosts(metas), metas.get(currentPath), config, tree, metas);
+    extras = blogHomeExtrasFor(siteType, buildPosts(metas, mtimeMapOf(tree)), metas.get(currentPath), config, tree, metas);
   }
   const logoUrl = site.logo
     ? siteUrl(platform, `.plainstruct/assets/${site.logo}`)
@@ -775,7 +790,7 @@ export async function renderSpecialPreview(
 
   const rootIndex = paths.find((p) => p.toLowerCase() === "index.md");
   const homeDoc = rootIndex ? metas.get(rootIndex) : undefined;
-  const allPosts = siteType === "blog" ? buildPosts(metas) : [];
+  const allPosts = siteType === "blog" ? buildPosts(metas, mtimeMapOf(tree)) : [];
 
   let page: DocMeta;
   let extras: BlogHomeExtras;
@@ -796,22 +811,40 @@ export async function renderSpecialPreview(
     const view = siteType === "blog" ? await folderViewOf(dir) : "list";
     const node = findDirNode(tree, dir);
     const children = node?.children ?? [];
-    page = {
-      path: `${dir}/index.md`,
-      title: node?.name ?? dir,
-      order: 0,
-      // 博客双视图由模板切换(正文留空);文档站点仍以目录列表为正文
-      body: siteType === "blog" ? "" : tocHtml(buildNav(children, metas), dir),
-    };
-    extras =
-      siteType === "blog"
-        ? {
-            siteType,
-            folderPosts: postsInDir(allPosts, htmlToMdMap(metas), dir),
-            folderListHtml: tocHtml(buildNav(children, metas), dir),
-            folderView: view,
-          }
-        : { siteType };
+    // 目录自身的 index.md:存在时其正文渲染在卡片流上方(页面即「文件夹页」)
+    const indexChild = children.find((c) => c.type === "file" && c.name.toLowerCase() === "index.md");
+    const indexMeta = indexChild ? metas.get(indexChild.path) : undefined;
+    const listChildren = children.filter((c) => c !== indexChild);
+    if (indexMeta) {
+      page = indexMeta;
+      // 文档站点:有 index.md 的目录本就以该正文页面为准(不带卡片流)
+      extras =
+        siteType === "blog"
+          ? {
+              siteType,
+              folderPosts: postsInDir(allPosts, htmlToMdMap(metas), dir),
+              folderListHtml: tocHtml(buildNav(listChildren, metas), dir),
+              folderView: view,
+            }
+          : { siteType };
+    } else {
+      page = {
+        path: `${dir}/index.md`,
+        title: node?.name ?? dir,
+        order: 0,
+        // 博客双视图由模板切换(正文留空);文档站点仍以目录列表为正文
+        body: siteType === "blog" ? "" : tocHtml(buildNav(children, metas), dir),
+      };
+      extras =
+        siteType === "blog"
+          ? {
+              siteType,
+              folderPosts: postsInDir(allPosts, htmlToMdMap(metas), dir),
+              folderListHtml: tocHtml(buildNav(listChildren, metas), dir),
+              folderView: view,
+            }
+          : { siteType };
+    }
   }
 
   const logoUrl = site.logo ? siteUrl(platform, `.plainstruct/assets/${site.logo}`) : undefined;
@@ -925,8 +958,29 @@ export async function buildSite(site: SiteConfig, theme: ThemeBundle, root: stri
   const siteType = site.siteType ?? "docs";
   const isBlog = siteType === "blog";
   const docExtras: BlogHomeExtras = { siteType };
+  // 文件夹页面配置提前读取:子文件夹 index.md 页与自动落地页都用(卡片流 + 默认视图)
+  const folderConfigs = isBlog ? await ipc.readFolderConfigs() : {};
+  const mtimes = mtimeMapOf(tree);
+  /** 子文件夹 index.md 的页面 extras:正文渲染在卡片流上方(页内含该目录文章) */
+  const folderIndexExtras = (dir: string, children: TreeNode[]): BlogHomeExtras => ({
+    siteType,
+    folderPosts: postsInDir(allPosts, htmlToMdMap(metas), dir),
+    folderListHtml: tocHtml(buildNav(children, metas), dir),
+    folderView: folderConfigs[dir]?.view ?? "stream",
+  });
   // 博客首页分页:每页文章数来自主题配置,文章流拆成 index.html + page/N 系列页
-  const allPosts = isBlog ? buildPosts(metas) : [];
+  const allPosts = isBlog ? buildPosts(metas, mtimes) : [];
+  // 子文件夹 index.md 的目录子树(主循环渲染时取卡片流数据;目录列表不含 index.md 自身)
+  const dirIndexChildren = new Map<string, TreeNode[]>();
+  if (isBlog) {
+    walkTree(tree, (n) => {
+      if (n.type !== "dir") return;
+      const children = (n.children ?? []).filter(
+        (c) => !(c.type === "file" && c.name.toLowerCase() === "index.md"),
+      );
+      dirIndexChildren.set(n.path.toLowerCase(), children);
+    });
+  }
   const perPage = postsPerPageOf(config);
   const totalPages = Math.max(1, Math.ceil(allPosts.length / perPage));
   const warnings: BuildWarning[] = [];
@@ -957,6 +1011,11 @@ export async function buildSite(site: SiteConfig, theme: ThemeBundle, root: stri
   for (const doc of metas.values()) {
     // 博客的根 index.md 属于首页系列(公告正文 + 文章流),在下方单独渲染
     if (isBlog && doc.path.toLowerCase() === "index.md") continue;
+    // 博客的子文件夹 index.md:正文渲染在文件夹卡片流上方(页内含该目录文章)
+    const isDirIndex = isBlog && basename(doc.path).toLowerCase() === "index.md";
+    const extras = isDirIndex
+      ? folderIndexExtras(dirname(doc.path), dirIndexChildren.get(dirname(doc.path).toLowerCase()) ?? [])
+      : docExtras;
     const { html } = renderOnePage(
       site,
       config,
@@ -969,7 +1028,7 @@ export async function buildSite(site: SiteConfig, theme: ThemeBundle, root: stri
       undefined,
       undefined,
       undefined,
-      docExtras,
+      extras,
     );
     emit(mdToHtml(doc.path), html, doc.title, doc.description, !doc.hidden);
   }
@@ -1024,7 +1083,6 @@ export async function buildSite(site: SiteConfig, theme: ThemeBundle, root: stri
   // 文件夹页:每个没有 index.md 的目录生成一个落地页(dir/index.html);资产目录除外。
   // 博客站点为分类落地页:卡片流与目录列表双视图数据都渲染(页内切换),
   // 默认视图取 folders.json(缺省卡片流);文档站点为目录列表页
-  const folderConfigs = isBlog ? await ipc.readFolderConfigs() : {};
   const htmlToMd = htmlToMdMap(metas);
   const folderPages: { doc: DocMeta; dir: string; children: TreeNode[] }[] = [];
   walkTree(tree, (node) => {

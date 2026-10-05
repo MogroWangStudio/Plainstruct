@@ -30,6 +30,12 @@ export const DEMO_ROOT = "C:/Sites/Plainstruct 演示站点";
 
 /** 绝对路径 -> 文件内容 */
 const files = new Map<string, string>();
+/** 绝对路径 -> 最后写入时间(毫秒):mock 的 mtime,随写入/移动更新 */
+const filesMtime = new Map<string, number>();
+
+function touchFile(abs: string) {
+  filesMtime.set(abs, Date.now());
+}
 /** 自定义主题 id -> 文件表 */
 const customThemes = new Map<string, Record<string, string>>();
 let settings: AppSettings = { locale: "zh-CN", autosave: true, autosaveDelay: 900, disableRefreshAnim: false, theme: "system", uiFont: "system", uiFontSize: 1, uiFontWeight: 400, editorFont: "default", editorWhitespace: true, editorBreakKey: "enter", editorIndentKey: "tab", editorIndentWidth: 2 };
@@ -266,6 +272,7 @@ function buildTree(root: string): TreeNode[] {
       path: rel,
       type: "file",
       size: new TextEncoder().encode(content).length,
+      mtime: filesMtime.get(`${root}/content/${rel}`),
     };
     const parts = rel.split("/");
     const parentDir = parts.slice(0, -1).join("/");
@@ -475,7 +482,9 @@ async readSiteConfig(): Promise<SiteConfig> {
   },
 
   async saveDoc(path: string, content: string): Promise<void> {
-    files.set(`${currentRoot}/content/${path}`, content);
+    const abs = `${currentRoot}/content/${path}`;
+    files.set(abs, content);
+    touchFile(abs);
   },
 
   async createDoc(dir: string, name: string, title?: string, description?: string): Promise<string> {
@@ -489,10 +498,9 @@ async readSiteConfig(): Promise<SiteConfig> {
     }
     const docTitle = title?.trim() || base;
     const descLine = description?.trim() ? `description: ${description.trim()}\n` : "";
-    files.set(
-      `${currentRoot}/content/${rel}`,
-      `---\ntitle: ${docTitle}\n${descLine}---\n\n正文。\n`,
-    );
+    const abs = `${currentRoot}/content/${rel}`;
+    files.set(abs, `---\ntitle: ${docTitle}\n${descLine}---\n\n正文。\n`);
+    touchFile(abs);
     return rel;
   },
 
@@ -577,7 +585,9 @@ async readSiteConfig(): Promise<SiteConfig> {
   async importFiles(srcPaths: string[], _destDir: string): Promise<number> {
     for (const src of srcPaths) {
       const name = src.split(/[\\/]/).pop()!;
-      files.set(`${currentRoot}/content/${name}`, `# ${name}\n\n(导入的文件)\n`);
+      const abs = `${currentRoot}/content/${name}`;
+      files.set(abs, `# ${name}\n\n(导入的文件)\n`);
+      touchFile(abs);
     }
     return srcPaths.length;
   },
@@ -599,7 +609,9 @@ async readSiteConfig(): Promise<SiteConfig> {
       let i = 2;
       while (taken.has(name)) name = `${stem}-${i++}${ext}`;
       taken.add(name);
-      files.set(`${currentRoot}/content/asset/${name}`, `(站点图片 ${name})`);
+      const abs = `${currentRoot}/content/asset/${name}`;
+      files.set(abs, `(站点图片 ${name})`);
+      touchFile(abs);
       names.push(name);
     }
     return names;
@@ -622,7 +634,9 @@ async readSiteConfig(): Promise<SiteConfig> {
     let i = 2;
     while (taken.has(target)) target = `${stem}-${i++}${ext}`;
     const original = src.split(/[\\/]/).pop() ?? "image";
-    files.set(prefix + target, `(站点图片 ${original})`);
+    const abs = prefix + target;
+    files.set(abs, `(站点图片 ${original})`);
+    touchFile(abs);
     return target;
   },
 

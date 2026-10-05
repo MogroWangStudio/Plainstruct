@@ -43,6 +43,24 @@ async function computeHtml(): Promise<string> {
       app.settings.disableRefreshAnim ?? false,
     );
   }
+  // 博客的子文件夹 index.md:与构建产物一致,渲染「正文 + 文件夹卡片流」页面
+  const active = editor.activePath.toLowerCase();
+  if (
+    (site.config.siteType ?? "docs") === "blog" &&
+    active !== "index.md" &&
+    active.endsWith("/index.md")
+  ) {
+    return renderSpecialPreview(
+      site.config,
+      theme.activeBundle,
+      site.tree,
+      site.docsCache,
+      { type: "folder", dir: editor.activePath.slice(0, -"/index.md".length) },
+      app.platform,
+      site.pluginContents,
+      app.settings.disableRefreshAnim ?? false,
+    );
+  }
   // 传原始内容,renderPreview 内统一解析 front-matter(标题/正文)
   return renderPreview(
     site.config,
@@ -163,10 +181,8 @@ function resolveSpecialPage(target: string): { type: "archive" } | { type: "fold
   const dir = target.slice(0, -"/index.md".length);
   const dirNode = findDirNode(site.tree, dir);
   if (!dirNode) return null;
-  const hasIndexDoc = (dirNode.children ?? []).some(
-    (c) => c.type === "file" && c.name.toLowerCase() === "index.md",
-  );
-  return hasIndexDoc ? null : { type: "folder", dir };
+  // 无论目录有无 index.md 都走 special 渲染:博客的文件夹页 = 正文(有 index.md 时)+ 卡片流
+  return { type: "folder", dir };
 }
 
 function findDirNode(nodes: typeof site.tree, dir: string): (typeof site.tree)[number] | undefined {

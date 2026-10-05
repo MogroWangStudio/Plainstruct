@@ -161,6 +161,8 @@ export interface TreeNode {
   type: "dir" | "file";
   /** 文件字节数(仅文件节点携带) */
   size?: number;
+  /** 文件最后修改时间(毫秒时间戳,仅文件节点携带;供构建产物携带排序数据) */
+  mtime?: number;
   children?: TreeNode[];
 }
 

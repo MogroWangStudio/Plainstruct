@@ -232,7 +232,7 @@ body:not([data-hv-nav="无"]) .blog-nav a:hover {
 .blog-entry-date {
   display: block;
   margin: 0 0 4px;
-  font-size: 12px;
+  font-size: 0.8571em;
   color: var(--ps-accent);
   opacity: 0.85;
 }
@@ -249,7 +249,7 @@ body:not([data-hv-nav="无"]) .blog-nav a:hover {
 
 .blog-entry-title {
   margin: 0;
-  font-size: 16px;
+  font-size: 1.1429em;
   font-weight: 650;
   line-height: 1.6;
 }
@@ -277,7 +277,7 @@ body:not([data-hv-nav="无"]) .blog-nav a:hover {
 
 .blog-entry-desc {
   margin: 6px 0 0;
-  font-size: 13px;
+  font-size: 0.9286em;
   line-height: 1.75;
   color: var(--ps-ink-2);
 }

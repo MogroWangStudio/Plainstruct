@@ -18,6 +18,9 @@ pub struct TreeNode {
     /// 文件字节数(仅文件节点;目录为 None 不序列化)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub size: Option<u64>,
+    /// 文件最后修改时间(毫秒时间戳,仅文件节点;供构建产物携带排序数据)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mtime: Option<u64>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub children: Vec<TreeNode>,
 }
@@ -206,17 +209,24 @@ fn walk(dir: &PathBuf, rel: &str, order: &DocOrderMap) -> Vec<TreeNode> {
             path: child_rel,
             node_type: "dir".into(),
             size: None,
+            mtime: None,
             children,
         });
     }
     for (name, abs) in files {
         let path = if rel.is_empty() { name.clone() } else { format!("{rel}/{name}") };
-        let size = std::fs::metadata(&abs).ok().map(|m| m.len());
+        let meta = std::fs::metadata(&abs).ok();
+        let size = meta.as_ref().map(|m| m.len());
+        let mtime = meta
+            .and_then(|m| m.modified().ok())
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| d.as_millis() as u64);
         nodes.push(TreeNode {
             name,
             path,
             node_type: "file".into(),
             size,
+            mtime,
             children: Vec::new(),
         });
     }

@@ -25,6 +25,8 @@ export interface PostSummary {
   description?: string;
   /** 封面图:content/ 相对路径或外链 URL,渲染时换算为页面相对地址 */
   cover?: string;
+  /** 源文档最后修改时间(毫秒时间戳;渲染为卡片 data-updated,供页内按更新日期排序) */
+  updated?: number;
 }
 
 /** 主页分类卡片流的一组(分类标题 + 组内文章):

@@ -88,10 +88,11 @@
     <header class="blog-folder-head">
       <h1 class="blog-folder-title">{{page.title}}</h1>
       <div class="blog-folder-tabs" role="tablist">
-        <button type="button" data-fview="stream">卡片流</button>
-        <button type="button" data-fview="list">目录</button>
+        <button type="button" data-fview="stream"{{#unless (eq page.folderView "list")}} class="is-active"{{/unless}}>卡片流</button>
+        <button type="button" data-fview="list"{{#if (eq page.folderView "list")}} class="is-active"{{/if}}>目录</button>
       </div>
     </header>
+    {{#if page.content}}<div class="blog-folder-body blog-post-body">{{{page.content}}}</div>{{/if}}
     <div class="blog-folder-pane" data-fpane="stream"{{#if (eq page.folderView "list")}} hidden{{/if}}>
       <input class="blog-folder-filter" type="search" placeholder="筛选文章…" aria-label="筛选文章">
       <div class="blog-stream">

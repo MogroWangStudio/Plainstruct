@@ -227,7 +227,7 @@
     });
   }
 
-  /* ---------- 文件夹落地页:卡片流 / 目录视图切换 + 卡片标题筛选 ---------- */
+  /* ---------- 文件夹落地页:卡片流 / 目录视图切换 + 卡片标题筛选 + 排序 ---------- */
   var folder = doc.querySelector(".blog-folder");
   if (folder) {
     var ftabs = folder.querySelector(".blog-folder-tabs");
@@ -253,7 +253,95 @@
           card.classList.toggle("is-filtered", !!q && text.indexOf(q) === -1);
         });
       });
+
+      /* 排序:默认 / 更新日期 / 发布日期 / 标题,方向按钮切正倒序。
+         排序在筛选之后仍成立(筛选是 class 状态,不随重排丢失) */
+      var stream = folder.querySelector('.blog-folder-pane[data-fpane="stream"] .blog-stream');
+      if (stream) {
+        var cardsInOrder = Array.prototype.slice.call(stream.querySelectorAll(":scope > .blog-entry"));
+        var sortBar = doc.createElement("div");
+        sortBar.className = "blog-folder-sort";
+        var sortSel = doc.createElement("select");
+        sortSel.className = "blog-folder-sort-select";
+        sortSel.setAttribute("aria-label", "排序方式");
+        [
+          ["default", "默认排序"],
+          ["updated", "按更新日期"],
+          ["date", "按发布日期"],
+          ["title", "按标题"],
+        ].forEach(function (item) {
+          var opt = doc.createElement("option");
+          opt.value = item[0];
+          opt.textContent = item[1];
+          sortSel.appendChild(opt);
+        });
+        var sortDir = doc.createElement("button");
+        sortDir.type = "button";
+        sortDir.className = "blog-folder-sort-dir";
+        sortDir.textContent = "↓";
+        sortDir.title = "切换正序 / 倒序";
+        sortDir.setAttribute("aria-label", "切换正序 / 倒序");
+        sortBar.appendChild(sortSel);
+        sortBar.appendChild(sortDir);
+        filter.insertAdjacentElement("afterend", sortBar);
+
+        var titleOf = function (card) {
+          var t = card.querySelector(".blog-entry-title");
+          return (t ? t.textContent : card.textContent || "").trim();
+        };
+        var keyOf = {
+          updated: function (card) { return Number(card.getAttribute("data-updated") || 0); },
+          // date 可能是 2026-9-1 这类非零填充写法:斜杠化交给 Date 解析
+          date: function (card) {
+            var d = new Date(String(card.getAttribute("data-date") || "").replace(/-/g, "/"));
+            return isNaN(d.getTime()) ? 0 : d.getTime();
+          },
+          title: function (card) { return titleOf(card); },
+        };
+        var applySort = function () {
+          var mode = sortSel.value;
+          var desc = sortDir.textContent === "↓";
+          var ordered = cardsInOrder.slice();
+          if (mode !== "default") {
+            var key = keyOf[mode];
+            ordered.sort(function (a, b) {
+              var ka = key(a);
+              var kb = key(b);
+              var r = typeof ka === "string" ? ka.localeCompare(kb, "zh-Hans-CN") : ka - kb;
+              return desc ? -r : r;
+            });
+          }
+          ordered.forEach(function (card) { stream.appendChild(card); });
+        };
+        sortSel.addEventListener("change", applySort);
+        sortDir.addEventListener("click", function () {
+          sortDir.textContent = sortDir.textContent === "↓" ? "↑" : "↓";
+          applySort();
+        });
+      }
     }
+  }
+
+  /* ---------- 移动端顶栏目录:按钮展开导航面板(≤640px,主题开关) ---------- */
+  var mnavBtn = doc.querySelector(".blog-mnav-btn");
+  var mnav = doc.querySelector(".blog-mnav");
+  if (mnavBtn && mnav) {
+    var setMnav = function (open) {
+      mnav.setAttribute("data-open", String(open));
+      mnavBtn.setAttribute("aria-expanded", String(open));
+    };
+    mnavBtn.addEventListener("click", function () {
+      setMnav(mnav.getAttribute("data-open") !== "true");
+    });
+    mnav.addEventListener("click", function (e) {
+      if (e.target && e.target.closest && e.target.closest("a")) setMnav(false);
+    });
+    doc.addEventListener("click", function (e) {
+      if (mnav.getAttribute("data-open") !== "true") return;
+      var t = e.target;
+      if (t && t.closest && (t.closest(".blog-mnav") || t.closest(".blog-mnav-btn"))) return;
+      setMnav(false);
+    });
   }
 
   /* ---------- 加载指示 ---------- */
