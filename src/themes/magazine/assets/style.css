@@ -1608,3 +1608,16 @@ body[data-cover-fixed="true"][data-cover-ratio="1:1"] .blog-entry-cover-empty {
 .blog-group .blog-stream {
   margin-top: 18px;
 }
+
+/* 博客文件夹落地页(卡片流视图):标题与文章流 */
+.blog-folder-head {
+  margin: 40px 0 0;
+}
+.blog-folder-title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+}
+.blog-folder .blog-stream {
+  margin-top: 22px;
+}

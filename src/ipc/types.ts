@@ -102,6 +102,11 @@ export interface SiteThemeRef {
   config: Record<string, string | number | boolean>;
 }
 
+/** 博客站点文件夹落地页的显示配置:view = "list"(目录列表,默认)或 "stream"(文章卡片流) */
+export interface FolderMeta {
+  view: string;
+}
+
 /** 用户导入的站点插件:文件存于 .plainstruct/plugins/<id>/,构建时拷入产物 */
 export interface SitePluginEntry {
   /** 插件目录名(自动生成,避免重名) */

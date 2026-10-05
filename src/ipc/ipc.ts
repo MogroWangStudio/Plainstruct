@@ -3,6 +3,7 @@ import type {
   AppSettings,
   Bootstrap,
   CopyItem,
+  FolderMeta,
   GithubConfig,
   OutputFile,
   PagesBuildStatus,
@@ -153,6 +154,16 @@ export const ipc = {
   /** 保存某目录下的手动排序(传入该目录全部子项的期望顺序) */
   saveDocOrder(dir: string, names: string[]): Promise<void> {
     return inTauri ? invoke<void>("save_doc_order", { dir, names }) : mock.saveDocOrder(dir, names);
+  },
+  /** 读取全部文件夹页面配置(键 = content/ 相对目录路径;博客文件夹落地页的显示方式) */
+  readFolderConfigs(): Promise<Record<string, FolderMeta>> {
+    return inTauri ? invoke<Record<string, FolderMeta>>("read_folder_configs") : mock.readFolderConfigs();
+  },
+  /** 写入一个文件夹的页面配置;meta 传 null 清除该目录配置(回退默认列表) */
+  writeFolderConfig(dir: string, meta: FolderMeta | null): Promise<void> {
+    return inTauri
+      ? invoke<void>("write_folder_config", { dir, meta })
+      : mock.writeFolderConfig(dir, meta);
   },
   readDocs(paths: string[]): Promise<string[]> {
     return inTauri ? invoke<string[]>("read_docs", { paths }) : mock.readDocs(paths);

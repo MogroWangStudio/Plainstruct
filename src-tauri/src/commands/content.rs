@@ -1,5 +1,5 @@
 /** 内容命令:文件树、文档读写、增删改移、导入、手动排序 */
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use tauri::State;
@@ -58,6 +58,59 @@ fn natural_cmp(a: &str, b: &str) -> std::cmp::Ordering {
         }
     }
     (av.len() - i).cmp(&(bv.len() - j))
+}
+
+/* ---------- 文件夹页面配置(folders.json) ---------- */
+
+/// 博客站点自动生成的文件夹落地页的显示配置:view = "list"(目录列表,默认)
+/// 或 "stream"(文章卡片流)。键为 content/ 相对目录路径。
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct FolderMeta {
+    #[serde(default)]
+    pub view: String,
+}
+
+type FolderConfigMap = BTreeMap<String, FolderMeta>;
+
+fn folders_path(root: &PathBuf) -> PathBuf {
+    plainstruct_dir(root).join("folders.json")
+}
+
+fn read_folder_map(root: &PathBuf) -> FolderConfigMap {
+    std::fs::read_to_string(folders_path(root))
+        .ok()
+        .and_then(|text| serde_json::from_str(&text).ok())
+        .unwrap_or_default()
+}
+
+/// 读取全部文件夹页面配置(键 = content/ 相对目录路径)
+#[tauri::command]
+pub fn read_folder_configs(window: tauri::WebviewWindow, state: State<'_, AppState>) -> Result<FolderConfigMap, String> {
+    ensure_main(&window)?;
+    let root = state.site_root()?;
+    Ok(read_folder_map(&root))
+}
+
+/// 写入一个文件夹的页面配置;meta 为 None 时清除该目录的配置(回退默认列表)。
+/// dir 为 content/ 相对目录路径,首尾斜杠会被清洗。
+#[tauri::command]
+pub fn write_folder_config(window: tauri::WebviewWindow, state: State<'_, AppState>, dir: String, meta: Option<FolderMeta>) -> Result<(), String> {
+    ensure_main(&window)?;
+    let root = state.site_root()?;
+    let key = dir.trim().trim_matches('/').to_string();
+    let mut map = read_folder_map(&root);
+    match meta {
+        Some(m) => {
+            map.insert(key, m);
+        }
+        None => {
+            map.remove(&key);
+        }
+    }
+    std::fs::create_dir_all(plainstruct_dir(&root)).map_err(|e| e.to_string())?;
+    let json = serde_json::to_string_pretty(&map).map_err(|e| e.to_string())?;
+    std::fs::write(folders_path(&root), json).map_err(|e| e.to_string())
 }
 
 /* ---------- 手动排序(order.json) ---------- */

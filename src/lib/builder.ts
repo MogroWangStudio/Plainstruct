@@ -405,13 +405,16 @@ function buildPostGroups(
   return groups;
 }
 
-/** 博客主页系列页的渲染数据:文章切片/分类分组 + 分页信息(url 由 renderOnePage 按页深换算) */
+/** 博客落地页系列页的渲染数据:文章切片/分类分组/文件夹卡片流 + 分页信息
+ *  (url 由 renderOnePage 按页深换算) */
 interface BlogHomeExtras {
   siteType: SiteType;
   posts?: PostSummary[];
   pagination?: { current: number; total: number };
   /** 主页配置头 homeGroups 开启时按分类分组展示(此时不分页) */
   postGroups?: PostGroup[];
+  /** 博客文件夹落地页的卡片流视图(该目录递归内的文章;缺省视图) */
+  folderPosts?: PostSummary[];
 }
 
 /** 渲染单页(构建与预览共用)。warnings 为空数组时收集,预览可忽略。 */
@@ -518,6 +521,8 @@ function renderOnePage(
             posts: g.posts.map(mapPost),
           }))
         : undefined,
+      // 博客文件夹落地页的卡片流视图(该目录递归内的文章)
+      folderPosts: isBlog ? extras?.folderPosts?.map(mapPost) : undefined,
     },
     // 博客顶栏按主题配置裁剪(自定义选择 + 数量上限);文档站侧栏隐去隐藏文档;
     // 上/下篇与面包屑仍按完整导航树计算
@@ -777,7 +782,17 @@ export async function buildSite(site: SiteConfig, theme: ThemeBundle, root: stri
     }
   }
 
-  // 文件夹页:每个没有 index.md 的目录生成一个目录列表页(dir/index.html);资产目录除外
+  // 文件夹页:每个没有 index.md 的目录生成一个落地页(dir/index.html);资产目录除外。
+  // 博客站点为分类落地页:缺省卡片流(该目录递归内的文章),可在文件树配置为目录列表
+  const folderConfigs = isBlog ? await ipc.readFolderConfigs() : {};
+  const htmlToMd = new Map([...metas.values()].map((m) => [mdToHtml(m.path), m.path]));
+  const postsInDir = (dir: string): PostSummary[] => {
+    const prefix = dir ? `${dir}/` : "";
+    return allPosts.filter((p) => {
+      const md = htmlToMd.get(p.htmlPath);
+      return md !== undefined && md.startsWith(prefix);
+    });
+  };
   const folderPages: DocMeta[] = [];
   walkTree(tree, (node) => {
     if (node.type !== "dir" || isAssetDir(node.path)) return;
@@ -791,7 +806,11 @@ export async function buildSite(site: SiteConfig, theme: ThemeBundle, root: stri
     });
   });
   for (const page of folderPages) {
-    const { html } = renderOnePage(site, config, render, navRaw, docMap, dirSet, page, warnings, undefined, undefined, undefined, docExtras);
+    let extras: BlogHomeExtras = docExtras;
+    if (isBlog && (folderConfigs[dirname(page.path)]?.view ?? "stream") === "stream") {
+      extras = { siteType, folderPosts: postsInDir(dirname(page.path)) };
+    }
+    const { html } = renderOnePage(site, config, render, navRaw, docMap, dirSet, page, warnings, undefined, undefined, undefined, extras);
     emit(mdToHtml(page.path), html, page.title);
   }
 

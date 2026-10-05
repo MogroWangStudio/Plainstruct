@@ -3,6 +3,7 @@ import type {
   AppSettings,
   Bootstrap,
   CopyItem,
+  FolderMeta,
   GithubConfig,
   OutputFile,
   PagesBuildStatus,
@@ -444,6 +445,29 @@ async readSiteConfig(): Promise<SiteConfig> {
     const order = readOrder(currentRoot!);
     order[dir] = names;
     files.set(orderPath(currentRoot!), JSON.stringify(order, null, 2));
+  },
+
+  async readFolderConfigs(): Promise<Record<string, FolderMeta>> {
+    const raw = files.get(`${currentRoot}/.plainstruct/folders.json`);
+    try {
+      return raw ? (JSON.parse(raw) as Record<string, FolderMeta>) : {};
+    } catch {
+      return {};
+    }
+  },
+
+  async writeFolderConfig(dir: string, meta: FolderMeta | null): Promise<void> {
+    const key = `${currentRoot}/.plainstruct/folders.json`;
+    let map: Record<string, FolderMeta> = {};
+    try {
+      map = JSON.parse(files.get(key) ?? "{}") as Record<string, FolderMeta>;
+    } catch {
+      map = {};
+    }
+    const clean = dir.trim().replace(/^\/+|\/+$/g, "");
+    if (meta) map[clean] = meta;
+    else delete map[clean];
+    files.set(key, JSON.stringify(map, null, 2));
   },
 
   async readDocs(paths: string[]): Promise<string[]> {

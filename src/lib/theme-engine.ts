@@ -86,6 +86,8 @@ export interface PageContext {
     pagination?: PaginationInfo;
     /** 主页分类卡片流(主页配置头 homeGroups 开启时;渲染按组展示,不分页) */
     postGroups?: PostGroup[];
+    /** 博客文件夹落地页的卡片流视图(该目录递归内的文章) */
+    folderPosts?: PostSummary[];
   };
   nav: NavItem[];
   prev?: { title: string; url: string };

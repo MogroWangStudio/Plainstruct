@@ -42,7 +42,17 @@
   {{/if}}
 </section>
 {{else}}
-<article class="blog-post">
+  {{#if page.folderPosts}}
+  <section class="blog-folder">
+    <header class="blog-folder-head">
+      <h1 class="blog-folder-title">{{page.title}}</h1>
+    </header>
+    <div class="blog-stream">
+      {{#each page.folderPosts}}{{> post-entry}}{{/each}}
+    </div>
+  </section>
+  {{else}}
+  <article class="blog-post">
   <header class="blog-post-head">
     {{#if page.title}}<h1 class="blog-post-title">{{page.title}}</h1>{{/if}}
     <div class="blog-post-meta">{{#if config.showDate}}{{#if page.date}}<time class="blog-post-date">{{page.date}}</time>{{/if}}{{/if}}{{#if config.showAuthor}}{{#if page.author}}<span class="ps-doc-author">{{page.author}}</span>{{/if}}{{/if}}{{#if config.showAigc}}{{#if page.aigc}}<span class="ps-aigc" data-aigc="{{page.aigc}}">{{#if (eq page.aigc "present")}}本文由 AI 辅助生成{{else}}本文无任何 AIGC{{/if}}</span>{{/if}}{{/if}}</div>
@@ -68,4 +78,5 @@
     {{#if next}}<a class="blog-pager-item is-next" href="{{next.url}}"><span>{{next.title}}</span><span class="blog-pager-tag">→</span></a>{{/if}}
   </nav>
 </article>
+  {{/if}}
 {{/if}}

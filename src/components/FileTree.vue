@@ -16,6 +16,8 @@ import { ASSET_MIME, basename, dirname, isImageFile, safeName, stripExt } from "
 import { siteUrl } from "@/lib/preview";
 import { toCssPx } from "@/lib/scale";
 import AppIcon from "./AppIcon.vue";
+import Modal from "./Modal.vue";
+import SelectMenu from "./SelectMenu.vue";
 import FileTreeNode, { type DropMark, type SelectClick } from "./FileTreeNode.vue";
 import PromptModal from "./PromptModal.vue";
 
@@ -466,6 +468,15 @@ function openTreeMenu(e: MouseEvent) {
       icon: "download",
       run: () => void onImport(node.path),
     });
+    // 博客站点:文件夹自动生成落地页,可配置卡片流/列表显示
+    if ((site.config?.siteType ?? "docs") === "blog") {
+      items.push({
+        id: "folderConfig",
+        label: t("tree.folderConfig"),
+        icon: "frontmatter",
+        run: () => void openFolderConfig(node),
+      });
+    }
   } else if (!node) {
     items.push({
       id: "import",
@@ -505,6 +516,39 @@ function openTreeMenu(e: MouseEvent) {
   e.preventDefault();
   e.stopPropagation();
   ctxMenu.show(e.clientX, e.clientY, items);
+}
+
+/* ---------- 文件夹页面配置(博客站点落地页:卡片流 / 列表) ---------- */
+
+const folderCfgOpen = ref(false);
+const folderCfgDir = ref("");
+const folderCfgView = ref<"list" | "stream">("stream");
+
+const folderViewOptions = computed(() => [
+  { value: "stream", label: t("tree.folderViewStream") },
+  { value: "list", label: t("tree.folderViewList") },
+]);
+
+async function openFolderConfig(node: TreeNode) {
+  folderCfgDir.value = node.path;
+  try {
+    const map = await ipc.readFolderConfigs();
+    folderCfgView.value = map[node.path]?.view === "list" ? "list" : "stream";
+  } catch {
+    folderCfgView.value = "stream";
+  }
+  folderCfgOpen.value = true;
+}
+
+async function saveFolderConfig() {
+  folderCfgOpen.value = false;
+  try {
+    await ipc.writeFolderConfig(folderCfgDir.value, { view: folderCfgView.value });
+    useBuilderStore().onSiteChanged();
+    ui.toast(t("tree.folderConfigSaved"), "success");
+  } catch (e) {
+    ui.toast(t("ui.operationFailed", { msg: ipc.errText(e) }), "error");
+  }
 }
 
 /* ---------- 导入 ---------- */
@@ -860,6 +904,19 @@ async function onTreeDrop(e: DragEvent) {
       @confirm="onFmConfirm"
       @cancel="fmOpen = false"
     />
+
+    <!-- 文件夹页面配置:博客站点自动落地页的显示方式(卡片流 / 列表) -->
+    <Modal v-if="folderCfgOpen" :title="t('tree.folderConfigTitle', { dir: folderCfgDir.split('/').pop() || folderCfgDir })" :width="380" @cancel="folderCfgOpen = false">
+      <label class="flex flex-col gap-1">
+        <span class="field-label">{{ t("tree.folderConfigView") }}</span>
+        <SelectMenu v-model="folderCfgView" :options="folderViewOptions" align="left" />
+      </label>
+      <p class="opt-hint">{{ t("tree.folderConfigHint") }}</p>
+      <template #footer>
+        <button class="btn btn-secondary" @click="folderCfgOpen = false">{{ t("common.cancel") }}</button>
+        <button class="btn btn-primary" @click="saveFolderConfig">{{ t("common.save") }}</button>
+      </template>
+    </Modal>
 
     <!-- 移动目标文件夹选择对话框 -->
     <Teleport to="body">
