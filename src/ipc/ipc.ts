@@ -197,6 +197,13 @@ export const ipc = {
       ? invoke<string[]>("import_site_images", { srcPaths })
       : mock.importSiteImages(srcPaths);
   },
+  /** 导入单张图片到指定站点内路径(content/ 相对,可含子目录;重名自动加序号),
+   *  返回实际落盘的 content/ 相对路径 —— 供「插入图片」弹窗按用户选择的目标落盘 */
+  importSiteImageTo(src: string, dest: string): Promise<string> {
+    return inTauri
+      ? invoke<string>("import_site_image_to", { src, dest })
+      : mock.importSiteImageTo(src, dest);
+  },
 
   /* ---------- 构建 ---------- */
   /** 构建三命令均需传发起构建时的站点根:后端校验与当前站点根一致才执行,

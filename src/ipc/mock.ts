@@ -581,6 +581,27 @@ async readSiteConfig(): Promise<SiteConfig> {
     return names;
   },
 
+  /** 与 Rust 端行为一致:复制到 content/ 下指定路径(重名加序号),返回实际 content/ 相对路径 */
+  async importSiteImageTo(src: string, dest: string): Promise<string> {
+    const clean = dest.trim().replace(/^\/+/, "");
+    if (!clean || clean.split("/").some((seg) => seg === ".." || seg === "")) {
+      throw new Error("目标路径非法");
+    }
+    const prefix = `${currentRoot}/content/`;
+    const taken = new Set(
+      [...files.keys()].filter((k) => k.startsWith(prefix)).map((k) => k.slice(prefix.length)),
+    );
+    const dot = clean.lastIndexOf(".");
+    const stem = dot > 0 ? clean.slice(0, dot) : clean;
+    const ext = dot > 0 ? clean.slice(dot) : "";
+    let target = clean;
+    let i = 2;
+    while (taken.has(target)) target = `${stem}-${i++}${ext}`;
+    const original = src.split(/[\\/]/).pop() ?? "image";
+    files.set(prefix + target, `(站点图片 ${original})`);
+    return target;
+  },
+
   async clearBuild(_root: string): Promise<void> {
     buildFiles = new Map();
   },

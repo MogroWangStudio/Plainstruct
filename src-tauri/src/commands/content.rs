@@ -426,3 +426,31 @@ pub fn import_site_images(window: tauri::WebviewWindow, state: State<'_, AppStat
     }
     Ok(names)
 }
+
+/// 导入单张图片到指定的站点内路径(content/ 相对,如 asset/pic.png 或 img/pic.png):
+/// 目标重名时自动加序号,返回实际落盘的 content/ 相对路径 ——
+/// 供「插入图片」弹窗按用户选择的目标路径落盘(目标可含子目录)。
+#[tauri::command]
+pub fn import_site_image_to(window: tauri::WebviewWindow, state: State<'_, AppState>, src: String, dest: String) -> Result<String, String> {
+    ensure_main(&window)?;
+    let root = state.site_root()?;
+    let src_path = PathBuf::from(&src);
+    if !src_path.is_file() || !is_importable(&src_path) {
+        return Err("源文件不是可导入的图片".into());
+    }
+    let dest = dest.trim().trim_start_matches('/');
+    if dest.is_empty() {
+        return Err("目标路径为空".into());
+    }
+    // 目标限制在 content/ 内:safe_join 拒绝越界(../ 与绝对路径)
+    let target_base = safe_join(&content_root(&root), dest)?;
+    if let Some(parent) = target_base.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let target = unique_path(&target_base);
+    std::fs::copy(&src_path, &target).map_err(|e| e.to_string())?;
+    target
+        .strip_prefix(content_root(&root))
+        .map_err(|_| "路径计算失败".into())
+        .map(|p| p.to_string_lossy().replace('\\', "/"))
+}

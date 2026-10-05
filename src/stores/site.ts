@@ -362,6 +362,15 @@ export const useSiteStore = defineStore("site", {
       return names;
     },
 
+    /** 导入单张图片到指定站点内路径(content/ 相对):落盘后刷新树并触发重建,
+     *  返回实际落盘路径(重名自动加序号)——「插入图片」弹窗专用 */
+    async importSiteImageTo(src: string, dest: string) {
+      const actual = await ipc.importSiteImageTo(src, dest);
+      await this.refreshTree();
+      void useBuilderStore().onSiteChanged();
+      return actual;
+    },
+
     /* ---------- 站点插件 ---------- */
 
     /** 预载启用插件的文件内容(站点打开与插件增删、开关切换后调用) */

@@ -20,6 +20,7 @@ import { IMG_PREVIEW_MARK } from "@/lib/plugins";
 import { registerCmView, unregisterCmView } from "@/lib/contextMenu";
 import AppIcon from "@/components/AppIcon.vue";
 import FrontMatterModal, { type FrontMatterForm } from "@/components/FrontMatterModal.vue";
+import ImageInsertModal, { type ImageInsertResult, type ImageInsertSource } from "@/components/ImageInsertModal.vue";
 
 const { t } = useI18n();
 const editor = useEditorStore();
@@ -371,36 +372,34 @@ function writeFrontMatter(form: FrontMatterForm) {
   fmOpen.value = false;
 }
 
+/** HTML 属性/文本转义(< > & ") */
+function escHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
 /**
- * 插入图片:选取后统一复制进站点 asset 文件夹(自动建目录、重名加序号),
+ * 插入图片(批量路径):选取后统一复制进站点 asset 文件夹(自动建目录、重名加序号),
  * 在光标处插入按当前文档位置换算的相对路径(根级文档 asset/…,子目录 ../asset/…),
  * 构建与预览都能正确显示;光标落在 front-matter 内时移到其后插入,避免破坏元数据块;
  * 资产栏同步刷新,并以提示说明图片去向。asFigure 时以 <figure class="ps-image">
  * 预览块包裹(带图注),配合站点图片预览插件可点击进入灯箱。
  */
-async function insertImages(asFigure: boolean) {
+async function insertImages(asFigure: boolean, preFiles?: string[]) {
   if (!view) return;
-  const files = await ipc.pickImages();
+  const files = preFiles ?? (await ipc.pickImages());
   if (!files?.length) return;
   try {
     const names = await site.importSiteImages(files);
     if (!names.length) return;
-    const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
     const pieces = names.map((name) => {
       const alt = stripExt(name) || t("editor.toolbar.imageAlt");
       return asFigure
-        ? `<figure class="ps-image">\n  <img class="${IMG_PREVIEW_MARK}" src="${encodePath(coverPrefix() + name)}" alt="${esc(alt)}">\n  <figcaption>${esc(alt)}</figcaption>\n</figure>`
+        ? `<figure class="ps-image">\n  <img class="${IMG_PREVIEW_MARK}" src="${encodePath(coverPrefix() + name)}" alt="${escHtml(alt)}">\n  <figcaption>${escHtml(alt)}</figcaption>\n</figure>`
         : `![${alt}](${encodePath(coverPrefix() + name)})`;
     });
     const markdown = pieces.join("\n");
-    const { state } = view;
-    const range = state.selection.main;
-    const fmEnd = frontMatterEnd(state.doc);
-    // 默认光标停在文档开头(front-matter 之前):图片改插到元数据块后的正文区,补空行分段
-    const inFm = fmEnd !== null && range.from < fmEnd;
-    const from = inFm ? fmEnd : range.from;
-    const to = inFm ? fmEnd : range.to;
-    const insert = (inFm ? "\n\n" : "") + markdown;
+    const { from, to, lead } = computeInsertRange();
+    const insert = lead + markdown;
     commit(from, to, insert, from + insert.length, from + insert.length);
     ui.toast(t("editor.imageImported", { n: names.length }), "success");
   } catch (e) {
@@ -408,8 +407,79 @@ async function insertImages(asFigure: boolean) {
   }
 }
 
+/** 插入落点:光标在 front-matter 内时移到元数据块后的正文区,补空行分段 */
+function computeInsertRange(): { from: number; to: number; lead: string } {
+  const { state } = view!;
+  const range = state.selection.main;
+  const fmEnd = frontMatterEnd(state.doc);
+  if (fmEnd !== null && range.from < fmEnd) return { from: fmEnd, to: fmEnd, lead: "\n\n" };
+  return { from: range.from, to: range.to, lead: "" };
+}
+
+/* ---------- 插入图片配置弹窗:单张插入走弹窗(方式/路径/对齐/尺寸/class 可配),
+   多张批量与预览块保持直插 ---------- */
+
+const imageModalOpen = ref(false);
+const imageSource = ref<ImageInsertSource | null>(null);
+/** 打开弹窗时确定的插入位置(拖入为 drop 落点,工具栏为当前选区) */
+let pendingImage: { from: number; to: number; lead: string } | null = null;
+
 async function insertImage() {
-  await insertImages(false);
+  if (!view) return;
+  const files = await ipc.pickImages();
+  if (!files?.length) return;
+  if (files.length === 1) {
+    pendingImage = computeInsertRange();
+    imageSource.value = { kind: "local", path: files[0] };
+    imageModalOpen.value = true;
+    return;
+  }
+  await insertImages(false, files);
+}
+
+/** 弹窗取消:清空暂存的来源与插入位置,不插入任何内容 */
+function onImageInsertCancel() {
+  imageModalOpen.value = false;
+  imageSource.value = null;
+  pendingImage = null;
+}
+
+/** 弹窗确认:本地文件按所选目标路径复制进站点(重名自动加序号),再按方式生成片段插入 */
+async function onImageInsertConfirm(r: ImageInsertResult) {
+  imageModalOpen.value = false;
+  const pending = pendingImage;
+  const source = imageSource.value;
+  pendingImage = null;
+  imageSource.value = null;
+  if (!view || !source || !pending) return;
+  try {
+    const sitePath =
+      source.kind === "local" && r.localSrc ? await site.importSiteImageTo(r.localSrc, r.sitePath) : r.sitePath;
+    const docDir = editor.activePath ? editor.activePath.split("/").slice(0, -1).join("/") : "";
+    const ref = relPosix(docDir, sitePath);
+    const alt = r.alt || stripExt(sitePath.split("/").pop() ?? "") || t("editor.toolbar.imageAlt");
+    let snippet: string;
+    if (r.mode === "markdown") {
+      snippet = `![${alt}](${encodePath(ref)})`;
+    } else {
+      const attrs = [`src="${encodePath(ref)}"`, `alt="${escHtml(alt)}"`];
+      if (r.width) attrs.push(`width="${r.width}"`);
+      if (r.height) attrs.push(`height="${r.height}"`);
+      if (r.klass) attrs.push(`class="${escHtml(r.klass)}"`);
+      const img = `<img ${attrs.join(" ")}>`;
+      snippet = r.align === "none" ? img : `<div align="${r.align}">${img}</div>`;
+    }
+    const insert = pending.lead + snippet;
+    view.dispatch({
+      changes: { from: pending.from, to: pending.to, insert },
+      selection: { anchor: pending.from + insert.length },
+      scrollIntoView: true,
+    });
+    view.focus();
+    ui.toast(t("editor.imageImported", { n: 1 }), "success");
+  } catch (e) {
+    ui.toast(t("editor.imageImportFailed", { msg: ipc.errText(e) }), "error");
+  }
 }
 
 /** 插入图片预览块:<figure class="ps-image"> 包裹的图片 + 图注 */
@@ -674,12 +744,13 @@ function makeWritingExtensions(): Extension[] {
 
 const writingComp = new Compartment();
 
-/* ---------- 资产拖入:资产栏图片拖到正文即插入 md 引用 ---------- */
+/* ---------- 资产拖入:资产栏图片拖到正文,弹窗确认插入方式与属性 ---------- */
 
 /**
  * 从资产栏拖来的图片(ASSET_MIME 载荷为 content/ 相对路径):
- * 落点行空白时就地插入,否则另起一段;落点在 front-matter 内时移到其后,
- * 路径按当前文档位置换算为页面相对引用。
+ * drop 时记住落点并打开插入弹窗 —— 用户确认插入方式(Markdown/HTML)与属性后
+ * 按落点插入;取消则不插入。落点行空白时就地插入,否则另起一段;
+ * 落点在 front-matter 内时移到其后。
  */
 const assetDrop = EditorView.domEventHandlers({
   dragover(e) {
@@ -692,12 +763,6 @@ const assetDrop = EditorView.domEventHandlers({
     const asset = e.dataTransfer?.getData(ASSET_MIME);
     if (!asset) return false;
     e.preventDefault();
-    // 载荷本身已是 content/ 相对路径(含资产目录名,如 asset/foo.png),
-    // 直接换算「当前文档目录 → 该文件」的相对引用;旧实现重复拼接
-    // assetRefPrefix 导致路径多出一层 asset/,引用 404
-    const docDir = editor.activePath ? editor.activePath.split("/").slice(0, -1).join("/") : "";
-    const ref = relPosix(docDir, asset);
-    const md = `![${stripExt(asset.split("/").pop() ?? "") || t("editor.toolbar.imageAlt")}](${encodePath(ref)})`;
     let pos = v.posAtCoords({ x: e.clientX, y: e.clientY }) ?? v.state.selection.main.head;
     const fmEnd = frontMatterEnd(v.state.doc);
     let at: number;
@@ -715,13 +780,9 @@ const assetDrop = EditorView.domEventHandlers({
         lead = "\n\n";
       }
     }
-    const insert = lead + md;
-    v.dispatch({
-      changes: { from: at, to: at, insert },
-      selection: { anchor: at + insert.length },
-      scrollIntoView: true,
-    });
-    v.focus();
+    pendingImage = { from: at, to: at, lead };
+    imageSource.value = { kind: "asset", path: asset };
+    imageModalOpen.value = true;
     return true;
   },
 });
@@ -920,6 +981,9 @@ defineExpose({
       @confirm="writeFrontMatter"
       @cancel="fmOpen = false"
     />
+
+    <!-- 插入图片配置:方式(Markdown/HTML 嵌入)、站点内路径与 HTML 对齐/尺寸/class -->
+    <ImageInsertModal :open="imageModalOpen" :source="imageSource" @confirm="onImageInsertConfirm" @cancel="onImageInsertCancel" />
   </div>
 </template>
 
