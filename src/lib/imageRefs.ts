@@ -30,14 +30,37 @@ function coverRefsOf(content: string): string[] {
   return cover ? [cover] : [];
 }
 
-/** 站点图片的统一标识(content/ 相对路径)是否被某文档引用的路径写法命中 */
-function resolveRef(docPath: string, raw: string): string | null {
+/** 站点图片的统一标识(content/ 相对路径)是否被某文档引用的路径写法命中 */function resolveRef(docPath: string, raw: string): string | null {
   if (/^(https?:|data:)/i.test(raw)) return null;
   const target = splitHash(raw)[0];
   if (!target) return null;
   const resolved = joinPosix(dirname(docPath), decodeHref(target));
   if (resolved.startsWith("..")) return null;
   return resolved;
+}
+
+/**
+ * 以上下文定界替换一处引用写法,杜绝纯子串替换的误伤:
+ * "asset/pic.png" 是 "../asset/pic.png" 的子串,naive 的 split/join 会让
+ * 已换算的 `../` 再翻一层(文档拖入文件夹后图片路径多出 `..` 的根源)。
+ * Markdown(图片/链接同构)以 "](" 定位且保留 title 部分;
+ * 内联 HTML 以 src="..." / src='...' 定位(引号原样保留);
+ * 封面图仅在 front-matter 的 cover: 行值与目标完全一致时替换。
+ */
+function replaceRef(out: string, raw: string, next: string): string {
+  if (!next || next === raw) return out;
+  const mdNeedle = `](${raw}`;
+  if (out.includes(mdNeedle)) out = out.split(mdNeedle).join(`](${next}`);
+  const esc = raw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  out = out.replace(
+    new RegExp(`(src\\s*=\\s*)(["'])${esc}\\2`, "gi"),
+    (_m: string, p1: string, q: string) => `${p1}${q}${next}${q}`,
+  );
+  out = out.replace(/^([ \t]*cover:[ \t]*)(.+)$/m, (line: string, p1: string, val: string) => {
+    const v = val.trim().replace(/^["']|["']$/g, "");
+    return v === raw ? `${p1}${next}` : line;
+  });
+  return out;
 }
 
 /** 在全部文档中查找引用指定图片的位置(md 图片语法与内联 <img>),按文档与原文写法去重 */
@@ -71,7 +94,7 @@ export function replaceImageRefs(content: string, refs: ImageRef[], newName: str
   for (const { raw } of refs) {
     const i = raw.lastIndexOf("/");
     const newRaw = (i === -1 ? "" : raw.slice(0, i + 1)) + encodeURIComponent(newName);
-    if (newRaw !== raw) out = out.split(raw).join(newRaw);
+    out = replaceRef(out, raw, newRaw);
   }
   return out;
 }
@@ -84,11 +107,9 @@ export function moveImageRefs(
   newPath: string,
   docPath: string,
 ): string {
-  let out = content;
   const newRaw = encodePath(relPosix(dirname(docPath), newPath));
-  for (const { raw } of refs) {
-    if (newRaw !== raw) out = out.split(raw).join(newRaw);
-  }
+  let out = content;
+  for (const { raw } of refs) out = replaceRef(out, raw, newRaw);
   return out;
 }
 
@@ -108,25 +129,15 @@ export function remapDocRefsForMove(oldPath: string, newPath: string, content: s
     if (resolved.startsWith("..")) return raw; // 出根的写法保持原样
     return encodePath(relPosix(newDir, resolved)) + raw.slice(target.length);
   };
+  // 站内 md 链接与图片语法同构([text](target) 也命中 ![alt](target) 的子串),
+  // 统一走上下文定界替换:图片先换算后,链接阶段的子串不再命中("](../asset/…"
+  // 不含 "](asset/…"),不会把已经换算的 "../" 再翻一层
   let out = content;
-  for (const m of content.matchAll(MD_IMAGE)) {
-    const next = remap(m[2]);
-    if (next !== m[2]) out = out.split(m[2]).join(next);
-  }
-  for (const m of content.matchAll(HTML_IMAGE)) {
-    const next = remap(m[1]);
-    if (next !== m[1]) out = out.split(m[1]).join(next);
-  }
+  for (const m of content.matchAll(MD_IMAGE)) out = replaceRef(out, m[2], remap(m[2]));
+  for (const m of content.matchAll(HTML_IMAGE)) out = replaceRef(out, m[1], remap(m[1]));
   const cover = coverRefsOf(content)[0];
-  if (cover) {
-    const next = remap(cover);
-    if (next !== cover) out = out.split(cover).join(next);
-  }
-  // 站内 md 链接(不含图片;图片上方已换算):[text](target) 的 target 非锚点/外链时换算
-  for (const m of content.matchAll(MD_LINK)) {
-    const next = remap(m[2]);
-    if (next !== m[2]) out = out.split(m[2]).join(next);
-  }
+  if (cover) out = replaceRef(out, cover, remap(cover));
+  for (const m of content.matchAll(MD_LINK)) out = replaceRef(out, m[2], remap(m[2]));
   return out;
 }
 
