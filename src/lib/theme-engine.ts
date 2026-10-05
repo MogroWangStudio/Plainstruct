@@ -28,11 +28,13 @@ export interface PostSummary {
 }
 
 /** 主页分类卡片流的一组(分类标题 + 组内文章):
- *  extras 阶段 url 为分类落地页的 content/ 相对 htmlPath,渲染时换算为页面相对地址 */
+ *  extras 阶段 url 为分类落地页的 content/ 相对 htmlPath,渲染时换算为页面相对地址。
+ *  total 为截断前的组内文章总数(配置了每组上限且截断生效时存在,模板据此显示「查看更多」) */
 export interface PostGroup {
   title: string;
   url?: string;
   posts: PostSummary[];
+  total?: number;
 }
 
 /** 归档页按年份分组的一组(无日期文章的 year 为空串,渲染为「未注明日期」) */
@@ -104,6 +106,19 @@ export interface PageContext {
     postGroups?: PostGroup[];
     /** 博客文件夹落地页的卡片流视图(该目录递归内的文章) */
     folderPosts?: PostSummary[];
+    /** 博客文件夹落地页的目录列表视图 HTML(自动目录页正文,客户端切换用) */
+    folderListHtml?: string;
+    /** 博客文件夹落地页的默认视图(stream = 卡片流,list = 目录列表;页内可切换) */
+    folderView?: string;
+    /** 页脚友情链接(主题配置 footerLinks 按行解析;渲染为图标 + 名称) */
+    footerLinks?: { name: string; url: string; icon?: string }[];
+    /** 构建信息(每次构建/预览时生成):text 为按主题「构建信息格式」替换令牌后的成品文案 */
+    build?: {
+      version: string;
+      date: string;
+      time: string;
+      text: string;
+    };
     /** 博客归档页:全部文章的三种视图数据(列表/分类/卡片流) */
     isArchive?: boolean;
     archive?: ArchiveData;

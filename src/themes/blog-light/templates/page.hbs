@@ -8,6 +8,7 @@
       <div class="blog-stream">
         {{#each this.posts}}{{> post-entry}}{{/each}}
       </div>
+      {{#if this.total}}{{#if this.url}}<div class="blog-group-more"><a class="blog-group-more-link" href="{{this.url}}">查看更多 →</a></div>{{/if}}{{/if}}
     </section>
     {{/each}}
   {{else}}
@@ -83,12 +84,22 @@
 </section>
 {{else}}
   {{#if page.folderPosts}}
-  <section class="blog-folder">
+  <section class="blog-folder" data-folder-view="{{page.folderView}}">
     <header class="blog-folder-head">
       <h1 class="blog-folder-title">{{page.title}}</h1>
+      <div class="blog-folder-tabs" role="tablist">
+        <button type="button" data-fview="stream">卡片流</button>
+        <button type="button" data-fview="list">目录</button>
+      </div>
     </header>
-    <div class="blog-stream">
-      {{#each page.folderPosts}}{{> post-entry}}{{/each}}
+    <div class="blog-folder-pane" data-fpane="stream"{{#if (eq page.folderView "list")}} hidden{{/if}}>
+      <input class="blog-folder-filter" type="search" placeholder="筛选文章…" aria-label="筛选文章">
+      <div class="blog-stream">
+        {{#each page.folderPosts}}{{> post-entry}}{{/each}}
+      </div>
+    </div>
+    <div class="blog-folder-pane" data-fpane="list"{{#unless (eq page.folderView "list")}} hidden{{/unless}}>
+      <div class="blog-folder-list">{{{page.folderListHtml}}}</div>
     </div>
   </section>
   {{else}}

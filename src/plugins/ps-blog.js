@@ -227,6 +227,35 @@
     });
   }
 
+  /* ---------- 文件夹落地页:卡片流 / 目录视图切换 + 卡片标题筛选 ---------- */
+  var folder = doc.querySelector(".blog-folder");
+  if (folder) {
+    var ftabs = folder.querySelector(".blog-folder-tabs");
+    if (ftabs) {
+      ftabs.addEventListener("click", function (e) {
+        var btn = e.target && e.target.closest ? e.target.closest("button[data-fview]") : null;
+        if (!btn) return;
+        var view = btn.getAttribute("data-fview");
+        Array.prototype.forEach.call(ftabs.querySelectorAll("button[data-fview]"), function (b) {
+          b.classList.toggle("is-active", b === btn);
+        });
+        Array.prototype.forEach.call(folder.querySelectorAll(".blog-folder-pane"), function (pane) {
+          pane.hidden = pane.getAttribute("data-fpane") !== view;
+        });
+      });
+    }
+    var filter = folder.querySelector(".blog-folder-filter");
+    if (filter) {
+      filter.addEventListener("input", function () {
+        var q = filter.value.trim().toLowerCase();
+        Array.prototype.forEach.call(folder.querySelectorAll('.blog-folder-pane[data-fpane="stream"] .blog-entry'), function (card) {
+          var text = (card.textContent || "").toLowerCase();
+          card.classList.toggle("is-filtered", !!q && text.indexOf(q) === -1);
+        });
+      });
+    }
+  }
+
   /* ---------- 加载指示 ---------- */
   var loader = doc.querySelector(".ps-loader");
   if (loader) {

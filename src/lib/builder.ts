@@ -359,25 +359,42 @@ function blogHomeExtrasFor(
 ): BlogHomeExtras {
   if (siteType !== "blog") return { siteType };
   if (home?.homeGroups) {
-    return { siteType, posts: allPosts, postGroups: buildPostGroups(tree, metas, allPosts, home) };
+    return {
+      siteType,
+      posts: allPosts,
+      postGroups: buildPostGroups(tree, metas, allPosts, home, homeGroupMaxOf(config)),
+    };
   }
   const perPage = postsPerPageOf(config);
   const total = Math.max(1, Math.ceil(allPosts.length / perPage));
   return { siteType, posts: allPosts.slice(0, perPage), pagination: { current: 1, total } };
 }
 
+/** 主页分类卡片流每组最多展示篇数(主题配置 homeGroupMax,0 = 不限制,越界时收敛) */
+export function homeGroupMaxOf(config: Record<string, string | number | boolean>): number {
+  const n = Math.floor(Number(config.homeGroupMax));
+  return Number.isFinite(n) ? Math.min(30, Math.max(0, n)) : 0;
+}
+
 /** 主页分类卡片流:顶层目录(导航树顺序)为一组,组名取目录 index.md 的标题或目录名,
  *  组内文章保持 posts 的既有排序(日期倒序)。根级文章归入「未分类」排最后 ——
- *  仅在主页配置允许显示时出现,组名可由主页配置自定义 */
+ *  仅在主页配置允许显示时出现,组名可由主页配置自定义。
+ *  maxPerGroup 为每组最多展示篇数(0 = 不限制):超出时组内只保留前 N 篇,
+ *  total 记录截断前总数,模板据此显示「查看更多」跳转分类落地页(未分类组无落地页,不显示) */
 function buildPostGroups(
   tree: TreeNode[],
   metas: Map<string, DocMeta>,
   posts: PostSummary[],
   home: DocMeta | undefined,
+  maxPerGroup = 0,
 ): PostGroup[] {
   const byPath = new Map(posts.map((p) => [p.htmlPath, p]));
   const used = new Set<string>();
   const groups: PostGroup[] = [];
+  const capGroup = (items: PostSummary[]): { posts: PostSummary[]; total?: number } =>
+    maxPerGroup > 0 && items.length > maxPerGroup
+      ? { posts: items.slice(0, maxPerGroup), total: items.length }
+      : { posts: items };
   for (const node of tree) {
     if (node.type !== "dir" || isAssetDir(node.path)) continue;
     const indexChild = (node.children ?? []).find(
@@ -396,10 +413,12 @@ function buildPostGroups(
     };
     for (const c of node.children ?? []) collect(c);
     if (group.length) {
+      const { posts: capped, total } = capGroup(group);
       groups.push({
         title: (indexChild ? metas.get(indexChild.path)?.title : undefined) ?? node.name,
         url: mdToHtml(indexChild ? indexChild.path : `${node.path}/index.md`),
-        posts: group,
+        posts: capped,
+        total,
       });
     }
   }
@@ -407,7 +426,8 @@ function buildPostGroups(
   if (showUncategorized) {
     const rest = posts.filter((p) => !used.has(p.htmlPath));
     if (rest.length) {
-      groups.push({ title: home?.homeUncategorizedLabel?.trim() || "未分类", posts: rest });
+      const { posts: capped } = capGroup(rest);
+      groups.push({ title: home?.homeUncategorizedLabel?.trim() || "未分类", posts: capped });
     }
   }
   return groups;
@@ -416,6 +436,36 @@ function buildPostGroups(
 /** 文章的 content/ 相对路径映射(htmlPath → md path),供按目录过滤文章流 */
 function htmlToMdMap(metas: Map<string, DocMeta>): Map<string, string> {
   return new Map([...metas.values()].map((m) => [mdToHtml(m.path), m.path]));
+}
+
+/** 页脚友情链接解析:每行「名称|链接|图标地址(可选)」,忽略坏行与缺链接的行 */
+function parseFooterLinks(raw: string | number | boolean | undefined): { name: string; url: string; icon?: string }[] {
+  return String(raw ?? "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => line.split("|").map((s) => s.trim()))
+    .filter((p) => p.length >= 2 && p[0] && /^(https?:|\/|\.\/|\.\.\/|#|mailto:)/i.test(p[1]))
+    .map((p) => ({ name: p[0], url: p[1], icon: p[2] || undefined }));
+}
+
+/** 构建信息:应用版本 + 本次构建/预览时刻的日期与时间,按主题「构建信息格式」
+ *  替换令牌得到成品文案({version}/{date}/{time},未知令牌原样保留) */
+function buildInfoOf(config: Record<string, string | number | boolean>): PageContext["page"]["build"] {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const date = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  const time = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  const fmt = String(config.footerBuildFormat ?? "").trim() || "{version} · 构建于 {date} {time}";
+  return {
+    version: __APP_VERSION__,
+    date,
+    time,
+    text: fmt
+      .replace(/\{version\}/g, __APP_VERSION__)
+      .replace(/\{date\}/g, date)
+      .replace(/\{time\}/g, time),
+  };
 }
 
 /** 某目录(递归)内的文章,保持 allPosts 的既有排序(日期倒序) */
@@ -451,6 +501,10 @@ interface BlogHomeExtras {
   postGroups?: PostGroup[];
   /** 博客文件夹落地页的卡片流视图(该目录递归内的文章;缺省视图) */
   folderPosts?: PostSummary[];
+  /** 博客文件夹落地页的目录列表视图 HTML(自动目录页正文,页内与卡片流切换) */
+  folderListHtml?: string;
+  /** 博客文件夹落地页的默认视图(stream = 卡片流,list = 目录列表) */
+  folderView?: string;
   /** 博客归档页:全部文章的三种视图数据(列表/分类/卡片流) */
   archive?: { posts: PostSummary[]; groups: PostGroup[]; years: ArchiveYear[] };
 }
@@ -551,16 +605,33 @@ function renderOnePage(
       // 博客文章页的页内目录;标题 id 与渲染管线同源(extractHeadings 复用 slugify),锚点一致
       toc: isBlog && !pagination ? extractHeadings(doc.body) : undefined,
       pagination,
-      // 主页分类卡片流(主页配置头 homeGroups;组内条目与文章流同规则换算)
+      // 主页分类卡片流(主页配置头 homeGroups;组内条目与文章流同规则换算,
+      // total(截断前总数)透传给模板显示「查看更多」)
       postGroups: isBlog
         ? extras?.postGroups?.map((g) => ({
             title: g.title,
             url: g.url ? encodePath(relPosix(outDir, g.url)) : undefined,
             posts: g.posts.map(mapPost),
+            total: g.total,
           }))
         : undefined,
-      // 博客文件夹落地页的卡片流视图(该目录递归内的文章)
+      // 博客文件夹落地页:卡片流视图 + 目录列表视图(页内切换)+ 默认视图
       folderPosts: isBlog ? extras?.folderPosts?.map(mapPost) : undefined,
+      folderListHtml: isBlog ? extras?.folderListHtml : undefined,
+      folderView: isBlog ? extras?.folderView : undefined,
+      // 页脚友情链接(主题配置按行解析;站内图标路径按页面深度换算相对地址)
+      footerLinks: isBlog
+        ? parseFooterLinks(config.footerLinks).map((l) => ({
+            ...l,
+            icon: l.icon
+              ? /^(https?:|data:)/i.test(l.icon)
+                ? l.icon
+                : encodePath(relPosix(outDir, l.icon))
+              : undefined,
+          }))
+        : undefined,
+      // 构建信息(版本/日期/时间 + 按格式替换令牌后的文案),博客页脚按配置展示
+      build: isBlog ? buildInfoOf(config) : undefined,
       // 归档页:三种视图的数据全部按页深换算
       isArchive: !!extras?.archive || undefined,
       archive: extras?.archive
@@ -720,28 +791,26 @@ export async function renderSpecialPreview(
     };
   } else {
     const dir = target.type === "folder" ? target.dir : "";
-    let view = "stream";
-    if (siteType === "blog") {
-      try {
-        view = (await ipc.readFolderConfigs())[dir]?.view ?? "stream";
-      } catch {
-        /* 读取失败回退缺省卡片流 */
-      }
-    } else {
-      view = "list";
-    }
+    // 双视图数据:卡片流(该目录递归内文章)与目录列表都带上,页内客户端切换;
+    // 默认视图取文件夹配置(缺省卡片流),文档站点固定为目录列表
+    const view = siteType === "blog" ? await folderViewOf(dir) : "list";
     const node = findDirNode(tree, dir);
     const children = node?.children ?? [];
-    const asList = siteType !== "blog" || view === "list";
     page = {
       path: `${dir}/index.md`,
       title: node?.name ?? dir,
       order: 0,
-      body: asList ? tocHtml(buildNav(children, metas), dir) : "",
+      // 博客双视图由模板切换(正文留空);文档站点仍以目录列表为正文
+      body: siteType === "blog" ? "" : tocHtml(buildNav(children, metas), dir),
     };
     extras =
-      siteType === "blog" && !asList
-        ? { siteType, folderPosts: postsInDir(allPosts, htmlToMdMap(metas), dir) }
+      siteType === "blog"
+        ? {
+            siteType,
+            folderPosts: postsInDir(allPosts, htmlToMdMap(metas), dir),
+            folderListHtml: tocHtml(buildNav(children, metas), dir),
+            folderView: view,
+          }
         : { siteType };
   }
 
@@ -781,6 +850,15 @@ function findDirNode(tree: TreeNode[], dir: string): TreeNode | undefined {
     if (hit) return hit;
   }
   return undefined;
+}
+
+/** 文件夹落地页的默认视图(folders.json;读取失败或未记录时回退卡片流) */
+async function folderViewOf(dir: string): Promise<string> {
+  try {
+    return (await ipc.readFolderConfigs())[dir]?.view ?? "stream";
+  } catch {
+    return "stream";
+  }
 }
 
 /** mock 预览的动画抑制样式(与注入 shim 的 ps-noanim 同款) */
@@ -944,25 +1022,39 @@ export async function buildSite(site: SiteConfig, theme: ThemeBundle, root: stri
   }
 
   // 文件夹页:每个没有 index.md 的目录生成一个落地页(dir/index.html);资产目录除外。
-  // 博客站点为分类落地页:缺省卡片流(该目录递归内的文章),可在文件树配置为目录列表
+  // 博客站点为分类落地页:卡片流与目录列表双视图数据都渲染(页内切换),
+  // 默认视图取 folders.json(缺省卡片流);文档站点为目录列表页
   const folderConfigs = isBlog ? await ipc.readFolderConfigs() : {};
   const htmlToMd = htmlToMdMap(metas);
-  const folderPages: DocMeta[] = [];
+  const folderPages: { doc: DocMeta; dir: string; children: TreeNode[] }[] = [];
   walkTree(tree, (node) => {
     if (node.type !== "dir" || isAssetDir(node.path)) return;
     const children = node.children ?? [];
     if (children.some((c) => c.type === "file" && c.name.toLowerCase() === "index.md")) return;
     folderPages.push({
-      path: `${node.path}/index.md`,
-      title: node.name,
-      order: 0,
-      body: tocHtml(buildNav(children, metas), node.path),
+      dir: node.path,
+      children,
+      doc: {
+        path: `${node.path}/index.md`,
+        title: node.name,
+        order: 0,
+        body: "",
+      },
     });
   });
-  for (const page of folderPages) {
+  for (const { doc: page, dir, children } of folderPages) {
     let extras: BlogHomeExtras = docExtras;
-    if (isBlog && (folderConfigs[dirname(page.path)]?.view ?? "stream") === "stream") {
-      extras = { siteType, folderPosts: postsInDir(allPosts, htmlToMd, dirname(page.path)) };
+    if (isBlog) {
+      const view = folderConfigs[dir]?.view ?? "stream";
+      extras = {
+        siteType,
+        folderPosts: postsInDir(allPosts, htmlToMd, dir),
+        folderListHtml: tocHtml(buildNav(children, metas), dir),
+        folderView: view,
+      };
+    } else {
+      // 文档站点:目录列表即正文(其模板只输出 page.content)
+      page.body = tocHtml(buildNav(children, metas), dir);
     }
     const { html } = renderOnePage(site, config, render, navRaw, docMap, dirSet, page, warnings, undefined, undefined, undefined, extras);
     emit(mdToHtml(page.path), html, page.title);

@@ -643,6 +643,11 @@ async readSiteConfig(): Promise<SiteConfig> {
     return buildFiles.get("index.html") ?? null;
   },
 
+  /** 读取构建产物中的单个文件(诊断与集成测试用) */
+  getBuildFile(path: string): string | null {
+    return buildFiles.get(path) ?? null;
+  },
+
   async listCustomThemes(): Promise<ThemeMeta[]> {
     const metas: ThemeMeta[] = [];
     for (const [id, themeFiles] of customThemes) {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-/** 新建文档弹窗:文档名称与配置头(标题/描述/日期/封面)一次填好,创建时一并写入 */
+/** 新建文档弹窗:文档名称与配置头(标题/描述/日期/封面/作者/AIGC)一次填好,创建时一并写入 */
 import { computed, nextTick, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { ipc } from "@/ipc/ipc";
@@ -7,12 +7,14 @@ import { useSiteStore } from "@/stores/site";
 import { useThemeStore } from "@/stores/theme";
 import { useUiStore } from "@/stores/ui";
 import { assetRefPrefix } from "@/lib/paths";
+import { parseFrontMatter, type AigcDeclaration } from "@/lib/frontmatter";
 import AppIcon from "@/components/AppIcon.vue";
 import DateTimePicker from "@/components/DateTimePicker.vue";
+import SelectMenu from "@/components/SelectMenu.vue";
 
 const props = defineProps<{ open: boolean; dir: string }>();
 const emit = defineEmits<{
-  confirm: [payload: { name: string; title: string; description: string; date: string; cover: string }];
+  confirm: [payload: { name: string; title: string; description: string; date: string; cover: string; author: string; aigc: "" | AigcDeclaration }];
   cancel: [];
 }>();
 
@@ -21,7 +23,7 @@ const site = useSiteStore();
 const theme = useThemeStore();
 const ui = useUiStore();
 
-const form = reactive({ name: "", title: "", description: "", date: "", cover: "" });
+const form = reactive({ name: "", title: "", description: "", date: "", cover: "", author: "", aigc: "" as "" | AigcDeclaration });
 const importing = ref(false);
 const inputRef = ref<HTMLInputElement>();
 
@@ -35,6 +37,8 @@ watch(
       const d = new Date();
       form.date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} 00:00:00`;
       form.cover = "";
+      form.author = "";
+      form.aigc = "";
       void nextTick(() => inputRef.value?.focus());
     }
   },
@@ -49,6 +53,23 @@ function coverPrefix(): string {
 const coverSuggestions = computed(() =>
   site.assetFiles.map((n) => coverPrefix() + n.path.slice(n.path.indexOf("/") + 1)),
 );
+
+/** 站内已有文档用过的作者署名:去重后供下拉快速选择(仍可自由输入) */
+const authorSuggestions = computed(() => {
+  const set = new Set<string>();
+  for (const content of Object.values(site.docsCache)) {
+    const a = parseFrontMatter(content).data.author?.trim();
+    if (a) set.add(a);
+  }
+  return [...set];
+});
+
+/** AIGC 声明三档;选「不显示」时不落字段 */
+const aigcOptions = computed(() => [
+  { value: "", label: t("editor.aigcHidden") },
+  { value: "none", label: t("editor.aigcNone") },
+  { value: "present", label: t("editor.aigcPresent") },
+]);
 
 /** 选取本地图片导入 asset,直接作为封面 */
 async function importCover() {
@@ -74,6 +95,8 @@ function submit() {
     description: form.description.trim(),
     date: form.date,
     cover: form.cover.trim(),
+    author: form.author.trim(),
+    aigc: form.aigc,
   });
 }
 </script>
@@ -109,6 +132,17 @@ function submit() {
                 <DateTimePicker v-model="form.date" />
               </label>
             </div>
+            <label class="flex flex-col gap-1">
+              <span class="field-label">{{ t("editor.fmAuthor") }}</span>
+              <input v-model="form.author" class="input" type="text" list="newDocAuthorOptions" :placeholder="t('editor.fmAuthorPlaceholder')" />
+              <datalist id="newDocAuthorOptions">
+                <option v-for="a in authorSuggestions" :key="a" :value="a" />
+              </datalist>
+            </label>
+            <label class="flex flex-col gap-1">
+              <span class="field-label">{{ t("editor.fmAigc") }}</span>
+              <SelectMenu v-model="form.aigc" :options="aigcOptions" align="left" />
+            </label>
             <label class="flex flex-col gap-1">
               <span class="field-label">{{ t("editor.fmCover") }}</span>
               <div class="flex gap-2">

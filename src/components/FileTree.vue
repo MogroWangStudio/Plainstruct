@@ -292,6 +292,8 @@ async function onNewDocConfirm(payload: {
   description: string;
   date: string;
   cover: string;
+  author: string;
+  aigc: "" | "none" | "present";
 }) {
   newDocOpen.value = false;
   try {
@@ -419,6 +421,48 @@ async function onFmConfirm(form: FrontMatterForm) {
   }
 }
 
+/** 行内「编辑配置头」按钮:文档取自身,文件夹经其 index.md(无则创建) */
+function onNodeFm(node: TreeNode) {
+  if (node.type === "dir") void openFolderFm(node);
+  else void openFmEditor(node);
+}
+
+/** 打开文件夹页 md:已有 index.md 直接打开;没有则创建一篇(标题取文件夹名,自动打开) */
+async function editFolderPage(node: TreeNode) {
+  const idx = (node.children ?? []).find(
+    (c) => c.type === "file" && c.name.toLowerCase() === "index.md",
+  );
+  if (idx) {
+    await editor.openDoc(idx);
+    return;
+  }
+  try {
+    await site.createDoc(node.path, "index", node.name);
+    ui.toast(t("tree.folderPageCreated"), "success");
+  } catch (e) {
+    ui.toast(t("ui.operationFailed", { msg: ipc.errText(e) }), "error");
+  }
+}
+
+/** 文件夹的配置头:取其 index.md 的配置头;没有文件夹页 md 时先创建再打开 */
+async function openFolderFm(node: TreeNode) {
+  const idx = (node.children ?? []).find(
+    (c) => c.type === "file" && c.name.toLowerCase() === "index.md",
+  );
+  if (idx) {
+    await openFmEditor(idx);
+    return;
+  }
+  try {
+    await site.createDoc(node.path, "index", node.name);
+    ui.toast(t("tree.folderPageCreated"), "success");
+    const created = site.findDoc(`${node.path}/index.md`);
+    if (created) await openFmEditor(created);
+  } catch (e) {
+    ui.toast(t("ui.operationFailed", { msg: ipc.errText(e) }), "error");
+  }
+}
+
 /** 选取本地图片导入站点 asset 文件夹(资产栏导入按钮与右键共用) */
 async function importImages() {
   const files = await ipc.pickImages();
@@ -462,12 +506,21 @@ function openTreeMenu(e: MouseEvent) {
     },
   ];
   if (node?.type === "dir") {
-    items.push({
-      id: "import",
-      label: t("tree.importToFolder"),
-      icon: "download",
-      run: () => void onImport(node.path),
-    });
+    items.push(
+      {
+        id: "import",
+        label: t("tree.importToFolder"),
+        icon: "download",
+        run: () => void onImport(node.path),
+      },
+      // 文件夹页 md(index.md)可直接编辑:没有时创建一篇再打开
+      {
+        id: "editFolderPage",
+        label: t("tree.editFolderPage"),
+        icon: "file",
+        run: () => void editFolderPage(node),
+      },
+    );
     // 博客站点:文件夹自动生成落地页,可配置卡片流/列表显示
     if ((site.config?.siteType ?? "docs") === "blog") {
       items.push({
@@ -502,13 +555,20 @@ function openTreeMenu(e: MouseEvent) {
         run: () => void onRemove(node),
       },
     );
-    // Markdown 文档可从文件树直接打开配置头表单(图片没有配置头;主页同样可用)
+    // Markdown 文档与文件夹(经其 index.md)可从文件树直接打开配置头表单(图片没有配置头;主页同样可用)
     if (node.type === "file" && !isImageFile(node.path)) {
       items.splice(2, 0, {
         id: "frontmatter",
         label: t("tree.fmEdit"),
         icon: "frontmatter",
         run: () => void openFmEditor(node),
+      });
+    } else if (node.type === "dir") {
+      items.splice(2, 0, {
+        id: "frontmatter",
+        label: t("tree.fmEdit"),
+        icon: "frontmatter",
+        run: () => void openFolderFm(node),
       });
     }
   }
@@ -747,6 +807,16 @@ async function onTreeDrop(e: DragEvent) {
         <span class="min-w-0 flex-1 truncate text-[calc(13px*var(--ui-font-scale))]" :class="homeActive ? 'font-medium' : ''">
           {{ t("tree.home") }}
         </span>
+        <!-- 主页快捷按钮:编辑配置头(主页 index.md 缺失时无从编辑,不显示) -->
+        <button
+          v-if="homeNode && !selectMode"
+          class="btn-icon !h-6 !w-6 shrink-0 opacity-0"
+          :title="t('tree.fmEdit')"
+          tabindex="-1"
+          @click.stop="homeNode && openFmEditor(homeNode)"
+        >
+          <AppIcon name="frontmatter" :size="13" />
+        </button>
         <span v-if="!homeNode" class="shrink-0 pr-1 text-[calc(10.5px*var(--ui-font-scale))] text-ink-3">
           {{ t("tree.homeMissing") }}
         </span>
@@ -789,6 +859,8 @@ async function onTreeDrop(e: DragEvent) {
           @reorder="onReorder"
           @select-click="handleSelectClick"
           @import-to="(dir: string) => onImport(dir)"
+          @edit-folder-page="editFolderPage"
+          @edit-front-matter="onNodeFm"
         />
         <!-- 拖到空白处:移动到根目录末尾的指示线 -->
         <div v-if="dropMark?.kind === 'root-end'" class="drop-line-root" aria-hidden="true" />
@@ -973,6 +1045,10 @@ async function onTreeDrop(e: DragEvent) {
 .home-row.is-missing .home-row-icon {
   color: var(--color-ink-3);
   opacity: 0.75;
+}
+/* 主页行的悬停快捷按钮(编辑配置头):与树行按钮同款悬停浮现 */
+.home-row:hover .btn-icon.opacity-0 {
+  opacity: 1;
 }
 
 /* 多选模式按钮激活态:实心墨底 */

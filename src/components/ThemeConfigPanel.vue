@@ -184,6 +184,11 @@ function commitEdit(field: ThemeField, e: Event) {
   onField(field, Math.min(field.max ?? 100, Math.max(field.min ?? 0, n)));
 }
 
+/** 令牌按钮:把占位符追加到文本字段当前值尾部(如构建信息格式的 {date}) */
+function insertToken(field: ThemeField, token: string) {
+  onField(field, String(fieldValue(field) ?? "") + token);
+}
+
 /* navlist(博客顶栏导航):可选项与构建同源 -- 完整导航树,文件夹默认折叠,点箭头展开 */
 const navOptions = computed<NavPickerItem[]>(() => topNavItems(site.tree, site.docsCache));
 
@@ -519,14 +524,35 @@ async function removePlugin(id: string, name: string) {
           <span class="text-[calc(13px*var(--ui-font-scale))] text-ink-2">{{ field.label }}</span>
         </label>
 
-        <!-- 文本 -->
-        <input
-          v-else
+        <!-- 多行文本:如页脚友情链接(每行一条) -->
+        <textarea
+          v-else-if="field.type === 'textarea'"
           class="input !w-64"
-          type="text"
+          rows="3"
           :value="String(fieldValue(field))"
           @change="onField(field, ($event.target as HTMLInputElement).value)"
         />
+        <!-- 文本:附令牌按钮时,点击把占位符追加到当前值(构建时替换为实际值) -->
+        <template v-else>
+          <input
+            class="input !w-64"
+            type="text"
+            :value="String(fieldValue(field))"
+            @change="onField(field, ($event.target as HTMLInputElement).value)"
+          />
+          <div v-if="field.tokens?.length" class="flex flex-wrap gap-1">
+            <button
+              v-for="tok in field.tokens"
+              :key="tok"
+              type="button"
+              class="mono rounded border border-line px-1.5 py-0.5 text-[calc(11px*var(--ui-font-scale))] text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink"
+              :title="t('theme.insertToken')"
+              @click="insertToken(field, tok)"
+            >
+              {{ tok }}
+            </button>
+          </div>
+        </template>
         <!-- 行为边界说明(来自 theme.json 的 hint):如「首页不显示」之类,在配置处即可见 -->
         <p v-if="field.hint" class="opt-hint">{{ field.hint }}</p>
         </div>

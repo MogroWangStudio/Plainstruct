@@ -32,6 +32,9 @@ article a img {
   inset: 0;
   z-index: 10000;
   pointer-events: auto;
+  /* 触摸手势全部归灯箱内部手势:移动端拖拽 1:1 跟手,双指缩放不再被
+     浏览器拿去缩放页面(pointercancel 不再打断拖拽) */
+  touch-action: none;
 }
 /* 暗化背景独立成层:开合只淡出背景,飞回的图片保持完全不透明,
    不会随遮罩一起淡化消失 */
@@ -65,6 +68,7 @@ article a img {
   will-change: transform;
   user-select: none;
   -webkit-user-drag: none;
+  touch-action: none;
 }
 .ps-lb-img.ps-lb-spring {
   transition: transform 0.38s cubic-bezier(0.3, 1.15, 0.5, 1);
@@ -120,6 +124,11 @@ article a img {
 }
 .ps-lb-btn:active {
   transform: scale(0.92);
+}
+/* 切换态按钮(渲染方式):激活时以浅底标记 */
+.ps-lb-btn.is-active {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
 }
 .ps-lb-btn:focus-visible {
   outline: 2px solid rgba(255, 255, 255, 0.7);

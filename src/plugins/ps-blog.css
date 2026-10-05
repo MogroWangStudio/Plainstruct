@@ -41,6 +41,20 @@ body[data-cover-fixed="true"][data-cover-ratio="1:1"] .blog-entry-cover-empty {
   margin-top: 18px;
 }
 
+/* 组尾「查看更多」:分组开启每组上限且截断生效时出现(跳转分类落地页) */
+.blog-group-more {
+  margin-top: 18px;
+}
+.blog-group-more-link {
+  display: inline-block;
+  color: var(--ps-accent);
+  font-size: 13.5px;
+  text-decoration: none;
+}
+.blog-group-more-link:hover {
+  text-decoration: underline;
+}
+
 /* 博客文件夹落地页(卡片流视图):标题与文章流 */
 .blog-folder-head {
   margin: 40px 0 0;
@@ -52,6 +66,111 @@ body[data-cover-fixed="true"][data-cover-ratio="1:1"] .blog-entry-cover-empty {
 }
 .blog-folder .blog-stream {
   margin-top: 22px;
+}
+
+/* 文件夹页视图切换(卡片流 / 目录):样式与归档页 tabs 共用(见上) */
+.blog-folder-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.blog-folder-tabs {
+  display: flex;
+  gap: 8px;
+}
+
+/* 文件夹页标题筛选:按卡片文本过滤(目录视图不显示筛选框) */
+.blog-folder-filter {
+  margin: 18px 0 0;
+  width: min(100%, 320px);
+  padding: 7px 14px;
+  border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+  transition: border-color var(--duration-base, 160ms) var(--ease-plain, ease);
+}
+.blog-folder-filter:focus {
+  border-color: var(--ps-accent);
+}
+.blog-folder-filter::placeholder {
+  color: inherit;
+  opacity: 0.45;
+}
+.blog-entry.is-filtered {
+  display: none;
+}
+/* 目录列表视图:自动目录页正文的列表样式(与 ps-home-list 同源结构) */
+.blog-folder-list .ps-home-list {
+  margin: 22px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.blog-folder-list .ps-home-item {
+  padding: 8px 0;
+  border-bottom: 1px dashed color-mix(in srgb, currentColor 16%, transparent);
+}
+.blog-folder-list .ps-home-link {
+  color: inherit;
+  text-decoration: none;
+}
+.blog-folder-list .ps-home-link:hover {
+  color: var(--ps-accent);
+}
+
+/* 页脚:说明文字 / 友情链接 / 构建信息(footer 全空时不占位、不显示边框) */
+.blog-footer:not(:has(*)) {
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+.blog-footer-note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.7;
+  opacity: 0.75;
+}
+.blog-footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 18px;
+  margin-top: 14px;
+}
+.blog-footer-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: inherit;
+  font-size: 13px;
+  text-decoration: none;
+  opacity: 0.78;
+  transition: opacity var(--duration-base, 160ms) var(--ease-plain, ease);
+}
+.blog-footer-link:hover {
+  color: var(--ps-accent);
+  opacity: 1;
+}
+.blog-footer-link-icon {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  object-fit: cover;
+}
+.blog-footer-build {
+  margin: 14px 0 0;
+  font-size: 12px;
+  opacity: 0.55;
+  font-variant-numeric: tabular-nums;
+}
+.blog-footer-credit {
+  display: inline-block;
+  margin-top: 14px;
 }
 
 /* 归档页:全部文章的列表 / 分类 / 卡片流三种视图,客户端切换 */
@@ -68,7 +187,9 @@ body[data-cover-fixed="true"][data-cover-ratio="1:1"] .blog-entry-cover-empty {
   gap: 8px;
   margin: 20px 0 6px;
 }
-.blog-archive-tabs button {
+/* 归档页与文件夹页的视图切换按钮:同一设计语言(胶囊 + 强调色激活态) */
+.blog-archive-tabs button,
+.blog-folder-tabs button {
   border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
   border-radius: 999px;
   padding: 5px 16px;
@@ -82,11 +203,13 @@ body[data-cover-fixed="true"][data-cover-ratio="1:1"] .blog-entry-cover-empty {
     color var(--duration-base, 160ms) var(--ease-plain, ease),
     border-color var(--duration-base, 160ms) var(--ease-plain, ease);
 }
-.blog-archive-tabs button:hover {
+.blog-archive-tabs button:hover,
+.blog-folder-tabs button:hover {
   border-color: var(--ps-accent);
   color: var(--ps-accent);
 }
-.blog-archive-tabs button.is-active {
+.blog-archive-tabs button.is-active,
+.blog-folder-tabs button.is-active {
   background: var(--ps-accent);
   border-color: var(--ps-accent);
   color: #fff;

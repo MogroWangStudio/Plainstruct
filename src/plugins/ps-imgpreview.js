@@ -18,6 +18,8 @@
     zoomOut: zh ? "缩小" : "Zoom out",
     reset: zh ? "重置缩放" : "Reset zoom",
     rotate: zh ? "旋转 90°" : "Rotate 90°",
+    pixelOn: zh ? "切换为抗锯齿渲染" : "Switch to smooth rendering",
+    pixelOff: zh ? "切换为像素渲染" : "Switch to pixel rendering",
     download: zh ? "下载图片" : "Download image",
     close: zh ? "关闭" : "Close",
     dialog: zh ? "图片预览" : "Image preview",
@@ -36,6 +38,7 @@
     minus: '<path d="M5 12h14"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
     rotate: '<path d="M20 5v5h-5"/><path d="M20 10a8 8 0 1 0 1.7 6"/>',
+    pixel: '<path d="M4 4h5v5H4z"/><path d="M15 4h5v5h-5z"/><path d="M9.5 9.5h5v5h-5z"/><path d="M4 15h5v5H4z"/><path d="M15 15h5v5h-5z"/>',
     download: '<path d="M12 4v11"/><path d="M7 11l5 4.5 5-4.5"/><path d="M5 20h14"/>',
     close: '<path d="M6 6l12 12M18 6L6 18"/>',
   };
@@ -57,6 +60,37 @@
   })();
   // 内联注入通道(mock 预览):壳层经 window.__psImgRequireMark 传入标记
   if (typeof window.__psImgRequireMark === "string") requireMark = window.__psImgRequireMark.trim();
+
+  /* 标记模式下的光标:未带标记的图片不提示可预览(悬停光标不变),带标记的
+     仍显 zoom-in,链接内图片保持 pointer。注入到主题样式之后,优先级按
+     文档顺序压过默认的 main img 规则 */
+  var markToken = requireMark.replace(/[^A-Za-z0-9_-]/g, "");
+  if (markToken) {
+    var cursorStyle = document.createElement("style");
+    cursorStyle.id = "ps-imgpreview-cursor";
+    cursorStyle.textContent =
+      "main img,article img{cursor:auto}" +
+      "main img." + markToken + ",main ." + markToken + " img,article img." + markToken + ",article ." + markToken + " img{cursor:zoom-in}" +
+      "main a img,article a img{cursor:pointer}";
+    (document.head || document.documentElement).appendChild(cursorStyle);
+  }
+
+  /* 移动端禁用网页缩放:双指捏合与双击放大交给灯箱内部手势,页面本身的
+     缩放反而让图片「放大不动」。viewport 收紧缩放能力;iOS 不理会
+     user-scalable=no,再以 gesturestart 捕获阶段拦下手势事件 */
+  (function () {
+    var vp = document.querySelector('meta[name="viewport"]');
+    if (!vp) {
+      vp = document.createElement("meta");
+      vp.name = "viewport";
+      (document.head || document.documentElement).appendChild(vp);
+    }
+    var keep = (vp.getAttribute("content") || "").replace(/user-scalable\s*=[^,]*,?/gi, "").replace(/maximum-scale\s*=[^,]*,?/gi, "").replace(/,\s*$/, "");
+    vp.setAttribute("content", keep + (keep ? ", " : "") + "maximum-scale=1, user-scalable=no");
+  })();
+  document.addEventListener("gesturestart", function (e) {
+    e.preventDefault();
+  }, { passive: false });
 
   function zoomable(target) {
     var im = target && target.tagName === "IMG" ? target : null;
@@ -276,6 +310,7 @@
   function buildBar(host) {
     var bar = document.createElement("div");
     bar.className = "ps-lb-bar";
+    var pixel = false; // 本次预览的渲染方式:false = 抗锯齿(默认),true = 像素
     var out = btn(ICON.minus, T.zoomOut, function () {
       setMode("ps-lb-spring");
       zoomAt(window.innerWidth / 2, window.innerHeight / 2, st.scale / 1.5);
@@ -299,6 +334,15 @@
       st.rot += 90; // 累积角度:取模会让 270°→0° 沿原路倒转一大圈
       apply();
     });
+    // 渲染方式:像素放大(关闭插值,像素网格清晰)与抗锯齿放大(默认)切换
+    var pixelBtn = btn(ICON.pixel, T.pixelOff, function () {
+      pixel = !pixel;
+      img.style.imageRendering = pixel ? "pixelated" : "";
+      pixelBtn.classList.toggle("is-active", pixel);
+      pixelBtn.title = pixel ? T.pixelOn : T.pixelOff;
+      pixelBtn.setAttribute("aria-pressed", String(pixel));
+    });
+    pixelBtn.setAttribute("aria-pressed", "false");
     var dl = btn(ICON.download, T.download, function () {
       var name = decodeURIComponent((img.src.split("?")[0].split("#")[0].split("/").pop() || "image"));
       var a = document.createElement("a");
@@ -311,7 +355,7 @@
     var sep2 = document.createElement("span");
     sep2.className = "ps-lb-sep";
     var x = btn(ICON.close, T.close, close);
-    bar.append(out, scaleBtn, inn, sep1, rot, dl, sep2, x);
+    bar.append(out, scaleBtn, inn, sep1, rot, pixelBtn, dl, sep2, x);
     bar.addEventListener("mousedown", function (e) {
       e.stopPropagation(); // 工具条上的点击不触发背景关闭
     });

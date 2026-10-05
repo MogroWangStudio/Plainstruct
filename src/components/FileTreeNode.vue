@@ -36,6 +36,8 @@ const emit = defineEmits<{
   reorder: [src: string, target: string, pos: "before" | "after"];
   selectClick: [click: SelectClick];
   importTo: [dir: string];
+  editFolderPage: [node: TreeNode];
+  editFrontMatter: [node: TreeNode];
 }>();
 
 const editor = useEditorStore();
@@ -230,6 +232,19 @@ function onDrop(e: DragEvent) {
         <button v-if="isDir" class="btn-icon !h-6 !w-6" :title="$t('tree.newDoc')" tabindex="-1" @click.stop="emit('newDocIn', node.path)">
           <AppIcon name="filePlus" :size="13" />
         </button>
+        <button v-if="isDir" class="btn-icon !h-6 !w-6" :title="$t('tree.editFolderPage')" tabindex="-1" @click.stop="emit('editFolderPage', node)">
+          <AppIcon name="file" :size="13" />
+        </button>
+        <!-- Markdown 文档与文件夹(经其 index.md)可直达配置头表单 -->
+        <button
+          v-if="isDir || (!isImage && node.name.toLowerCase().endsWith('.md'))"
+          class="btn-icon !h-6 !w-6"
+          :title="$t('tree.fmEdit')"
+          tabindex="-1"
+          @click.stop="emit('editFrontMatter', node)"
+        >
+          <AppIcon name="frontmatter" :size="13" />
+        </button>
         <button class="btn-icon !h-6 !w-6" :title="$t('tree.rename')" tabindex="-1" @click.stop="emit('rename', node)">
           <AppIcon name="pencil" :size="13" />
         </button>
@@ -255,6 +270,8 @@ function onDrop(e: DragEvent) {
           @reorder="(s: string, t: string, p: 'before' | 'after') => emit('reorder', s, t, p)"
           @select-click="(c: SelectClick) => emit('selectClick', c)"
           @import-to="(d: string) => emit('importTo', d)"
+          @edit-folder-page="(n: TreeNode) => emit('editFolderPage', n)"
+          @edit-front-matter="(n: TreeNode) => emit('editFrontMatter', n)"
         />
       </div>
     </div>

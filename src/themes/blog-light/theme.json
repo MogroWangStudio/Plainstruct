@@ -1,7 +1,7 @@
 {
   "id": "blog-light",
   "name": "素记 · 浅色",
-  "version": "3.6.0",
+  "version": "3.8.0",
   "author": "MogroWang Studio",
   "type": "blog",
   "description": "博客·浅色:纸面素栏,文章为流,日期为记。",
@@ -271,6 +271,17 @@
       "category": "布局"
     },
     {
+      "key": "navColumnsM",
+      "label": "移动端卡片并排(个)",
+      "type": "number",
+      "default": 1,
+      "min": 1,
+      "max": 4,
+      "step": 1,
+      "category": "布局",
+      "hint": "窗口宽度 ≤640px 时的卡片并排列数"
+    },
+    {
       "key": "coverHeight",
       "label": "封面图高度(px)",
       "type": "number",
@@ -279,6 +290,17 @@
       "max": 420,
       "step": 20,
       "category": "布局"
+    },
+    {
+      "key": "coverHeightM",
+      "label": "移动端封面图高度(px)",
+      "type": "number",
+      "default": 160,
+      "min": 100,
+      "max": 420,
+      "step": 10,
+      "category": "布局",
+      "hint": "窗口宽度 ≤640px 时生效;开启固定封面比例后由比例裁切"
     },
     {
       "key": "coverFixedRatio",
@@ -321,6 +343,17 @@
       "max": 30,
       "step": 1,
       "category": "布局"
+    },
+    {
+      "key": "homeGroupMax",
+      "label": "分类卡片流每组最多显示(篇)",
+      "type": "number",
+      "default": 0,
+      "min": 0,
+      "max": 30,
+      "step": 1,
+      "category": "布局",
+      "hint": "主页「卡片流按分类分组」时每组最多展示的篇数,0 = 不限制;超出时组尾出现「查看更多」进入该分类页"
     },
     {
       "key": "cardShadow",
@@ -575,6 +608,27 @@
       "category": "卡片外观"
     },
     {
+      "key": "fontSizePc",
+      "label": "正文字号(桌面端)",
+      "type": "number",
+      "default": 16,
+      "min": 13,
+      "max": 22,
+      "step": 1,
+      "category": "颜色与字体"
+    },
+    {
+      "key": "fontSizeM",
+      "label": "正文字号(移动端)",
+      "type": "number",
+      "default": 15,
+      "min": 12,
+      "max": 20,
+      "step": 1,
+      "category": "颜色与字体",
+      "hint": "窗口宽度 ≤640px 时生效"
+    },
+    {
       "key": "accentColor",
       "label": "强调色",
       "type": "color",
@@ -775,6 +829,39 @@
       ],
       "category": "内容显示",
       "hint": "与搜索入口同角时自动竖列并排"
+    },
+    {
+      "key": "footerNote",
+      "label": "页脚说明",
+      "type": "text",
+      "default": "",
+      "category": "页脚",
+      "hint": "显示在每页底部的一行说明文字,留空不显示"
+    },
+    {
+      "key": "footerBuild",
+      "label": "显示构建版本与日期",
+      "type": "boolean",
+      "default": false,
+      "category": "页脚"
+    },
+    {
+      "key": "footerBuildFormat",
+      "label": "构建信息格式",
+      "type": "text",
+      "default": "{version} · 构建于 {date} {time}",
+      "tokens": ["{version}", "{date}", "{time}"],
+      "visibleIf": { "key": "footerBuild", "equals": true },
+      "category": "页脚",
+      "hint": "点击格式输入框旁的令牌按钮插入占位符,构建时自动替换为实际值"
+    },
+    {
+      "key": "footerLinks",
+      "label": "友情链接",
+      "type": "textarea",
+      "default": "",
+      "category": "页脚",
+      "hint": "每行一条:名称|链接|图标地址(图标可选),如 素构|https://example.com|https://example.com/logo.svg"
     }
   ]
 }
