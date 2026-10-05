@@ -1,6 +1,6 @@
 /** 素构识别的配置头字段(写回时以表单值为准重建这些行;表单未管理的字段
  *  不在此列 —— 用户手写的行原样保留,如 order) */
-export const FM_KEYS = ["title", "description", "date", "cover", "author", "aigc", "hidden", "homegroups", "homeposts"];
+export const FM_KEYS = ["title", "description", "date", "cover", "author", "aigc", "hidden", "homegroups", "homeuncategorized", "homeuncategorizedlabel"];
 
 /** AIGC 声明:present = 存在 AIGC,none = 无任何 AIGC;缺省(不写字段)即不显示声明 */
 export type AigcDeclaration = "none" | "present";
@@ -21,8 +21,10 @@ export function applyFrontMatter(
     hidden?: boolean;
     /** 博客主页(根 index.md)专属:卡片流按分类分组 */
     homeGroups?: boolean;
-    /** 博客主页专属:卡片流只显示这些文章(content/ 相对路径);空数组 = 显示全部 */
-    homePosts?: string[];
+    /** 博客主页专属:分组时是否显示「未分类」组(根级文章);缺省显示,隐藏时写 false */
+    homeUncategorized?: boolean;
+    /** 博客主页专属:「未分类」组的自定义标题;空 = 缺省「未分类」 */
+    homeUncategorizedLabel?: string;
   },
 ): string {
   const fields = [
@@ -34,7 +36,11 @@ export function applyFrontMatter(
     ...(values.aigc === "none" || values.aigc === "present" ? [`aigc: ${values.aigc}`] : []),
     ...(values.hidden ? ["hidden: true"] : []),
     ...(values.homeGroups ? ["homeGroups: true"] : []),
-    ...(values.homePosts?.length ? [`homePosts: ${values.homePosts.join(", ")}`] : []),
+    // 显示未分类是缺省行为(不写字段);仅在用户隐藏时落 false
+    ...(values.homeGroups && values.homeUncategorized === false ? ["homeUncategorized: false"] : []),
+    ...(values.homeGroups && values.homeUncategorizedLabel?.trim()
+      ? [`homeUncategorizedLabel: ${values.homeUncategorizedLabel.trim()}`]
+      : []),
   ];
   const m = content.match(/^---\r?\n([\s\S]*?)\r?\n(?:---|\.\.\.)(?:\r?\n|$)/);
   if (!m) {
@@ -64,8 +70,10 @@ export interface FrontMatter {
   hidden?: boolean;
   /** 博客主页(根 index.md)专属:卡片流按分类分组(分类 = 顶层文件夹) */
   homeGroups?: boolean;
-  /** 博客主页专属:卡片流只显示这些文章(content/ 相对路径,逗号分隔) */
-  homePosts?: string[];
+  /** 博客主页专属:分组时显示「未分类」组(根级文章);缺省显示 */
+  homeUncategorized?: boolean;
+  /** 博客主页专属:「未分类」组的自定义标题 */
+  homeUncategorizedLabel?: string;
 }
 
 export interface ParsedDoc {
@@ -106,9 +114,10 @@ export function parseFrontMatter(src: string): ParsedDoc {
       if (value === "true" || value === "1") data.hidden = true;
     } else if (key === "homegroups") {
       if (value === "true" || value === "1") data.homeGroups = true;
-    } else if (key === "homeposts") {
-      const list = value.split(",").map((s) => s.trim()).filter(Boolean);
-      if (list.length) data.homePosts = list;
+    } else if (key === "homeuncategorized") {
+      if (value === "false" || value === "0") data.homeUncategorized = false;
+    } else if (key === "homeuncategorizedlabel") {
+      if (value) data.homeUncategorizedLabel = value;
     }
   }
   // 结束围栏缺失时视为普通正文,不吞内容

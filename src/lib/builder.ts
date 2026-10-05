@@ -54,8 +54,10 @@ export interface DocMeta {
   hidden?: boolean;
   /** 博客主页(根 index.md)专属:卡片流按分类分组 */
   homeGroups?: boolean;
-  /** 博客主页专属:卡片流只显示这些文章(content/ 相对路径) */
-  homePosts?: string[];
+  /** 博客主页专属:分组时显示「未分类」组(根级文章);缺省显示,false = 隐藏 */
+  homeUncategorized?: boolean;
+  /** 博客主页专属:「未分类」组的自定义标题 */
+  homeUncategorizedLabel?: string;
   body: string;
 }
 
@@ -114,7 +116,8 @@ function buildMetas(paths: string[], cache: DocsCache): Map<string, DocMeta> {
       aigc: data.aigc,
       hidden: data.hidden === true,
       homeGroups: data.homeGroups === true,
-      homePosts: data.homePosts,
+      homeUncategorized: data.homeUncategorized === false ? false : undefined,
+      homeUncategorizedLabel: data.homeUncategorizedLabel,
       body: stripLeadingTitle(body, title),
     });
   }
@@ -336,8 +339,7 @@ export function topNavItems(tree: TreeNode[], cache: DocsCache): NavPickerItem[]
   return conv(buildNav(tree, metas));
 }
 
-/** 博客主页 extras:主页配置头(homeGroups/homePosts)驱动分类分组与文章过滤。
- *  homePosts 为 content/ 相对 htmlPath 的白名单(缺省显示全部);
+/** 博客主页 extras:主页配置头(homeGroups)驱动分类分组。
  *  分组模式整流展示不分页,常规模式按主题「每页文章数」切片分页 */
 function blogHomeExtrasFor(
   siteType: SiteType,
@@ -348,27 +350,22 @@ function blogHomeExtrasFor(
   metas: Map<string, DocMeta>,
 ): BlogHomeExtras {
   if (siteType !== "blog") return { siteType };
-  let posts = allPosts;
-  const picked = (home?.homePosts ?? []).map((s) => s.trim().toLowerCase()).filter(Boolean);
-  if (picked.length) {
-    const set = new Set(picked);
-    posts = allPosts.filter((p) => set.has(p.htmlPath.toLowerCase()));
-  }
   if (home?.homeGroups) {
-    return { siteType, posts, postGroups: buildPostGroups(tree, metas, posts) };
+    return { siteType, posts: allPosts, postGroups: buildPostGroups(tree, metas, allPosts, home) };
   }
   const perPage = postsPerPageOf(config);
-  const total = Math.max(1, Math.ceil(posts.length / perPage));
-  return { siteType, posts: posts.slice(0, perPage), pagination: { current: 1, total } };
+  const total = Math.max(1, Math.ceil(allPosts.length / perPage));
+  return { siteType, posts: allPosts.slice(0, perPage), pagination: { current: 1, total } };
 }
 
 /** 主页分类卡片流:顶层目录(导航树顺序)为一组,组名取目录 index.md 的标题或目录名,
- *  组内文章保持 posts 的既有排序(日期倒序);未被任何顶层目录收编的文章归入
- *  「未分类」排最后。组 url 指向分类落地页(目录 index 页或自动目录列表页) */
+ *  组内文章保持 posts 的既有排序(日期倒序)。根级文章归入「未分类」排最后 ——
+ *  仅在主页配置允许显示时出现,组名可由主页配置自定义 */
 function buildPostGroups(
   tree: TreeNode[],
   metas: Map<string, DocMeta>,
   posts: PostSummary[],
+  home: DocMeta | undefined,
 ): PostGroup[] {
   const byPath = new Map(posts.map((p) => [p.htmlPath, p]));
   const used = new Set<string>();
@@ -398,8 +395,13 @@ function buildPostGroups(
       });
     }
   }
-  const rest = posts.filter((p) => !used.has(p.htmlPath));
-  if (rest.length) groups.push({ title: "未分类", posts: rest });
+  const showUncategorized = home?.homeUncategorized !== false;
+  if (showUncategorized) {
+    const rest = posts.filter((p) => !used.has(p.htmlPath));
+    if (rest.length) {
+      groups.push({ title: home?.homeUncategorizedLabel?.trim() || "未分类", posts: rest });
+    }
+  }
   return groups;
 }
 

@@ -363,9 +363,9 @@ function findNodeByPath(path: string): TreeNode | null {
 
 const fmOpen = ref(false);
 const fmTarget = ref("");
-/** 主页配置区数据:目标是博客根 index.md 时为候选文章列表,否则 null */
-const fmBlogHome = ref<{ posts: { title: string; path: string }[] } | null>(null);
-const fmInitial = reactive<FrontMatterForm>({ title: "", description: "", date: "", cover: "", author: "", aigc: "", hidden: false, homeGroups: false, homePosts: [] });
+/** 是否显示主页配置区:目标是博客根 index.md */
+const fmBlogHome = ref(false);
+const fmInitial = reactive<FrontMatterForm>({ title: "", description: "", date: "", cover: "", author: "", aigc: "", hidden: false, homeGroups: false, homeShowUncategorized: true, homeUncategorizedLabel: "" });
 
 /** 打开配置头表单:当前打开的文档取编辑器内容(含未保存修改),其余读磁盘版本 */
 async function openFmEditor(node: TreeNode) {
@@ -382,12 +382,12 @@ async function openFmEditor(node: TreeNode) {
   fmInitial.author = parsed.data.author ?? "";
   fmInitial.aigc = parsed.data.aigc ?? "";
   fmInitial.hidden = parsed.data.hidden === true;
-  // 主页配置区预填:已有 homePosts 按其勾选,否则全勾(= 显示全部)
-  const opts = site.blogHomePostOptions;
-  const isHomeDoc = !!opts && node.path.toLowerCase() === "index.md";
-  fmBlogHome.value = isHomeDoc ? { posts: opts } : null;
-  fmInitial.homeGroups = isHomeDoc && parsed.data.homeGroups === true;
-  fmInitial.homePosts = isHomeDoc ? (parsed.data.homePosts ?? opts!.map((o) => o.path)) : [];
+  // 主页配置区:未分类缺省显示,标题空 = 缺省「未分类」
+  const isHomeDoc = (site.config?.siteType ?? "docs") === "blog" && node.path.toLowerCase() === "index.md";
+  fmBlogHome.value = isHomeDoc;
+  fmInitial.homeGroups = parsed.data.homeGroups === true;
+  fmInitial.homeShowUncategorized = parsed.data.homeUncategorized !== false;
+  fmInitial.homeUncategorizedLabel = parsed.data.homeUncategorizedLabel ?? "";
   fmOpen.value = true;
 }
 
