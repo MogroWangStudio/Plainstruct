@@ -41,6 +41,46 @@
     </nav>
   {{/if}}
 </section>
+{{else if page.isArchive}}
+<section class="blog-archive">
+  <header class="blog-archive-head">
+    <h1 class="blog-archive-title">{{page.title}}</h1>
+  </header>
+  <div class="blog-archive-tabs" role="tablist">
+    <button type="button" data-view="list" class="is-active">列表</button>
+    <button type="button" data-view="cats">分类</button>
+    <button type="button" data-view="cards">卡片</button>
+  </div>
+  <div class="blog-archive-pane" data-pane="list">
+    {{#each page.archive.years}}
+    <section class="blog-archive-year">
+      <h2>{{#if this.year}}{{this.year}}{{else}}未注明日期{{/if}}</h2>
+      <ul>
+        {{#each this.posts}}
+        <li><a href="{{this.url}}">{{this.title}}</a>{{#if this.date}}<time>{{this.date}}</time>{{/if}}</li>
+        {{/each}}
+      </ul>
+    </section>
+    {{/each}}
+  </div>
+  <div class="blog-archive-pane" data-pane="cats" hidden>
+    {{#each page.archive.groups}}
+    <section class="blog-archive-cat">
+      <h2>{{#if this.url}}<a href="{{this.url}}">{{this.title}}</a>{{else}}{{this.title}}{{/if}}</h2>
+      <ul>
+        {{#each this.posts}}
+        <li><a href="{{this.url}}">{{this.title}}</a>{{#if this.date}}<time>{{this.date}}</time>{{/if}}</li>
+        {{/each}}
+      </ul>
+    </section>
+    {{/each}}
+  </div>
+  <div class="blog-archive-pane" data-pane="cards" hidden>
+    <div class="blog-stream">
+      {{#each page.archive.posts}}{{> post-entry}}{{/each}}
+    </div>
+  </div>
+</section>
 {{else}}
   {{#if page.folderPosts}}
   <section class="blog-folder">

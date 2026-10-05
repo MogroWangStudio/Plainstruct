@@ -39,8 +39,10 @@
     {{#if config.topbarPageTitle}}{{#unless page.isHome}}<span class="blog-topbar-page">{{page.title}}</span>{{/unless}}{{/if}}
     {{#if nav}}
       <nav class="blog-nav" aria-label="站点导航">
-        {{#each nav}}<a href="{{this.url}}"{{#if this.current}} class="current"{{/if}}>{{this.title}}</a>{{/each}}
+        {{#each nav}}<a href="{{this.url}}"{{#if this.current}} class="current"{{/if}}>{{this.title}}</a>{{/each}}{{#if config.showArchive}}<a href="{{asset "archive/index.html"}}">归档</a>{{/if}}
       </nav>
+    {{else if config.showArchive}}
+      <nav class="blog-nav" aria-label="站点导航"><a href="{{asset "archive/index.html"}}">归档</a></nav>
     {{/if}}
   </header>
   <main class="blog-main">

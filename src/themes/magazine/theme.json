@@ -159,6 +159,14 @@
       "category": "顶栏与导航"
     },
     {
+      "key": "showArchive",
+      "label": "顶栏显示归档入口",
+      "type": "boolean",
+      "default": true,
+      "hint": "顶栏导航末尾出现「归档」链接,进入全站归档页(所有非隐藏文章,支持列表/分类/卡片流三种视图切换)",
+      "category": "顶栏与导航"
+    },
+    {
       "key": "navHover",
       "label": "导航悬停反馈",
       "type": "select",

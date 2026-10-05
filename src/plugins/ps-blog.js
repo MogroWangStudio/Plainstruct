@@ -211,6 +211,22 @@
     placeBtn();
   }
 
+  /* ---------- 归档页:列表 / 分类 / 卡片流三种视图切换(无 JS 时默认显示列表) ---------- */
+  var tabs = doc.querySelector(".blog-archive-tabs");
+  if (tabs) {
+    tabs.addEventListener("click", function (e) {
+      var btn = e.target && e.target.closest ? e.target.closest("button[data-view]") : null;
+      if (!btn) return;
+      var view = btn.getAttribute("data-view");
+      Array.prototype.forEach.call(tabs.querySelectorAll("button[data-view]"), function (b) {
+        b.classList.toggle("is-active", b === btn);
+      });
+      Array.prototype.forEach.call(doc.querySelectorAll(".blog-archive-pane"), function (pane) {
+        pane.hidden = pane.getAttribute("data-pane") !== view;
+      });
+    });
+  }
+
   /* ---------- 加载指示 ---------- */
   var loader = doc.querySelector(".ps-loader");
   if (loader) {

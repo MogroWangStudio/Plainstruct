@@ -35,6 +35,22 @@ export interface PostGroup {
   posts: PostSummary[];
 }
 
+/** 归档页按年份分组的一组(无日期文章的 year 为空串,渲染为「未注明日期」) */
+export interface ArchiveYear {
+  year: string;
+  posts: PostSummary[];
+}
+
+/** 归档页数据:三种视图共用同一份文章集合(全部非隐藏文章) */
+export interface ArchiveData {
+  /** 卡片流视图:全部文章(日期倒序) */
+  posts: PostSummary[];
+  /** 分类视图:按顶层文件夹分组(同主页分类卡片流) */
+  groups: PostGroup[];
+  /** 列表视图:按年份分组(年份倒序,无日期组排最后) */
+  years: ArchiveYear[];
+}
+
 export interface TocEntry {
   level: number;
   text: string;
@@ -88,6 +104,9 @@ export interface PageContext {
     postGroups?: PostGroup[];
     /** 博客文件夹落地页的卡片流视图(该目录递归内的文章) */
     folderPosts?: PostSummary[];
+    /** 博客归档页:全部文章的三种视图数据(列表/分类/卡片流) */
+    isArchive?: boolean;
+    archive?: ArchiveData;
   };
   nav: NavItem[];
   prev?: { title: string; url: string };

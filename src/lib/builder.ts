@@ -5,7 +5,7 @@ import type { BuildReport, BuildWarning, CopyItem, OutputFile, Platform, SiteCon
 import { parseFrontMatter } from "./frontmatter";
 import { renderMarkdown, decodeHref, splitHash, extractHeadings, type MdEnv } from "./markdown";
 import { basename, dirname, encodePath, isMarkdown, isAssetDirName, joinPosix, mdToHtml, relPosix, relPrefix, stripExt } from "./paths";
-import { compileTheme, mergeConfigDefaults, type NavItem, type PageContext, type PaginationInfo, type PostGroup, type PostSummary, type ThemeBundle } from "./theme-engine";
+import { compileTheme, mergeConfigDefaults, type ArchiveYear, type NavItem, type PageContext, type PaginationInfo, type PostGroup, type PostSummary, type ThemeBundle } from "./theme-engine";
 import { siteUrl } from "./preview";
 import {
   builtinPluginOutputs,
@@ -415,6 +415,8 @@ interface BlogHomeExtras {
   postGroups?: PostGroup[];
   /** 博客文件夹落地页的卡片流视图(该目录递归内的文章;缺省视图) */
   folderPosts?: PostSummary[];
+  /** 博客归档页:全部文章的三种视图数据(列表/分类/卡片流) */
+  archive?: { posts: PostSummary[]; groups: PostGroup[]; years: ArchiveYear[] };
 }
 
 /** 渲染单页(构建与预览共用)。warnings 为空数组时收集,预览可忽略。 */
@@ -523,6 +525,19 @@ function renderOnePage(
         : undefined,
       // 博客文件夹落地页的卡片流视图(该目录递归内的文章)
       folderPosts: isBlog ? extras?.folderPosts?.map(mapPost) : undefined,
+      // 归档页:三种视图的数据全部按页深换算
+      isArchive: !!extras?.archive || undefined,
+      archive: extras?.archive
+        ? {
+            posts: extras.archive.posts.map(mapPost),
+            groups: extras.archive.groups.map((g) => ({
+              title: g.title,
+              url: g.url ? encodePath(relPosix(outDir, g.url)) : undefined,
+              posts: g.posts.map(mapPost),
+            })),
+            years: extras.archive.years.map((y) => ({ year: y.year, posts: y.posts.map(mapPost) })),
+          }
+        : undefined,
     },
     // 博客顶栏按主题配置裁剪(自定义选择 + 数量上限);文档站侧栏隐去隐藏文档;
     // 上/下篇与面包屑仍按完整导航树计算
@@ -812,6 +827,28 @@ export async function buildSite(site: SiteConfig, theme: ThemeBundle, root: stri
     }
     const { html } = renderOnePage(site, config, render, navRaw, docMap, dirSet, page, warnings, undefined, undefined, undefined, extras);
     emit(mdToHtml(page.path), html, page.title);
+  }
+
+  // 博客归档页:全部非隐藏文章(卡片流)+ 分类分组 + 年份分组;三种视图客户端切换。
+  // 不进搜索索引(归档是导航页,整页文章标题的拼接文本只会稀释搜索质量)
+  if (isBlog) {
+    const byYear = new Map<string, PostSummary[]>();
+    for (const p of allPosts) {
+      const year = p.date?.trim().match(/^(\d{4})/)?.[1] ?? "";
+      const bucket = byYear.get(year);
+      if (bucket) bucket.push(p);
+      else byYear.set(year, [p]);
+    }
+    const years: ArchiveYear[] = [...byYear.entries()]
+      .sort(([a], [b]) => (a && b ? b.localeCompare(a) : a ? -1 : 1))
+      .map(([year, posts]) => ({ year, posts }));
+    const archiveExtras: BlogHomeExtras = {
+      siteType,
+      archive: { posts: allPosts, groups: buildPostGroups(tree, metas, allPosts, homeDoc), years },
+    };
+    const archiveDoc: DocMeta = { path: "archive/index.md", title: "归档", order: 0, body: "" };
+    const { html } = renderOnePage(site, config, render, navRaw, docMap, dirSet, archiveDoc, warnings, undefined, undefined, undefined, archiveExtras);
+    emit("archive/index.html", html, "归档", undefined, false);
   }
 
   // 搜索索引(构建产物懒加载;预览通道为内联数据,见 renderPreview)
