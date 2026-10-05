@@ -368,6 +368,17 @@
       "category": "布局"
     },
     {
+      "key": "homeWidthPctM",
+      "label": "移动端主页卡片流宽度(%)",
+      "type": "number",
+      "default": 92,
+      "min": 50,
+      "max": 100,
+      "step": 5,
+      "category": "布局",
+      "hint": "窗口宽度 ≤640px 时生效"
+    },
+    {
       "key": "postsPerPage",
       "label": "每页文章数",
       "type": "number",

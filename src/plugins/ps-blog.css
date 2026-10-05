@@ -27,6 +27,12 @@ body[data-cover-fixed="true"][data-cover-ratio="1:1"] .blog-entry-cover-empty {
   font-size: var(--ps-card-fs, 16px);
 }
 
+/* 主页卡片流宽度:首页系列(含分页页)解除统一容器的限宽,
+   卡片流宽度百分比真正相对窗口内容宽 —— 100% 即窗口全宽(仍保留页面呼吸边距) */
+body.ps-home .blog-main {
+  max-width: none;
+}
+
 /* 主页分类卡片流:组标题可点击进入分类落地页,组内复用文章卡片流 */
 .blog-group {
   margin-top: 40px;
