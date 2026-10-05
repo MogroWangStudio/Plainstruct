@@ -39,7 +39,7 @@ function ensureLogListener() {
 
 export const usePublishStore = defineStore("publish", {
   state: (): State => ({
-    config: { owner: "", repo: "", branch: "gh-pages", token: "", autoCreate: true, accountType: "user" },
+    config: { owner: "", repo: "", branch: "gh-pages", token: "", autoCreate: true, accountType: "user", customDomain: "" },
     loaded: false,
     verifying: false,
     verifyResult: null,
@@ -51,6 +51,15 @@ export const usePublishStore = defineStore("publish", {
     deployState: "idle",
     logs: [],
   }),
+
+  getters: {
+    /** 有自定义域名时打开域名地址(DNS 已生效的前提下),否则打开 pages 地址 */
+    siteUrl(): string {
+      const r = this.result;
+      if (!r) return "";
+      return r.customDomain ? `https://${r.customDomain}` : r.pagesUrl;
+    },
+  },
 
   actions: {
     reset() {
@@ -199,7 +208,7 @@ export const usePublishStore = defineStore("publish", {
       const t = i18n.global.t;
       if (!this.result || this.checkingDeploy) return;
       if (this.deployState === "ready") {
-        await ipc.openExternal(this.result.pagesUrl);
+        await ipc.openExternal(this.siteUrl);
         return;
       }
       if (this.deployState === "building") return;
@@ -223,7 +232,7 @@ export const usePublishStore = defineStore("publish", {
         }
         if (ready) {
           this.deployState = "ready";
-          await ipc.openExternal(this.result.pagesUrl);
+          await ipc.openExternal(this.siteUrl);
           ui.toast(t("publish.deployReady"), "success");
         } else if (errored) {
           ui.toast(t("publish.deployErrored"), "error");
@@ -232,7 +241,7 @@ export const usePublishStore = defineStore("publish", {
         }
       } catch {
         // 部署状态查询失败(网络等):降级为直接打开,行为与不检测时一致
-        await ipc.openExternal(this.result.pagesUrl);
+        await ipc.openExternal(this.siteUrl);
       } finally {
         this.checkingDeploy = false;
       }

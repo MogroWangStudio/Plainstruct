@@ -28,6 +28,9 @@ pub struct GithubConfig {
     /// 以 403 / 404 拒绝,这正是旧配置最容易踩的坑。旧配置无此字段时按个人处理。
     #[serde(default = "default_account_type")]
     pub account_type: String,
+    /// 自定义域名(发布页设置):非空时发布自动写入 CNAME;留空则保留云端现有域名
+    #[serde(default)]
+    pub custom_domain: String,
 }
 
 fn default_branch() -> String {
@@ -103,6 +106,9 @@ pub struct SyncProgress {
 pub struct SyncResult {
     pub commit_sha: String,
     pub pages_url: String,
+    /// 本次发布写入的自定义域名(用户在发布页设置);空 = 未设置,前端按 pages_url 打开
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub custom_domain: String,
 }
 
 /// Pages 部署状态(针对本次发布提交)
@@ -137,6 +143,42 @@ fn git_blob_sha(bytes: &[u8]) -> String {
     hasher.update(format!("blob {}\0", bytes.len()));
     hasher.update(bytes);
     hasher.finalize().iter().map(|b| format!("{b:02x}")).collect()
+}
+
+/// 规范化用户输入的自定义域名:容忍粘贴带协议/路径/尾斜杠的写法,
+/// 取主机名部分(保留大小写);结果为空表示未设置域名
+fn normalize_custom_domain(raw: &str) -> String {
+    let s = raw.trim();
+    let s = s.strip_prefix("https://").unwrap_or(s);
+    let s = s.strip_prefix("http://").unwrap_or(s);
+    let host = s.split(['/', '?', '#']).next().unwrap_or("");
+    host.trim().trim_end_matches('.').to_string()
+}
+
+/// 校验自定义域名可作为 CNAME 内容:无效的 CNAME 会让整次 Pages 构建失败,
+/// 这里提前拦下并给出具体原因。留空合法(表示保留云端现有域名)。
+fn validate_custom_domain(domain: &str) -> Result<(), String> {
+    if domain.is_empty() {
+        return Ok(());
+    }
+    let labels_ok = domain.split('.').all(|l| {
+        !l.is_empty()
+            && !l.starts_with('-')
+            && !l.ends_with('-')
+            && l.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
+    });
+    if !labels_ok || domain.split('.').count() < 2 {
+        return Err(format!(
+            "自定义域名格式无效:「{domain}」。请填写裸域名(如 blog.example.com),不要带路径、协议或下划线。"
+        ));
+    }
+    let lower = domain.to_ascii_lowercase();
+    if lower == "github.io" || lower.ends_with(".github.io") {
+        return Err(format!(
+            "自定义域名不能是 github.io 下的域名:「{domain}」。GitHub Pages 会拒绝这样的 CNAME,请填写你自己的域名。"
+        ));
+    }
+    Ok(())
 }
 
 /// 递归取目录内文件的最大修改时间(目录不存在或无文件返回 None)
@@ -198,6 +240,7 @@ pub async fn github_read_config(window: tauri::WebviewWindow, state: State<'_, A
             token: String::new(),
             auto_create: true,
             account_type: default_account_type(),
+            custom_domain: String::new(),
         }),
     }
 }
@@ -653,14 +696,39 @@ async fn github_sync_inner(app: &AppHandle, state: &AppState, cfg: GithubConfig)
         );
     }
 
-    // 4.5 Pages 基础设施文件保留:CNAME / .nojekyll 不属于构建产物,而发布 tree 是
-    //    不带 base_tree 的精确替换 —— 产物之外的一切都会从发布分支上移除。
-    //    deploy-from-branch 模式下分支根目录的 CNAME 就是自定义域名的事实来源,
-    //    被清后下一次 Pages 构建会把域名设置一并清空。三层兜底:
-    //    产物自带 CNAME 以产物为准;否则复用云端分支的 CNAME blob(增量对比已取过
-    //    全量 tree,零额外请求);连分支都没有时按 Pages 设置的 cname 恢复。
+    // 4.5 CNAME(自定义域名):发布 tree 是不带 base_tree 的精确替换 —— 产物之外的
+    //    文件会全部从发布分支移除。deploy-from-branch 模式下分支根目录的 CNAME 就是
+    //    自定义域名的事实来源,被清后下一次 Pages 构建会把域名设置一并清空。
+    //    优先级:发布页设置的自定义域名(写入产物,内容变化经 blob sha 增量)
+    //    > 云端分支已有 CNAME(原样保留)> Pages 设置的 cname(恢复)。
     //    .nojekyll 仅在云端已有时原样保留(素构产物无下划线路径,不主动新建)。
-    if !files.iter().any(|(p, _)| p == "CNAME") {
+    let custom_domain = normalize_custom_domain(&cfg.custom_domain);
+    validate_custom_domain(&custom_domain)?;
+    let mut published_domain = String::new();
+    if !custom_domain.is_empty() {
+        let cname_bytes = format!("{custom_domain}\n").into_bytes();
+        let local_sha = git_blob_sha(&cname_bytes);
+        let sha = if remote_shas.get("CNAME").map(|s| s.as_str()) == Some(local_sha.as_str()) {
+            local_sha
+        } else {
+            let (blob_status, blob) = request(
+                &http,
+                reqwest::Method::POST,
+                &repo_api(&cfg, "/git/blobs"),
+                &cfg.token,
+                Some(json!({ "content": B64.encode(&cname_bytes), "encoding": "base64" })),
+            )
+            .await?;
+            if blob_status != 201 {
+                let msg = blob["message"].as_str().unwrap_or("");
+                return Err(format!("写入自定义域名失败({blob_status}): {msg}"));
+            }
+            blob["sha"].as_str().ok_or("blob 响应缺少 sha")?.to_string()
+        };
+        tree_items.push(json!({ "path": "CNAME", "mode": "100644", "type": "blob", "sha": sha }));
+        emit_log(app, "info", format!("自定义域名:{custom_domain}(已写入 CNAME,DNS 与 HTTPS 证书生效需要一些时间)"));
+        published_domain = custom_domain;
+    } else if !files.iter().any(|(p, _)| p == "CNAME") {
         if let Some(sha) = remote_shas.get("CNAME") {
             tree_items.push(json!({ "path": "CNAME", "mode": "100644", "type": "blob", "sha": sha }));
             emit_log(app, "info", "已保留云端的自定义域名(CNAME)");
@@ -848,6 +916,7 @@ async fn github_sync_inner(app: &AppHandle, state: &AppState, cfg: GithubConfig)
     Ok(SyncResult {
         commit_sha,
         pages_url: pages_url(&cfg),
+        custom_domain: published_domain,
     })
 }
 

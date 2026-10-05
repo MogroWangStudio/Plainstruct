@@ -216,6 +216,8 @@ export interface GithubConfig {
   autoCreate: boolean;
   /** 旧配置无此字段时按个人账号处理 */
   accountType: GithubAccountType;
+  /** 自定义域名:非空时发布自动写入 CNAME;留空则保留云端现有域名 */
+  customDomain: string;
 }
 
 export interface VerifyResult {
@@ -233,6 +235,8 @@ export interface VerifyResult {
 export interface SyncResult {
   commitSha: string;
   pagesUrl: string;
+  /** 本次发布写入的自定义域名;空 = 未设置(查看站点时打开 pagesUrl) */
+  customDomain?: string;
 }
 
 /** 发布前预检:提醒而非阻断 */

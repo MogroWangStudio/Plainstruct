@@ -78,6 +78,27 @@ watch(
   },
 );
 
+/* ---------- 自定义域名 ---------- */
+
+/** 输入容错规范化:与发布端一致 —— 去协议/路径/尾斜杠与尾点,取主机名 */
+const domainNormalized = computed(() => {
+  let s = publish.config.customDomain.trim().replace(/^https?:\/\//i, "");
+  return (s.split(/[/?#]/)[0] ?? "").trim().replace(/\.+$/, "");
+});
+
+/** 即时格式校验(与发布端同规则):无效时红字提示,发布端仍会最终把关 */
+const domainError = computed(() => {
+  const d = domainNormalized.value;
+  if (!d) return "";
+  const labels = d.split(".");
+  const shaped =
+    labels.length >= 2 &&
+    labels.every((l) => l.length > 0 && !l.startsWith("-") && !l.endsWith("-") && /^[a-zA-Z0-9-]+$/.test(l));
+  if (!shaped) return t("publish.domainInvalid");
+  if (d.toLowerCase() === "github.io" || d.toLowerCase().endsWith(".github.io")) return t("publish.domainGithubIo");
+  return "";
+});
+
 /* ---------- 运行日志 ---------- */
 
 const logBox = ref<HTMLElement | null>(null);
@@ -165,10 +186,25 @@ function openPages() {
             </div>
           </div>
 
-          <div>
-            <label class="field-label">{{ t("publish.branch") }}</label>
-            <input v-model="publish.config.branch" class="input !w-48" type="text" :placeholder="t('publish.branchPlaceholder')" />
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="field-label">{{ t("publish.branch") }}</label>
+              <input v-model="publish.config.branch" class="input" type="text" :placeholder="t('publish.branchPlaceholder')" />
+            </div>
+            <div>
+              <label class="field-label">{{ t("publish.customDomain") }}</label>
+              <input
+                v-model="publish.config.customDomain"
+                class="input mono"
+                type="text"
+                :placeholder="t('publish.customDomainPlaceholder')"
+                spellcheck="false"
+                autocapitalize="off"
+              />
+            </div>
           </div>
+          <p v-if="domainError" class="-mt-2 text-[calc(12.5px*var(--ui-font-scale))] leading-relaxed text-danger">{{ domainError }}</p>
+          <p v-else class="field-hint -mt-2">{{ t("publish.customDomainHint", { owner: publish.config.owner || "yourname" }) }}</p>
 
           <div>
             <label class="field-label">{{ t("publish.token") }}</label>
@@ -248,6 +284,9 @@ function openPages() {
             {{ t("publish.done") }}
           </p>
           <p class="mono text-[calc(12px*var(--ui-font-scale))] text-ink-2">{{ t("publish.commit", { sha: publish.result.commitSha.slice(0, 7) }) }}</p>
+          <p v-if="publish.result.customDomain" class="mono text-[calc(12px*var(--ui-font-scale))] text-ink-2">
+            {{ t("publish.customDomainApplied", { domain: publish.result.customDomain }) }}
+          </p>
           <div class="flex flex-wrap gap-2">
             <!-- 查看站点:Pages 构建中禁用并转圈,完成后亮起主色按钮 -->
             <button

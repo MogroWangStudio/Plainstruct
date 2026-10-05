@@ -691,6 +691,7 @@ async readSiteConfig(): Promise<SiteConfig> {
       branch: "gh-pages",
       token: "",
       autoCreate: true,
+      customDomain: "",
       ...stored,
       // 旧配置无账户类型字段:按个人账号处理(与后端反序列化默认值一致)
       accountType: stored.accountType === "org" ? "org" : "user",
