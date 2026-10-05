@@ -416,7 +416,7 @@ a.blog-page-step:active {
   top: calc(var(--ps-topbar-h) + 30px);
   align-self: start;
   max-height: calc(100vh - var(--ps-topbar-h) - 60px);
-  overflow-y: auto;
+  overflow: hidden auto; /* 横向裁掉微移悬停的位移,不出现滚动条 */
   font-size: 12px;
   line-height: 1.5;
 }
