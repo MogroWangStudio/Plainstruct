@@ -308,19 +308,31 @@ export function navMaxOf(config: Record<string, string | number | boolean>): num
 }
 
 /**
- * 博客顶栏导航:navMode 为"自定义"时按选择(htmlPath 按行分隔)保留,顺序仍随内容树;
+ * 博客顶栏导航:navMode 为"自定义"时按选择保留,顺序仍随内容树;
  * 可选池为整棵导航树(含文件夹内页面,选择器中展开后可选),不再限于顶层。
+ * 选择行格式:`htmlPath` 或 `htmlPath|顶栏显示名`(名称留空 = 显示原页面标题);
  * 选择为空或全部失效时回退为全部,避免导航意外消失。任何模式都受数量上限收敛。
  */
 export function blogTopNav(config: Record<string, string | number | boolean>, raw: RawNav[]): RawNav[] {
-  const picked = String(config.navPicked ?? "")
-    .split("\n")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  const custom = String(config.navMode ?? "") === "自定义" && picked.length;
+  const pickedMap = new Map(
+    String(config.navPicked ?? "")
+      .split("\n")
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const i = line.indexOf("|");
+        return i > 0 ? [line.slice(0, i).trim(), line.slice(i + 1).trim()] : [line, ""];
+      }),
+  );
+  const custom = String(config.navMode ?? "") === "自定义" && pickedMap.size > 0;
   const chosen = custom
-    ? // 自定义模式:按选择保留(隐藏文档被明确勾选时仍可展示在顶栏)
-      flattenNav(raw).filter((item) => item.htmlPath !== undefined && picked.includes(item.htmlPath))
+    ? // 自定义模式:按选择保留并套用顶栏显示名(隐藏文档被明确勾选时仍可展示在顶栏)
+      flattenNav(raw)
+        .filter((item) => item.htmlPath !== undefined && pickedMap.has(item.htmlPath))
+        .map((item) => {
+          const name = pickedMap.get(item.htmlPath!) ?? "";
+          return name ? { ...item, title: name } : item;
+        })
     : // 默认模式:隐去隐藏文档
       raw.filter((item) => !item.hidden);
   return chosen.slice(0, navMaxOf(config));

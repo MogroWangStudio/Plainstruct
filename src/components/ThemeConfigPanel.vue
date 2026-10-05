@@ -215,6 +215,7 @@ const pickerRows = computed(() => {
   return rows;
 });
 
+/** 选择行的原始内容(htmlPath 或 htmlPath|顶栏显示名) */
 function pickedOf(field: ThemeField): string[] {
   return String(fieldValue(field) ?? "")
     .split("\n")
@@ -222,11 +223,46 @@ function pickedOf(field: ThemeField): string[] {
     .filter(Boolean);
 }
 
+/** 选择行的纯 key(剥掉 | 后的自定义名),供勾选集合比对 */
+function pickedKeys(field: ThemeField): string[] {
+  return pickedOf(field).map((line) => {
+    const i = line.indexOf("|");
+    return (i > 0 ? line.slice(0, i) : line).trim();
+  });
+}
+
+/** 已选项的显示名映射(key -> 自定义顶栏名,无名称为空串) */
+function pickedCustoms(field: ThemeField): Map<string, string> {
+  return new Map(
+    pickedOf(field).map((line) => {
+      const i = line.indexOf("|");
+      return i > 0 ? [line.slice(0, i).trim(), line.slice(i + 1).trim()] : [line, ""];
+    }),
+  );
+}
+
+/** 修改某选中项的顶栏显示名(留空 = 恢复显示页面原标题) */
+function renamePicked(field: ThemeField, key: string, name: string) {
+  const lines = pickedOf(field).map((line) => {
+    const i = line.indexOf("|");
+    const k = (i > 0 ? line.slice(0, i) : line).trim();
+    if (k !== key) return line;
+    return name.trim() ? `${key}|${name.trim()}` : key;
+  });
+  onField(field, lines.join("\n"));
+}
+
 /** 数量上限与构建同源(navMaxItems 配置,缺省 6) */
 const maxNav = computed(() => navMaxOf(theme.configValues));
 
-/** 已选项的显示名(含所在文件夹链;文档已删除的项不再展示) */
-function pickedLabels(field: ThemeField): string[] {
+/** 已选行(含所在文件夹链与自定义顶栏名;文档已删除的项不再展示) */
+interface PickedRow {
+  key: string;
+  label: string;
+  custom: string;
+}
+
+function pickedRows(field: ThemeField): PickedRow[] {
   const labels = new Map<string, string>();
   const walk = (opts: NavPickerItem[], prefix: string) => {
     for (const o of opts) {
@@ -237,8 +273,13 @@ function pickedLabels(field: ThemeField): string[] {
   };
   walk(navOptions.value, "");
   return pickedOf(field)
-    .map((key) => labels.get(key))
-    .filter((l) => l !== undefined) as string[];
+    .map((line) => {
+      const i = line.indexOf("|");
+      const key = (i > 0 ? line.slice(0, i) : line).trim();
+      return { key, custom: i > 0 ? line.slice(i + 1).trim() : "" };
+    })
+    .filter((r) => labels.has(r.key))
+    .map((r) => ({ ...r, label: labels.get(r.key)! }));
 }
 
 /* 弹窗选择器:草稿集,点击确认才写入配置 */
@@ -248,7 +289,7 @@ const draft = ref(new Set<string>());
 
 function openPicker(field: ThemeField) {
   pickerField.value = field;
-  draft.value = new Set(pickedOf(field));
+  draft.value = new Set(pickedKeys(field));
   pickerOpen.value = true;
 }
 
@@ -261,8 +302,14 @@ function toggleDraft(key: string, on: boolean) {
   draft.value = next;
 }
 
+/** 确认勾选:已设过的顶栏自定义名原样保留(勾掉再勾回不丢名称) */
 function confirmPicker() {
-  if (pickerField.value) onField(pickerField.value, [...draft.value].join("\n"));
+  if (!pickerField.value) return;
+  const customs = pickedCustoms(pickerField.value);
+  onField(
+    pickerField.value,
+    [...draft.value].map((key) => (customs.get(key) ? `${key}|${customs.get(key)}` : key)).join("\n"),
+  );
   pickerOpen.value = false;
 }
 
@@ -497,16 +544,21 @@ async function removePlugin(id: string, name: string) {
             <button type="button" class="select !w-64 cursor-pointer text-left" @click="openPicker(field)">
               {{ pickedOf(field).length ? t("theme.navPickedCount", { n: pickedOf(field).length }) : t("theme.navPickEmpty") }}
             </button>
-            <template v-if="pickedLabels(field).length">
+            <template v-if="pickedRows(field).length">
               <p class="text-[calc(12px*var(--ui-font-scale))] text-ink-3">{{ t("theme.navPickedHeading") }}</p>
               <ul class="flex flex-col">
-                <li
-                  v-for="(label, i) in pickedLabels(field)"
-                  :key="i"
-                  class="max-w-64 truncate py-0.5 text-[calc(13px*var(--ui-font-scale))] text-ink-2"
-                  :title="label"
-                >
-                  {{ label }}
+                <li v-for="row in pickedRows(field)" :key="row.key" class="flex items-center gap-2 py-0.5">
+                  <span class="min-w-0 flex-1 truncate text-[calc(13px*var(--ui-font-scale))] text-ink-2" :title="row.label">
+                    {{ row.label }}
+                  </span>
+                  <input
+                    class="input h-7 w-28 shrink-0 text-[calc(12px*var(--ui-font-scale))]"
+                    type="text"
+                    :value="row.custom"
+                    :placeholder="t('theme.navRenamePlaceholder')"
+                    :title="t('theme.navRenameTitle')"
+                    @change="renamePicked(field, row.key, ($event.target as HTMLInputElement).value)"
+                  />
                 </li>
               </ul>
             </template>
