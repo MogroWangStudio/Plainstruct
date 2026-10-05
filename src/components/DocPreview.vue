@@ -8,7 +8,7 @@ import { useThemeStore } from "@/stores/theme";
 import { useUiStore } from "@/stores/ui";
 import { useAppStore } from "@/stores/app";
 import { ipc } from "@/ipc/ipc";
-import { renderPreview } from "@/lib/builder";
+import { renderPreview, renderSpecialPreview } from "@/lib/builder";
 import { joinPosix, stripExt } from "@/lib/paths";
 
 const { t } = useI18n();
@@ -24,8 +24,25 @@ let timer: ReturnType<typeof setTimeout> | null = null;
 let pendingHtml = "";
 let ready = false;
 
-function computeHtml(): string {
+/** 预览覆盖页:构建产物中才有、mock 预览可同源渲染的页面(博客归档页 / 文件夹落地页)。
+ *  点击对应链接时设置;编辑器内容或活动文档变化后清除,回到当前文档预览 */
+const previewOverride = ref<{ type: "archive" } | { type: "folder"; dir: string } | null>(null);
+
+async function computeHtml(): Promise<string> {
   if (!editor.activePath || !site.config || !theme.activeBundle) return "";
+  const override = previewOverride.value;
+  if (override) {
+    return renderSpecialPreview(
+      site.config,
+      theme.activeBundle,
+      site.tree,
+      site.docsCache,
+      override,
+      app.platform,
+      site.pluginContents,
+      app.settings.disableRefreshAnim ?? false,
+    );
+  }
   // 传原始内容,renderPreview 内统一解析 front-matter(标题/正文)
   return renderPreview(
     site.config,
@@ -56,10 +73,20 @@ function applyHtml(next: string) {
 function schedule() {
   if (timer) clearTimeout(timer);
   timer = setTimeout(() => {
-    pendingHtml = computeHtml();
-    if (ready) applyHtml(pendingHtml);
+    void computeHtml().then((html) => {
+      pendingHtml = html;
+      if (ready) applyHtml(pendingHtml);
+    });
   }, 240);
 }
+
+// 覆盖页随写作与文档切换清除:回到当前文档预览(归档/文件夹页与编辑内容无关)
+watch([() => editor.content, () => editor.activePath], () => {
+  if (previewOverride.value) {
+    previewOverride.value = null;
+    schedule();
+  }
+});
 
 watch(
   [
@@ -106,12 +133,49 @@ function attachClickHandlers() {
     const target = anchor.getAttribute("data-doc") ?? resolveInternal(href);
     const node = target ? site.findDoc(target) : null;
     if (node) {
+      previewOverride.value = null;
       void editor.openDoc(node);
       return;
     }
-    // 站内链接但预览无法呈现(如分页页 page/N)
+    // 构建产物中存在、预览可同源渲染的页面:博客归档页 / 文件夹落地页
+    const special = target ? resolveSpecialPage(target) : null;
+    if (special) {
+      previewOverride.value = special;
+      schedule();
+      return;
+    }
+    // 站内链接但预览无法呈现
     ui.toast(t("build.previewOnly"), "info");
   });
+}
+
+/**
+ * 识别预览可渲染的伪页面(构建产物存在、但不是内容文档):
+ * 博客归档页 archive/index.md;无 index.md 文档的目录落地页 dir/index.md
+ * (该目录须真实存在于内容树中)。
+ */
+function resolveSpecialPage(target: string): { type: "archive" } | { type: "folder"; dir: string } | null {
+  const lower = target.toLowerCase();
+  if (lower === "archive/index.md") {
+    return (site.config?.siteType ?? "docs") === "blog" ? { type: "archive" } : null;
+  }
+  if (!lower.endsWith("/index.md")) return null;
+  const dir = target.slice(0, -"/index.md".length);
+  const dirNode = findDirNode(site.tree, dir);
+  if (!dirNode) return null;
+  const hasIndexDoc = (dirNode.children ?? []).some(
+    (c) => c.type === "file" && c.name.toLowerCase() === "index.md",
+  );
+  return hasIndexDoc ? null : { type: "folder", dir };
+}
+
+function findDirNode(nodes: typeof site.tree, dir: string): (typeof site.tree)[number] | undefined {
+  for (const n of nodes) {
+    if (n.type === "dir" && n.path === dir) return n;
+    const hit = n.children ? findDirNode(n.children, dir) : undefined;
+    if (hit) return hit;
+  }
+  return undefined;
 }
 
 /** 无 data-doc 的相对链接(主题模板生成的 .html 链接/文件夹链接)解析为文档路径 */

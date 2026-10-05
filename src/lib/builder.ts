@@ -405,6 +405,34 @@ function buildPostGroups(
   return groups;
 }
 
+/** 文章的 content/ 相对路径映射(htmlPath → md path),供按目录过滤文章流 */
+function htmlToMdMap(metas: Map<string, DocMeta>): Map<string, string> {
+  return new Map([...metas.values()].map((m) => [mdToHtml(m.path), m.path]));
+}
+
+/** 某目录(递归)内的文章,保持 allPosts 的既有排序(日期倒序) */
+function postsInDir(allPosts: PostSummary[], htmlToMd: Map<string, string>, dir: string): PostSummary[] {
+  const prefix = dir ? `${dir}/` : "";
+  return allPosts.filter((p) => {
+    const md = htmlToMd.get(p.htmlPath);
+    return md !== undefined && md.startsWith(prefix);
+  });
+}
+
+/** 归档列表视图:按年份分组(年份倒序,无日期组排最后,year 为空串) */
+function buildArchiveYears(posts: PostSummary[]): ArchiveYear[] {
+  const byYear = new Map<string, PostSummary[]>();
+  for (const p of posts) {
+    const year = p.date?.trim().match(/^(\d{4})/)?.[1] ?? "";
+    const bucket = byYear.get(year);
+    if (bucket) bucket.push(p);
+    else byYear.set(year, [p]);
+  }
+  return [...byYear.entries()]
+    .sort(([a], [b]) => (a && b ? b.localeCompare(a) : a ? -1 : 1))
+    .map(([year, items]) => ({ year, posts: items }));
+}
+
 /** 博客落地页系列页的渲染数据:文章切片/分类分组/文件夹卡片流 + 分页信息
  *  (url 由 renderOnePage 按页深换算) */
 interface BlogHomeExtras {
@@ -637,6 +665,116 @@ export function renderPreview(
   return out;
 }
 
+/**
+ * 预览专用:渲染构建产物中才存在的页面 —— 博客归档页与文件夹落地页。
+ * 编辑器预览点击对应链接时由 DocPreview 调用,渲染管线与产物同源。
+ * 文件夹页显示方式按 folders.json(读取失败回退缺省卡片流);
+ * 文档站点的目录落地页以目录列表正文呈现。
+ */
+export async function renderSpecialPreview(
+  site: SiteConfig,
+  theme: ThemeBundle,
+  tree: TreeNode[],
+  cache: DocsCache,
+  target: { type: "archive" } | { type: "folder"; dir: string },
+  platform: Platform,
+  pluginContents: SitePluginFiles[] = [],
+  suppressAnim = false,
+): Promise<string> {
+  const paths = collectDocPaths(tree);
+  const metas = buildMetas(paths, cache);
+  const siteType = site.siteType ?? "docs";
+  const config = mergeConfigDefaults(theme.meta, site.theme.config);
+  const render = compileTheme(theme);
+  const navRaw = buildNav(tree, metas);
+  const docMap = new Map<string, string>();
+  const dirSet = new Set<string>();
+  walkTree(tree, (n) => {
+    if (n.type === "dir") dirSet.add(n.path.toLowerCase());
+  });
+  for (const p of paths) docMap.set(p.toLowerCase(), p);
+
+  const rootIndex = paths.find((p) => p.toLowerCase() === "index.md");
+  const homeDoc = rootIndex ? metas.get(rootIndex) : undefined;
+  const allPosts = siteType === "blog" ? buildPosts(metas) : [];
+
+  let page: DocMeta;
+  let extras: BlogHomeExtras;
+  if (target.type === "archive" && siteType === "blog") {
+    page = { path: "archive/index.md", title: "归档", order: 0, body: "" };
+    extras = {
+      siteType,
+      archive: {
+        posts: allPosts,
+        groups: buildPostGroups(tree, metas, allPosts, homeDoc),
+        years: buildArchiveYears(allPosts),
+      },
+    };
+  } else {
+    const dir = target.type === "folder" ? target.dir : "";
+    let view = "stream";
+    if (siteType === "blog") {
+      try {
+        view = (await ipc.readFolderConfigs())[dir]?.view ?? "stream";
+      } catch {
+        /* 读取失败回退缺省卡片流 */
+      }
+    } else {
+      view = "list";
+    }
+    const node = findDirNode(tree, dir);
+    const children = node?.children ?? [];
+    const asList = siteType !== "blog" || view === "list";
+    page = {
+      path: `${dir}/index.md`,
+      title: node?.name ?? dir,
+      order: 0,
+      body: asList ? tocHtml(buildNav(children, metas), dir) : "",
+    };
+    extras =
+      siteType === "blog" && !asList
+        ? { siteType, folderPosts: postsInDir(allPosts, htmlToMdMap(metas), dir) }
+        : { siteType };
+  }
+
+  const logoUrl = site.logo ? siteUrl(platform, `.plainstruct/assets/${site.logo}`) : undefined;
+  const faviconName = site.favicon || site.logo;
+  const faviconUrl = faviconName ? siteUrl(platform, `.plainstruct/assets/${faviconName}`) : undefined;
+  const { html } = renderOnePage(
+    site,
+    config,
+    render,
+    navRaw,
+    docMap,
+    dirSet,
+    page,
+    [],
+    (resolved) => siteUrl(platform, "content/" + resolved),
+    { logo: logoUrl, favicon: faviconUrl },
+    (cover) => siteUrl(platform, "content/" + cover),
+    extras,
+  );
+  let out = inlineThemeAssets(html, theme.files);
+  const tags = inlinePreviewPlugins(site, pluginContents);
+  if (tags.length) {
+    const search = normalizePlugins(site).search ? [searchIndexTag(previewSearchPages(metas, tree))] : [];
+    out = injectPluginTags(out, [...search, ...tags]);
+  }
+  if (suppressAnim) out = suppressPageAnimTag(out);
+  return out;
+}
+
+/** 在内容树中查找目录节点(content/ 相对路径) */
+function findDirNode(tree: TreeNode[], dir: string): TreeNode | undefined {
+  if (!dir) return undefined;
+  for (const n of tree) {
+    if (n.type === "dir" && n.path === dir) return n;
+    const hit = n.children ? findDirNode(n.children, dir) : undefined;
+    if (hit) return hit;
+  }
+  return undefined;
+}
+
 /** mock 预览的动画抑制样式(与注入 shim 的 ps-noanim 同款) */
 function suppressPageAnimTag(html: string): string {
   const style = `<style id="ps-noanim">*, *::before, *::after { animation: none !important; } .ps-loader { display: none !important; }</style>`;
@@ -800,14 +938,7 @@ export async function buildSite(site: SiteConfig, theme: ThemeBundle, root: stri
   // 文件夹页:每个没有 index.md 的目录生成一个落地页(dir/index.html);资产目录除外。
   // 博客站点为分类落地页:缺省卡片流(该目录递归内的文章),可在文件树配置为目录列表
   const folderConfigs = isBlog ? await ipc.readFolderConfigs() : {};
-  const htmlToMd = new Map([...metas.values()].map((m) => [mdToHtml(m.path), m.path]));
-  const postsInDir = (dir: string): PostSummary[] => {
-    const prefix = dir ? `${dir}/` : "";
-    return allPosts.filter((p) => {
-      const md = htmlToMd.get(p.htmlPath);
-      return md !== undefined && md.startsWith(prefix);
-    });
-  };
+  const htmlToMd = htmlToMdMap(metas);
   const folderPages: DocMeta[] = [];
   walkTree(tree, (node) => {
     if (node.type !== "dir" || isAssetDir(node.path)) return;
@@ -823,7 +954,7 @@ export async function buildSite(site: SiteConfig, theme: ThemeBundle, root: stri
   for (const page of folderPages) {
     let extras: BlogHomeExtras = docExtras;
     if (isBlog && (folderConfigs[dirname(page.path)]?.view ?? "stream") === "stream") {
-      extras = { siteType, folderPosts: postsInDir(dirname(page.path)) };
+      extras = { siteType, folderPosts: postsInDir(allPosts, htmlToMd, dirname(page.path)) };
     }
     const { html } = renderOnePage(site, config, render, navRaw, docMap, dirSet, page, warnings, undefined, undefined, undefined, extras);
     emit(mdToHtml(page.path), html, page.title);
@@ -832,19 +963,9 @@ export async function buildSite(site: SiteConfig, theme: ThemeBundle, root: stri
   // 博客归档页:全部非隐藏文章(卡片流)+ 分类分组 + 年份分组;三种视图客户端切换。
   // 不进搜索索引(归档是导航页,整页文章标题的拼接文本只会稀释搜索质量)
   if (isBlog) {
-    const byYear = new Map<string, PostSummary[]>();
-    for (const p of allPosts) {
-      const year = p.date?.trim().match(/^(\d{4})/)?.[1] ?? "";
-      const bucket = byYear.get(year);
-      if (bucket) bucket.push(p);
-      else byYear.set(year, [p]);
-    }
-    const years: ArchiveYear[] = [...byYear.entries()]
-      .sort(([a], [b]) => (a && b ? b.localeCompare(a) : a ? -1 : 1))
-      .map(([year, posts]) => ({ year, posts }));
     const archiveExtras: BlogHomeExtras = {
       siteType,
-      archive: { posts: allPosts, groups: buildPostGroups(tree, metas, allPosts, homeDoc), years },
+      archive: { posts: allPosts, groups: buildPostGroups(tree, metas, allPosts, homeDoc), years: buildArchiveYears(allPosts) },
     };
     const archiveDoc: DocMeta = { path: "archive/index.md", title: "归档", order: 0, body: "" };
     const { html } = renderOnePage(site, config, render, navRaw, docMap, dirSet, archiveDoc, warnings, undefined, undefined, undefined, archiveExtras);
