@@ -5,7 +5,7 @@ import type { BuildReport, BuildWarning, CopyItem, OutputFile, Platform, SiteCon
 import { parseFrontMatter } from "./frontmatter";
 import { renderMarkdown, decodeHref, splitHash, extractHeadings, type MdEnv } from "./markdown";
 import { basename, dirname, encodePath, isMarkdown, isAssetDirName, joinPosix, mdToHtml, relPosix, relPrefix, stripExt } from "./paths";
-import { compileTheme, mergeConfigDefaults, type NavItem, type PageContext, type PaginationInfo, type PostSummary, type ThemeBundle } from "./theme-engine";
+import { compileTheme, mergeConfigDefaults, type NavItem, type PageContext, type PaginationInfo, type PostGroup, type PostSummary, type ThemeBundle } from "./theme-engine";
 import { siteUrl } from "./preview";
 import {
   builtinPluginOutputs,
@@ -52,6 +52,10 @@ export interface DocMeta {
   aigc?: string;
   /** 隐藏文档:不进文章流/导航/搜索索引,页面仍生成(仅可通过链接访问) */
   hidden?: boolean;
+  /** 博客主页(根 index.md)专属:卡片流按分类分组 */
+  homeGroups?: boolean;
+  /** 博客主页专属:卡片流只显示这些文章(content/ 相对路径) */
+  homePosts?: string[];
   body: string;
 }
 
@@ -67,7 +71,7 @@ interface RawNav {
 
 export type DocsCache = Record<string, string>;
 
-function walkTree(nodes: TreeNode[], fn: (node: TreeNode) => void) {
+export function walkTree(nodes: TreeNode[], fn: (node: TreeNode) => void) {
   for (const n of nodes) {
     fn(n);
     if (n.children?.length) walkTree(n.children, fn);
@@ -109,6 +113,8 @@ function buildMetas(paths: string[], cache: DocsCache): Map<string, DocMeta> {
       author: data.author,
       aigc: data.aigc,
       hidden: data.hidden === true,
+      homeGroups: data.homeGroups === true,
+      homePosts: data.homePosts,
       body: stripLeadingTitle(body, title),
     });
   }
@@ -330,14 +336,80 @@ export function topNavItems(tree: TreeNode[], cache: DocsCache): NavPickerItem[]
   return conv(buildNav(tree, metas));
 }
 
-/** 博客首页系列的 extras:当前页文章切片 + 分页信息(url 由 renderOnePage 按页深换算) */
-function blogHomeExtras(
+/** 博客主页 extras:主页配置头(homeGroups/homePosts)驱动分类分组与文章过滤。
+ *  homePosts 为 content/ 相对 htmlPath 的白名单(缺省显示全部);
+ *  分组模式整流展示不分页,常规模式按主题「每页文章数」切片分页 */
+function blogHomeExtrasFor(
   siteType: SiteType,
+  allPosts: PostSummary[],
+  home: DocMeta | undefined,
+  config: Record<string, string | number | boolean>,
+  tree: TreeNode[],
+  metas: Map<string, DocMeta>,
+): BlogHomeExtras {
+  if (siteType !== "blog") return { siteType };
+  let posts = allPosts;
+  const picked = (home?.homePosts ?? []).map((s) => s.trim().toLowerCase()).filter(Boolean);
+  if (picked.length) {
+    const set = new Set(picked);
+    posts = allPosts.filter((p) => set.has(p.htmlPath.toLowerCase()));
+  }
+  if (home?.homeGroups) {
+    return { siteType, posts, postGroups: buildPostGroups(tree, metas, posts) };
+  }
+  const perPage = postsPerPageOf(config);
+  const total = Math.max(1, Math.ceil(posts.length / perPage));
+  return { siteType, posts: posts.slice(0, perPage), pagination: { current: 1, total } };
+}
+
+/** 主页分类卡片流:顶层目录(导航树顺序)为一组,组名取目录 index.md 的标题或目录名,
+ *  组内文章保持 posts 的既有排序(日期倒序);未被任何顶层目录收编的文章归入
+ *  「未分类」排最后。组 url 指向分类落地页(目录 index 页或自动目录列表页) */
+function buildPostGroups(
+  tree: TreeNode[],
+  metas: Map<string, DocMeta>,
   posts: PostSummary[],
-  current: number,
-  total: number,
-): { siteType: SiteType; posts?: PostSummary[]; pagination?: { current: number; total: number } } {
-  return { siteType, posts, pagination: { current, total } };
+): PostGroup[] {
+  const byPath = new Map(posts.map((p) => [p.htmlPath, p]));
+  const used = new Set<string>();
+  const groups: PostGroup[] = [];
+  for (const node of tree) {
+    if (node.type !== "dir" || isAssetDir(node.path)) continue;
+    const indexChild = (node.children ?? []).find(
+      (c) => c.type === "file" && c.name.toLowerCase() === "index.md",
+    );
+    const group: PostSummary[] = [];
+    const collect = (n: TreeNode) => {
+      if (n.type === "file" && isMarkdown(n.path)) {
+        const p = byPath.get(mdToHtml(n.path));
+        if (p) {
+          group.push(p);
+          used.add(p.htmlPath);
+        }
+      }
+      for (const c of n.children ?? []) collect(c);
+    };
+    for (const c of node.children ?? []) collect(c);
+    if (group.length) {
+      groups.push({
+        title: (indexChild ? metas.get(indexChild.path)?.title : undefined) ?? node.name,
+        url: mdToHtml(indexChild ? indexChild.path : `${node.path}/index.md`),
+        posts: group,
+      });
+    }
+  }
+  const rest = posts.filter((p) => !used.has(p.htmlPath));
+  if (rest.length) groups.push({ title: "未分类", posts: rest });
+  return groups;
+}
+
+/** 博客主页系列页的渲染数据:文章切片/分类分组 + 分页信息(url 由 renderOnePage 按页深换算) */
+interface BlogHomeExtras {
+  siteType: SiteType;
+  posts?: PostSummary[];
+  pagination?: { current: number; total: number };
+  /** 主页配置头 homeGroups 开启时按分类分组展示(此时不分页) */
+  postGroups?: PostGroup[];
 }
 
 /** 渲染单页(构建与预览共用)。warnings 为空数组时收集,预览可忽略。 */
@@ -356,7 +428,7 @@ function renderOnePage(
   /** 预览模式:文章封面的绝对地址(构建时留空,使用相对路径) */
   coverUrl?: (cover: string) => string,
   /** 站点类型与博客文章流(extras.posts 为当前页应展示的切片,extras.pagination 仅首页系列传入) */
-  extras?: { siteType?: SiteType; posts?: PostSummary[]; pagination?: { current: number; total: number } },
+  extras?: BlogHomeExtras,
 ): PageContext & { html: string } {
   const htmlPath = mdToHtml(doc.path);
   const outDir = dirname(htmlPath);
@@ -401,6 +473,16 @@ function renderOnePage(
   const cfgLogo = site.logo;
   // 站点外图标未单独设置时沿用站点内 logo(旧站点行为不变)
   const cfgFavicon = site.favicon || site.logo;
+  // 文章流条目统一换算:htmlPath/封面 → 当前页相对地址(预览封面为绝对协议地址)
+  const mapPost = (p: PostSummary) => ({
+    ...p,
+    url: encodePath(relPosix(outDir, p.htmlPath)),
+    cover: p.cover
+      ? /^(https?:|data:)/i.test(p.cover)
+        ? p.cover
+        : (coverUrl?.(p.cover) ?? encodePath(relPosix(outDir, p.cover)))
+      : undefined,
+  });
   const ctx: PageContext = {
     site: {
       name: site.name,
@@ -426,24 +508,21 @@ function renderOnePage(
       // 博客文章页的页内目录;标题 id 与渲染管线同源(extractHeadings 复用 slugify),锚点一致
       toc: isBlog && !pagination ? extractHeadings(doc.body) : undefined,
       pagination,
+      // 主页分类卡片流(主页配置头 homeGroups;组内条目与文章流同规则换算)
+      postGroups: isBlog
+        ? extras?.postGroups?.map((g) => ({
+            title: g.title,
+            url: g.url ? encodePath(relPosix(outDir, g.url)) : undefined,
+            posts: g.posts.map(mapPost),
+          }))
+        : undefined,
     },
     // 博客顶栏按主题配置裁剪(自定义选择 + 数量上限);文档站侧栏隐去隐藏文档;
     // 上/下篇与面包屑仍按完整导航树计算
     nav: navForPage(isBlog ? blogTopNav(config, navRaw) : navForSidebar(navRaw), htmlPath, outDir),
     prev: prev ? { title: prev.title, url: encodePath(relPosix(outDir, prev.htmlPath!)) } : undefined,
     next: next ? { title: next.title, url: encodePath(relPosix(outDir, next.htmlPath!)) } : undefined,
-    posts: isBlog
-      ? extras?.posts?.map((p) => ({
-          ...p,
-          url: encodePath(relPosix(outDir, p.htmlPath)),
-          // 预览时封面必须换成可访问的绝对地址(与正文图片同源),相对地址会指向应用自身 origin
-          cover: p.cover
-            ? /^(https?:|data:)/i.test(p.cover)
-              ? p.cover
-              : (coverUrl?.(p.cover) ?? encodePath(relPosix(outDir, p.cover)))
-            : undefined,
-        }))
-      : undefined,
+    posts: isBlog ? extras?.posts?.map(mapPost) : undefined,
     config,
   };
   return { ...ctx, html: injectSiteBehavior(render(ctx)) };
@@ -499,13 +578,10 @@ export function renderPreview(
   const doc = metas.get(currentPath);
   if (!doc) return "";
   const siteType = site.siteType ?? "docs";
-  // 博客根 index 预览第 1 页文章流;其余文档页不带分页数据
-  let extras: { siteType: SiteType; posts?: PostSummary[]; pagination?: { current: number; total: number } } = { siteType };
+  // 博客根 index 预览第 1 页文章流(按主页配置头裁剪);其余文档页不带分页数据
+  let extras: BlogHomeExtras = { siteType };
   if (siteType === "blog" && currentPath.toLowerCase() === "index.md") {
-    const allPosts = buildPosts(metas);
-    const perPage = postsPerPageOf(config);
-    const total = Math.max(1, Math.ceil(allPosts.length / perPage));
-    extras = blogHomeExtras(siteType, allPosts.slice(0, perPage), 1, total);
+    extras = blogHomeExtrasFor(siteType, buildPosts(metas), metas.get(currentPath), config, tree, metas);
   }
   const logoUrl = site.logo
     ? siteUrl(platform, `.plainstruct/assets/${site.logo}`)
@@ -602,7 +678,7 @@ export async function buildSite(site: SiteConfig, theme: ThemeBundle, root: stri
   const navRaw = buildNav(tree, metas);
   const siteType = site.siteType ?? "docs";
   const isBlog = siteType === "blog";
-  const docExtras = { siteType };
+  const docExtras: BlogHomeExtras = { siteType };
   // 博客首页分页:每页文章数来自主题配置,文章流拆成 index.html + page/N 系列页
   const allPosts = isBlog ? buildPosts(metas) : [];
   const perPage = postsPerPageOf(config);
@@ -654,10 +730,13 @@ export async function buildSite(site: SiteConfig, theme: ThemeBundle, root: stri
 
   // 根目录:无 index.md 时自动生成首页,保证 index.html 始终存在;
   // 文档站点为介绍页(TOC),博客站点为第 1 页文章流
+  // 博客主页 extras 按主页配置头裁剪(分类分组 / 自定义显示文章)
+  const rootIndex = mdPaths.find((p) => p.toLowerCase() === "index.md");
+  const homeDoc = rootIndex ? metas.get(rootIndex) : undefined;
   const homeExtras = isBlog
-    ? blogHomeExtras(siteType, allPosts.slice(0, perPage), 1, totalPages)
+    ? blogHomeExtrasFor(siteType, allPosts, homeDoc, config, tree, metas)
     : docExtras;
-  if (!mdPaths.some((p) => p.toLowerCase() === "index.md")) {
+  if (!rootIndex) {
     const home: DocMeta = {
       path: "index.md",
       title: site.name,
@@ -669,30 +748,31 @@ export async function buildSite(site: SiteConfig, theme: ThemeBundle, root: stri
     emit("index.html", html, site.name, site.description);
   } else if (isBlog) {
     // 有 index.md:正文作为公告栏显示在文章流上方
-    const homeDoc = metas.get(mdPaths.find((p) => p.toLowerCase() === "index.md")!)!;
-    const { html } = renderOnePage(site, config, render, navRaw, docMap, dirSet, homeDoc, warnings, undefined, undefined, undefined, homeExtras);
-    emit("index.html", html, homeDoc.title, homeDoc.description);
+    const { html } = renderOnePage(site, config, render, navRaw, docMap, dirSet, homeDoc!, warnings, undefined, undefined, undefined, homeExtras);
+    emit("index.html", html, homeDoc!.title, homeDoc!.description);
   }
 
-  // 博客首页系列第 2..N 页(page/N/index.html)
-  for (let n = 2; n <= totalPages; n++) {
-    const pseudo: DocMeta = { path: `page/${n}/index.md`, title: site.name, order: 0, body: "" };
-    const slice = allPosts.slice((n - 1) * perPage, n * perPage);
-    const { html } = renderOnePage(
-      site,
-      config,
-      render,
-      navRaw,
-      docMap,
-      dirSet,
-      pseudo,
-      warnings,
-      undefined,
-      undefined,
-      undefined,
-      blogHomeExtras(siteType, slice, n, totalPages),
-    );
-    emit(`page/${n}/index.html`, html, site.name);
+  // 博客首页系列第 2..N 页(page/N/index.html);主页配置头开启分类分组时整流展示,不生成系列页
+  if (isBlog && !homeExtras.postGroups) {
+    for (let n = 2; n <= totalPages; n++) {
+      const pseudo: DocMeta = { path: `page/${n}/index.md`, title: site.name, order: 0, body: "" };
+      const slice = allPosts.slice((n - 1) * perPage, n * perPage);
+      const { html } = renderOnePage(
+        site,
+        config,
+        render,
+        navRaw,
+        docMap,
+        dirSet,
+        pseudo,
+        warnings,
+        undefined,
+        undefined,
+        undefined,
+        { siteType, posts: slice, pagination: { current: n, total: totalPages } },
+      );
+      emit(`page/${n}/index.html`, html, site.name);
+    }
   }
 
   // 文件夹页:每个没有 index.md 的目录生成一个目录列表页(dir/index.html);资产目录除外

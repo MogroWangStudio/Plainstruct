@@ -27,6 +27,14 @@ export interface PostSummary {
   cover?: string;
 }
 
+/** 主页分类卡片流的一组(分类标题 + 组内文章):
+ *  extras 阶段 url 为分类落地页的 content/ 相对 htmlPath,渲染时换算为页面相对地址 */
+export interface PostGroup {
+  title: string;
+  url?: string;
+  posts: PostSummary[];
+}
+
 export interface TocEntry {
   level: number;
   text: string;
@@ -76,6 +84,8 @@ export interface PageContext {
     toc?: TocEntry[];
     /** 文章流分页(仅博客首页系列页存在) */
     pagination?: PaginationInfo;
+    /** 主页分类卡片流(主页配置头 homeGroups 开启时;渲染按组展示,不分页) */
+    postGroups?: PostGroup[];
   };
   nav: NavItem[];
   prev?: { title: string; url: string };

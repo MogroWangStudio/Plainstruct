@@ -273,6 +273,28 @@
       "category": "布局"
     },
     {
+      "key": "coverFixedRatio",
+      "label": "固定封面图显示比例",
+      "type": "boolean",
+      "default": false,
+      "hint": "开启后卡片封面按下方所选比例裁切显示,不再使用「封面图高度」",
+      "category": "布局"
+    },
+    {
+      "key": "coverRatio",
+      "label": "封面比例",
+      "type": "select",
+      "default": "16:9",
+      "options": [
+        "16:9",
+        "3:2",
+        "4:3",
+        "1:1"
+      ],
+      "visibleIf": { "key": "coverFixedRatio", "equals": true },
+      "category": "布局"
+    },
+    {
       "key": "homeWidthPct",
       "label": "主页卡片流宽度(%)",
       "type": "number",

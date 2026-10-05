@@ -1624,3 +1624,43 @@ body[data-toc-style="极简"] .blog-toc-item a:hover::after,
 body[data-toc-style="极简"] .blog-toc-item a:focus-visible::after {
   transform: scaleX(1);
 }
+
+/* 固定封面图显示比例:开启后封面(含占位块)按所选比例裁切,不再使用封面高度;
+   关闭时维持「封面图高度」的固定像素 */
+body[data-cover-fixed="true"] .blog-entry-cover img,
+body[data-cover-fixed="true"] .blog-entry-cover-empty {
+  height: auto;
+  aspect-ratio: 16 / 9;
+}
+body[data-cover-fixed="true"][data-cover-ratio="3:2"] .blog-entry-cover img,
+body[data-cover-fixed="true"][data-cover-ratio="3:2"] .blog-entry-cover-empty {
+  aspect-ratio: 3 / 2;
+}
+body[data-cover-fixed="true"][data-cover-ratio="4:3"] .blog-entry-cover img,
+body[data-cover-fixed="true"][data-cover-ratio="4:3"] .blog-entry-cover-empty {
+  aspect-ratio: 4 / 3;
+}
+body[data-cover-fixed="true"][data-cover-ratio="1:1"] .blog-entry-cover img,
+body[data-cover-fixed="true"][data-cover-ratio="1:1"] .blog-entry-cover-empty {
+  aspect-ratio: 1 / 1;
+}
+
+/* 主页分类卡片流:组标题可点击进入分类落地页,组内复用文章卡片流 */
+.blog-group {
+  margin-top: 40px;
+}
+.blog-group-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+.blog-group-title a {
+  color: inherit;
+  text-decoration: none;
+}
+.blog-group-title a:hover {
+  color: var(--ps-accent);
+}
+.blog-group .blog-stream {
+  margin-top: 18px;
+}

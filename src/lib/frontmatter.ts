@@ -1,5 +1,6 @@
-/** 素构识别的配置头字段(写回时以表单值为准重建这些行) */
-export const FM_KEYS = ["title", "description", "date", "order", "cover", "author", "aigc", "hidden"];
+/** 素构识别的配置头字段(写回时以表单值为准重建这些行;表单未管理的字段
+ *  不在此列 —— 用户手写的行原样保留,如 order) */
+export const FM_KEYS = ["title", "description", "date", "cover", "author", "aigc", "hidden", "homegroups", "homeposts"];
 
 /** AIGC 声明:present = 存在 AIGC,none = 无任何 AIGC;缺省(不写字段)即不显示声明 */
 export type AigcDeclaration = "none" | "present";
@@ -10,7 +11,19 @@ export type AigcDeclaration = "none" | "present";
  */
 export function applyFrontMatter(
   content: string,
-  values: { title?: string; description?: string; date?: string; cover?: string; author?: string; aigc?: AigcDeclaration | ""; hidden?: boolean },
+  values: {
+    title?: string;
+    description?: string;
+    date?: string;
+    cover?: string;
+    author?: string;
+    aigc?: AigcDeclaration | "";
+    hidden?: boolean;
+    /** 博客主页(根 index.md)专属:卡片流按分类分组 */
+    homeGroups?: boolean;
+    /** 博客主页专属:卡片流只显示这些文章(content/ 相对路径);空数组 = 显示全部 */
+    homePosts?: string[];
+  },
 ): string {
   const fields = [
     ...(values.title?.trim() ? [`title: ${values.title.trim()}`] : []),
@@ -20,6 +33,8 @@ export function applyFrontMatter(
     ...(values.author?.trim() ? [`author: ${values.author.trim()}`] : []),
     ...(values.aigc === "none" || values.aigc === "present" ? [`aigc: ${values.aigc}`] : []),
     ...(values.hidden ? ["hidden: true"] : []),
+    ...(values.homeGroups ? ["homeGroups: true"] : []),
+    ...(values.homePosts?.length ? [`homePosts: ${values.homePosts.join(", ")}`] : []),
   ];
   const m = content.match(/^---\r?\n([\s\S]*?)\r?\n(?:---|\.\.\.)(?:\r?\n|$)/);
   if (!m) {
@@ -47,6 +62,10 @@ export interface FrontMatter {
   aigc?: AigcDeclaration;
   /** 隐藏文档:不进文章流与导航、不入搜索索引,仅可通过链接访问 */
   hidden?: boolean;
+  /** 博客主页(根 index.md)专属:卡片流按分类分组(分类 = 顶层文件夹) */
+  homeGroups?: boolean;
+  /** 博客主页专属:卡片流只显示这些文章(content/ 相对路径,逗号分隔) */
+  homePosts?: string[];
 }
 
 export interface ParsedDoc {
@@ -85,6 +104,11 @@ export function parseFrontMatter(src: string): ParsedDoc {
       if (value === "none" || value === "present") data.aigc = value;
     } else if (key === "hidden") {
       if (value === "true" || value === "1") data.hidden = true;
+    } else if (key === "homegroups") {
+      if (value === "true" || value === "1") data.homeGroups = true;
+    } else if (key === "homeposts") {
+      const list = value.split(",").map((s) => s.trim()).filter(Boolean);
+      if (list.length) data.homePosts = list;
     }
   }
   // 结束围栏缺失时视为普通正文,不吞内容

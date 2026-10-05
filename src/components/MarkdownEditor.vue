@@ -322,7 +322,14 @@ function frontMatterEnd(doc: Text): number | null {
 /* ---------- 配置头可视化编辑:表单弹窗(FrontMatterModal),确认后就地写回 ---------- */
 
 const fmOpen = ref(false);
-const fmInitial: FrontMatterForm = reactive({ title: "", description: "", date: "", cover: "", author: "", aigc: "", hidden: false });
+const fmInitial: FrontMatterForm = reactive({ title: "", description: "", date: "", cover: "", author: "", aigc: "", hidden: false, homeGroups: false, homePosts: [] });
+
+/** 博客主页(根 index.md)配置区数据:候选文章列表;非博客或非主页为 null */
+const blogHomeOptions = computed(() => {
+  const opts = site.blogHomePostOptions;
+  if (!opts || !editor.activePath || editor.activePath.toLowerCase() !== "index.md") return null;
+  return { posts: opts };
+});
 
 /** 当前文档位置引用站点资产的路径前缀(根级 asset/…,子目录 ../asset/…) */
 function coverPrefix(): string {
@@ -348,6 +355,11 @@ function openFmEditor() {
   fmInitial.author = parsed.data.author ?? "";
   fmInitial.aigc = parsed.data.aigc ?? "";
   fmInitial.hidden = parsed.data.hidden === true;
+  // 主页配置区预填:已有 homePosts 按其勾选,否则全勾(= 显示全部)
+  const opts = blogHomeOptions.value?.posts;
+  const isHomeDoc = !!opts;
+  fmInitial.homeGroups = isHomeDoc && parsed.data.homeGroups === true;
+  fmInitial.homePosts = isHomeDoc ? (parsed.data.homePosts ?? opts!.map((o) => o.path)) : [];
   fmOpen.value = true;
 }
 
@@ -904,6 +916,7 @@ defineExpose({
       :open="fmOpen"
       :doc-path="editor.activePath ?? ''"
       :initial="fmInitial"
+      :blog-home="blogHomeOptions"
       @confirm="writeFrontMatter"
       @cancel="fmOpen = false"
     />

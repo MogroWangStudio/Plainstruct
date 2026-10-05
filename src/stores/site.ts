@@ -1,10 +1,11 @@
 import { defineStore } from "pinia";
 import { ipc } from "@/ipc/ipc";
 import type { SiteConfig, SitePluginEntry, SitePluginFiles, TreeNode } from "@/ipc/types";
-import { collectDocPaths, type DocsCache } from "@/lib/builder";
+import { collectDocPaths, walkTree, type DocsCache } from "@/lib/builder";
 import { enabledPlugins, normalizePlugins } from "@/lib/plugins";
 import { remapDocRefsForMove } from "@/lib/imageRefs";
-import { dirname, isAssetDirName, isImageFile } from "@/lib/paths";
+import { basename, dirname, isAssetDirName, isImageFile, isMarkdown, stripExt } from "@/lib/paths";
+import { parseFrontMatter } from "@/lib/frontmatter";
 import { useEditorStore } from "./editor";
 import { useBuilderStore } from "./builder";
 import { useThemeStore } from "./theme";
@@ -35,6 +36,21 @@ export const useSiteStore = defineStore("site", {
   }),
 
   getters: {
+    /** 博客主页配置头的候选文章(全部非隐藏文章,排除各级 index.md;标题取配置头或文件名)。
+     *  非博客站点返回 null —— 配置头弹窗据此显示/隐藏「主页」配置区 */
+    blogHomePostOptions(state): { title: string; path: string }[] | null {
+      if ((state.config?.siteType ?? "docs") !== "blog") return null;
+      const out: { title: string; path: string }[] = [];
+      walkTree(state.tree, (node) => {
+        if (node.type !== "file" || !isMarkdown(node.path)) return;
+        if (basename(node.path).toLowerCase() === "index.md") return;
+        const { data } = parseFrontMatter(state.docsCache[node.path] ?? "");
+        if (data.hidden === true) return;
+        out.push({ title: data.title ?? stripExt(node.name), path: node.path });
+      });
+      return out;
+    },
+
     docCount(state): number {
       const count = (nodes: TreeNode[]): number =>
         nodes.reduce(

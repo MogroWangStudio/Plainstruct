@@ -22,6 +22,10 @@ export interface FrontMatterForm {
   aigc: "" | "none" | "present";
   /** 隐藏文档:不进文章流/导航/搜索索引,仅可通过链接访问 */
   hidden: boolean;
+  /** 博客主页专属:卡片流按分类分组(仅主页配置区展示) */
+  homeGroups: boolean;
+  /** 博客主页专属:勾选显示的文章(content/ 相对路径);空数组 = 显示全部 */
+  homePosts: string[];
 }
 
 const props = defineProps<{
@@ -30,6 +34,8 @@ const props = defineProps<{
   docPath: string;
   /** 打开时的预填值(通常来自文档现有配置头) */
   initial: FrontMatterForm;
+  /** 博客主页(根 index.md)的配置区:候选文章列表;null = 非主页,不显示该区 */
+  blogHome?: { posts: { title: string; path: string }[] } | null;
 }>();
 
 const emit = defineEmits<{
@@ -41,7 +47,7 @@ const { t } = useI18n();
 const site = useSiteStore();
 const ui = useUiStore();
 
-const form = reactive<FrontMatterForm>({ title: "", description: "", date: "", cover: "", author: "", aigc: "", hidden: false });
+const form = reactive<FrontMatterForm>({ title: "", description: "", date: "", cover: "", author: "", aigc: "", hidden: false, homeGroups: false, homePosts: [] });
 
 /** AIGC 声明三档;选「不显示」时写回不落字段 */
 const aigcOptions = computed(() => [
@@ -49,6 +55,32 @@ const aigcOptions = computed(() => [
   { value: "none", label: t("editor.aigcNone") },
   { value: "present", label: t("editor.aigcPresent") },
 ]);
+
+/* ---------- 博客主页配置区(仅根 index.md) ---------- */
+
+/** 候选文章是否全部勾选(全勾/全不勾都等价于「显示全部」,写回时不落字段) */
+const allPostsSelected = computed(
+  () => (props.blogHome?.posts.length ?? 0) > 0 && form.homePosts.length === props.blogHome!.posts.length,
+);
+
+function togglePost(path: string, checked: boolean) {
+  const set = new Set(form.homePosts);
+  if (checked) set.add(path);
+  else set.delete(path);
+  form.homePosts = [...set];
+}
+
+function toggleAllPosts(checked: boolean) {
+  form.homePosts = checked ? (props.blogHome?.posts ?? []).map((p) => p.path) : [];
+}
+
+/** 确认:主页字段仅在「部分勾选」时落盘 —— 全勾/全不勾与未配置同义(显示全部) */
+function confirmForm() {
+  const all = props.blogHome?.posts ?? [];
+  const selected = all.length ? form.homePosts.filter((p) => all.some((a) => a.path === p)) : [];
+  const homePosts = selected.length > 0 && selected.length < all.length ? selected : [];
+  emit("confirm", { ...form, homePosts });
+}
 
 watch(
   () => props.open,
@@ -129,10 +161,68 @@ async function importCover() {
         </datalist>
       </label>
       <p class="text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("editor.fmHint") }}</p>
+
+      <!-- 博客主页专属配置区:卡片流分类分组与显示文章(仅根 index.md 显示) -->
+      <template v-if="blogHome">
+        <div class="my-1 border-t border-line" />
+        <p class="field-label">{{ t("editor.fmHomeSection") }}</p>
+        <label class="flex cursor-pointer items-center gap-2">
+          <input
+            type="checkbox"
+            class="checkbox-input"
+            :checked="form.homeGroups"
+            @change="form.homeGroups = ($event.target as HTMLInputElement).checked"
+          />
+          <span class="text-[calc(13px*var(--ui-font-scale))] text-ink-2">{{ t("editor.fmHomeGroups") }}</span>
+        </label>
+        <p class="opt-hint">{{ t("editor.fmHomeGroupsHint") }}</p>
+        <div>
+          <div class="flex items-center justify-between">
+            <span class="field-label">{{ t("editor.fmHomePosts") }}</span>
+            <label class="flex cursor-pointer items-center gap-1.5 text-[calc(12.5px*var(--ui-font-scale))] text-ink-2">
+              <input
+                type="checkbox"
+                class="checkbox-input"
+                :checked="allPostsSelected"
+                @change="toggleAllPosts(($event.target as HTMLInputElement).checked)"
+              />
+              {{ t("editor.fmHomeSelectAll") }}
+            </label>
+          </div>
+          <div class="fm-post-list mt-1.5">
+            <label
+              v-for="p in blogHome.posts"
+              :key="p.path"
+              class="flex cursor-pointer items-center gap-2 rounded px-1 py-1 text-[calc(12.5px*var(--ui-font-scale))] text-ink-2 hover:bg-surface-2"
+            >
+              <input
+                type="checkbox"
+                class="checkbox-input"
+                :checked="form.homePosts.includes(p.path)"
+                @change="togglePost(p.path, ($event.target as HTMLInputElement).checked)"
+              />
+              <span class="truncate">{{ p.title }}</span>
+            </label>
+          </div>
+          <p class="opt-hint">{{ t("editor.fmHomePostsHint") }}</p>
+        </div>
+      </template>
     </div>
     <template #footer>
       <button class="btn btn-secondary" @click="emit('cancel')">{{ t("common.cancel") }}</button>
-      <button class="btn btn-primary" @click="emit('confirm', { ...form })">{{ t("common.save") }}</button>
+      <button class="btn btn-primary" @click="confirmForm">{{ t("common.save") }}</button>
     </template>
   </Modal>
 </template>
+
+<style scoped>
+/* 主页文章勾选列表:限高滚动,避免长文章流撑爆弹窗 */
+.fm-post-list {
+  max-height: 216px;
+  overflow-y: auto;
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  background: var(--color-surface-2);
+  padding: 6px;
+}
+</style>

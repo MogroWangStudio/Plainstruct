@@ -363,7 +363,9 @@ function findNodeByPath(path: string): TreeNode | null {
 
 const fmOpen = ref(false);
 const fmTarget = ref("");
-const fmInitial = reactive<FrontMatterForm>({ title: "", description: "", date: "", cover: "", author: "", aigc: "", hidden: false });
+/** 主页配置区数据:目标是博客根 index.md 时为候选文章列表,否则 null */
+const fmBlogHome = ref<{ posts: { title: string; path: string }[] } | null>(null);
+const fmInitial = reactive<FrontMatterForm>({ title: "", description: "", date: "", cover: "", author: "", aigc: "", hidden: false, homeGroups: false, homePosts: [] });
 
 /** 打开配置头表单:当前打开的文档取编辑器内容(含未保存修改),其余读磁盘版本 */
 async function openFmEditor(node: TreeNode) {
@@ -380,6 +382,12 @@ async function openFmEditor(node: TreeNode) {
   fmInitial.author = parsed.data.author ?? "";
   fmInitial.aigc = parsed.data.aigc ?? "";
   fmInitial.hidden = parsed.data.hidden === true;
+  // 主页配置区预填:已有 homePosts 按其勾选,否则全勾(= 显示全部)
+  const opts = site.blogHomePostOptions;
+  const isHomeDoc = !!opts && node.path.toLowerCase() === "index.md";
+  fmBlogHome.value = isHomeDoc ? { posts: opts } : null;
+  fmInitial.homeGroups = isHomeDoc && parsed.data.homeGroups === true;
+  fmInitial.homePosts = isHomeDoc ? (parsed.data.homePosts ?? opts!.map((o) => o.path)) : [];
   fmOpen.value = true;
 }
 
@@ -848,6 +856,7 @@ async function onTreeDrop(e: DragEvent) {
       :open="fmOpen"
       :doc-path="fmTarget"
       :initial="fmInitial"
+      :blog-home="fmBlogHome"
       @confirm="onFmConfirm"
       @cancel="fmOpen = false"
     />
