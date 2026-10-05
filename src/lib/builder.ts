@@ -20,15 +20,23 @@ import {
   type SearchPage,
 } from "./plugins";
 import psBlogJs from "@/plugins/ps-blog.js?raw";
+import psBlogCss from "@/plugins/ps-blog.css?raw";
 
-/** 站点行为运行时:head 引导(ps-js,首帧前标记 JS 可用)+ body 末尾行为脚本
- *  (目录高亮/点按动画/顶栏/置顶/加载指示)。组页时注入而非写死在主题模板:
- *  构建产物与预览同源生效,自定义主题的旧模板快照同样获得最新行为与修复。 */
+/** 站点行为运行时:head 引导(ps-js,首帧前标记 JS 可用)+ 共享功能样式
+ *  (ps-blog:归档页/文件夹页/分类分组/封面比例 —— 注入到主题样式链接之前,
+ *  让主题自身的同名规则仍可覆盖)+ body 末尾行为脚本。
+ *  组页时注入而非写死在主题模板:构建产物与预览同源生效,自定义主题的
+ *  旧模板/旧样式快照同样获得最新行为与样式。 */
 const PS_BOOT_TAG = '<script>document.documentElement.classList.add("ps-js");</script>\n';
+const PS_STYLE_TAG = `<style id="ps-blog-css">\n${psBlogCss}\n</style>\n`;
 const PS_BEHAVIOR_TAG = `<script>\n${psBlogJs}\n</script>\n`;
 
 function injectSiteBehavior(html: string): string {
   let out = html;
+  // 共享样式插到主题样式链接之前(保证主题自定义可覆盖);
+  // mock 预览的内联化发生在注入之后,顺序保持不变
+  const link = out.search(/<link\b/i);
+  if (link >= 0) out = out.slice(0, link) + PS_STYLE_TAG + out.slice(link);
   const headEnd = out.lastIndexOf("</head>");
   if (headEnd >= 0) out = out.slice(0, headEnd) + PS_BOOT_TAG + out.slice(headEnd);
   else out = PS_BOOT_TAG + out;
