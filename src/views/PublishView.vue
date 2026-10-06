@@ -122,6 +122,9 @@ watch(
 
 const canPublish = computed(() => Boolean(publish.config.owner && publish.config.repo && publish.config.token && builder.report));
 
+/** 发布成功且不在发布中:主按钮转绿色打勾,浮现「重新发布」 */
+const publishDone = computed(() => Boolean(publish.result && !publish.syncing));
+
 const progressPct = computed(() =>
   publish.progress && publish.progress.total > 0
     ? Math.round((publish.progress.done / publish.progress.total) * 100)
@@ -144,7 +147,7 @@ function openPages() {
       <section class="panel p-6">
         <div class="flex flex-col gap-5">
           <!-- 账户类型:决定所有者字段填的是什么,也决定自动建仓打到哪个 GitHub 接口 -->
-          <div>
+          <div class="flex flex-col items-center text-center">
             <label class="field-label">{{ t("publish.accountType") }}</label>
             <div class="segmented" role="group" :aria-label="t('publish.accountType')">
               <span class="segmented-pill" :class="{ right: isOrg }" aria-hidden="true" />
@@ -247,22 +250,28 @@ function openPages() {
       <!-- 发布 -->
       <section class="panel p-6">
         <div class="flex flex-col items-center gap-2">
-          <!-- 发布按钮:居中加宽;发布中为非线性旋转;成功后变为「重新发布」 -->
-          <button
-            class="btn btn-primary publish-btn"
-            :class="{ 'is-busy': publish.syncing }"
-            :disabled="!canPublish || publish.syncing"
-            @click="publish.sync()"
-          >
-            <template v-if="publish.syncing">
-              <span class="spin-arc" aria-hidden="true" />
-              {{ t("publish.publishing") }}
-            </template>
-            <template v-else>
-              <AppIcon :name="publish.result ? 'refresh' : 'upload'" :size="15" />
-              {{ publish.result ? t("publish.republish") : t("publish.publish") }}
-            </template>
-          </button>
+          <!-- 发布按钮:圆形大号;发布中圆环循环扩散,成功转绿色打勾并浮现「重新发布」 -->
+          <div class="publish-orb-wrap">
+            <span v-if="publish.syncing" class="orb-ripple" aria-hidden="true" />
+            <span v-if="publish.syncing" class="orb-ripple orb-ripple-late" aria-hidden="true" />
+            <button
+              class="publish-orb"
+              :class="{ done: publishDone }"
+              :disabled="!canPublish || publish.syncing"
+              :aria-label="publishDone ? t('publish.done') : t('publish.publish')"
+              @click="publish.sync()"
+            >
+              <AppIcon :name="publishDone ? 'check' : 'upload'" :size="30" />
+            </button>
+          </div>
+          <p class="orb-label" :class="{ ok: publishDone }">
+            {{ publish.syncing ? t("publish.publishing") : publishDone ? t("publish.done") : t("publish.publish") }}
+          </p>
+          <Transition name="pop">
+            <button v-if="publishDone" class="orb-republish" :title="t('publish.republish')" @click="publish.sync()">
+              <AppIcon name="refresh" :size="16" />
+            </button>
+          </Transition>
           <span v-if="!builder.report && !publish.syncing" class="text-[calc(12.5px*var(--ui-font-scale))] text-ink-3">{{ t("publish.buildFirst") }}</span>
         </div>
 
@@ -413,10 +422,111 @@ function openPages() {
   }
 }
 
-/* 发布按钮:居中加宽,发布中带非线性旋转弧 */
-.publish-btn {
-  min-width: 240px;
-  justify-content: center;
+/* 发布按钮:圆形大号,发布中圆环循环扩散(非线性缓出),成功转绿色打勾 */
+.publish-orb-wrap {
+  position: relative;
+  display: grid;
+  place-items: center;
+  margin-top: 4px;
+}
+.publish-orb {
+  display: grid;
+  place-items: center;
+  width: 92px;
+  height: 92px;
+  border: none;
+  border-radius: 50%;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  cursor: pointer;
+  box-shadow: 0 12px 30px color-mix(in srgb, var(--color-accent) 32%, transparent);
+  transition:
+    transform 280ms var(--ease-pop),
+    background-color 260ms var(--ease-plain),
+    box-shadow 320ms var(--ease-plain),
+    opacity 200ms ease;
+}
+.publish-orb:hover:not(:disabled) {
+  transform: scale(1.05);
+}
+.publish-orb:active:not(:disabled) {
+  transform: scale(0.95);
+}
+.publish-orb:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.publish-orb.done {
+  background: var(--color-ok);
+  box-shadow: 0 12px 30px color-mix(in srgb, var(--color-ok) 32%, transparent);
+}
+/* 扩散环:两道错相的圆环从按钮向外扩散,提示发布进行中 */
+.orb-ripple {
+  position: absolute;
+  width: 92px;
+  height: 92px;
+  border: 2px solid var(--color-accent);
+  border-radius: 50%;
+  pointer-events: none;
+  animation: orb-ripple 1700ms var(--ease-plain) infinite;
+}
+.orb-ripple-late {
+  animation-delay: 850ms;
+}
+@keyframes orb-ripple {
+  0% {
+    transform: scale(1);
+    opacity: 0.65;
+  }
+  100% {
+    transform: scale(2.05);
+    opacity: 0;
+  }
+}
+.orb-label {
+  margin: 0;
+  font-size: calc(13px * var(--ui-font-scale));
+  font-weight: 550;
+  color: var(--color-ink-2);
+}
+.orb-label.ok {
+  color: var(--color-ok);
+}
+/* 重新发布:成功后浮现的圆形次级按钮 */
+.orb-republish {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-top: 2px;
+  border: 1px solid var(--color-line);
+  border-radius: 50%;
+  background: var(--color-surface);
+  color: var(--color-ink-2);
+  cursor: pointer;
+  transition:
+    transform 260ms var(--ease-pop),
+    background-color 180ms ease,
+    color 180ms ease,
+    border-color 180ms ease;
+}
+.orb-republish:hover {
+  background: var(--color-surface-2);
+  color: var(--color-ink);
+  border-color: var(--color-accent);
+}
+.orb-republish:active {
+  transform: scale(0.94);
+}
+@media (prefers-reduced-motion: reduce) {
+  .orb-ripple {
+    animation: none;
+    opacity: 0;
+  }
+  .publish-orb,
+  .orb-republish {
+    transition: none;
+  }
 }
 
 /* 非线性加载弧:两段式加减速旋转(先快后缓再收),比匀速旋转更有节奏 */

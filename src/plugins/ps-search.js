@@ -50,14 +50,23 @@
     return n;
   }
 
-  function build() {
-    var entryInput = null;
-    var entry = document.createElement("div");
-    if (entryStyle === "bar") {
-      // 长条搜索框:入口直接输入文本,点搜索按钮(或回车)后才弹出结果面板
+  /* ---------- 入口:形式(按钮/搜索框)与位置随 PC / 移动端配置各自挂载 ---------- */
+  var entry = null;
+  var entryInput = null;
+  var mqMobile = null;
+
+  function mountEntry() {
+    if (entry) entry.remove();
+    entryInput = null;
+    var mobile = Boolean(mqMobile && mqMobile.matches);
+    var style = mobile && entryStyleM ? entryStyleM : entryStyle;
+    var pos = mobile && entryPositionM ? entryPositionM : entryPosition;
+
+    entry = document.createElement(style === "bar" ? "div" : "button");
+    if (style === "bar") {
+      // 长条搜索框:入口直接输入文本,点右侧搜索按钮(或回车)后才弹出结果面板
       entry.className = "ps-search-entry ps-search-bar";
       entry.setAttribute("role", "search");
-      entry.innerHTML = ICON.replace('width="20" height="20"', 'width="15" height="15"');
       entryInput = el("input", "ps-search-field", entry);
       entryInput.type = "text";
       entryInput.placeholder = T.placeholder;
@@ -75,46 +84,46 @@
         e.stopPropagation(); // 不冒泡到入口的聚焦处理,避免与结果面板抢焦点
         submitEntry(entryInput);
       });
-    } else {
-      entry.className = "ps-search-entry ps-search-fab";
-      entry.innerHTML = ICON;
-    }
-    entry.id = "ps-search-fab";
-    entry.setAttribute("aria-label", T.openAria);
-    if (entryStyle === "bar") {
       // 点击胶囊空白处只聚焦输入框,不再直接开面板
       entry.addEventListener("click", function () { entryInput.focus(); });
     } else {
+      entry.className = "ps-search-entry ps-search-fab";
+      entry.innerHTML = ICON;
       entry.addEventListener("click", function () { show(); });
     }
+    entry.id = "ps-search-fab";
+    entry.setAttribute("aria-label", T.openAria);
 
-    if (entryPosition === "top") {
+    if (pos === "top") {
       // 顶栏最右侧:博客并入主题顶栏;文档主题(有 .ps-sidebar)在 PC 端改入侧栏、
-      // 站点标题下方整行展示,窄屏(≤900px 侧栏折叠时)回到顶栏 —— 随断点迁移
-      var mqDesktop = window.matchMedia("(min-width: 900px)");
-      var reposition = function () {
-        var sidebar = document.querySelector(".ps-sidebar");
-        var nav = sidebar ? sidebar.querySelector(".ps-nav") : null;
-        var bar = document.querySelector(".blog-topbar, .ps-topbar, header");
-        entry.classList.remove("ps-in-topbar", "ps-in-sidebar", "ps-pos-top");
-        if (sidebar && nav && mqDesktop.matches) {
-          entry.classList.add("ps-in-sidebar");
-          sidebar.insertBefore(entry, nav);
-        } else if (bar) {
-          entry.classList.add("ps-in-topbar");
-          bar.appendChild(entry);
-        } else {
-          entry.classList.add("ps-pos-top");
-          document.body.appendChild(entry);
-        }
-      };
-      reposition();
-      try { mqDesktop.addEventListener("change", reposition); } catch (err) { mqDesktop.addListener(reposition); }
+      // 站点标题下方整行展示,窄屏(侧栏折叠时)回到顶栏 —— 断点变化时整体重建
+      var sidebar = document.querySelector(".ps-sidebar");
+      var nav = sidebar ? sidebar.querySelector(".ps-nav") : null;
+      var bar = document.querySelector(".blog-topbar, .ps-topbar, header");
+      var desktop = window.matchMedia("(min-width: 900px)").matches;
+      if (sidebar && nav && desktop) {
+        entry.classList.add("ps-in-sidebar");
+        sidebar.insertBefore(entry, nav);
+      } else if (bar) {
+        entry.classList.add("ps-in-topbar");
+        bar.appendChild(entry);
+      } else {
+        entry.classList.add("ps-pos-top");
+        document.body.appendChild(entry);
+      }
     } else {
-      entry.classList.add(entryPosition === "bl" ? "ps-pos-bl" : "ps-pos-br");
+      entry.classList.add(pos === "bl" ? "ps-pos-bl" : "ps-pos-br");
       document.body.appendChild(entry);
     }
     requestAnimationFrame(function () { entry.classList.add("ps-ready"); });
+  }
+
+  function build() {
+    // 入口可随双端断点重建:形式与位置在 PC / 移动端各自独立
+    var bp = document.querySelector(".ps-sidebar") ? 900 : 640; // 文档主题与博客主题的移动断点
+    mqMobile = window.matchMedia("(max-width: " + bp + "px)");
+    mountEntry();
+    try { mqMobile.addEventListener("change", mountEntry); } catch (err) { mqMobile.addListener(mountEntry); }
 
     overlay = el("div", "", document.body);
     overlay.id = "ps-search-overlay";
@@ -317,9 +326,15 @@
     input.blur();
   }
 
-  /* ---------- 启动:数据源/根前缀/入口形式与位置来自注入的 script 标签 ---------- */
+  /* ---------- 启动:数据源/根前缀/入口形式与位置来自注入的 script 标签;
+     形式与位置支持 PC / 移动端双端独立,移动端未设置时沿用 PC 配置 ---------- */
   var entryStyle = "button";   // button | bar
   var entryPosition = "br";    // br | bl | top
+  var entryStyleM = null;      // 移动端形式,缺省沿用 PC
+  var entryPositionM = null;   // 移动端位置,缺省沿用 PC
+  function readPos(raw) {
+    return raw === "bottom-left" ? "bl" : raw === "topbar" ? "top" : "br";
+  }
   function start() {
     var me = document.currentScript;
     if (!me) {
@@ -330,14 +345,18 @@
       indexUrl = me.getAttribute("data-index-url") || "";
       rootPrefix = me.getAttribute("data-root-prefix") || "";
       entryStyle = me.getAttribute("data-style") === "bar" ? "bar" : "button";
-      var pos = me.getAttribute("data-position");
-      entryPosition = pos === "bottom-left" ? "bl" : pos === "topbar" ? "top" : "br";
+      entryPosition = readPos(me.getAttribute("data-position"));
+      var styleM = me.getAttribute("data-style-m");
+      if (styleM) entryStyleM = styleM === "bar" ? "bar" : "button";
+      var posM = me.getAttribute("data-position-m");
+      if (posM) entryPositionM = readPos(posM);
     }
     // 内联注入通道(mock 预览):壳层经 window.__psSearchCfg 传入
     if (window.__psSearchCfg) {
       if (window.__psSearchCfg.style === "bar") entryStyle = "bar";
-      if (window.__psSearchCfg.position === "bottom-left") entryPosition = "bl";
-      else if (window.__psSearchCfg.position === "topbar") entryPosition = "top";
+      entryPosition = readPos(window.__psSearchCfg.position);
+      if (window.__psSearchCfg.styleM === "bar" || window.__psSearchCfg.styleM === "button") entryStyleM = window.__psSearchCfg.styleM;
+      if (window.__psSearchCfg.positionM) entryPositionM = readPos(window.__psSearchCfg.positionM);
     }
     // 供置顶按钮等同位元素协调避让
     window.__psSearchCorner = entryPosition === "top" ? null : entryPosition;

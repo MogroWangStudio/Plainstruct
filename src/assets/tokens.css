@@ -16,6 +16,7 @@
   /* 强调色/危险色实底上的文字颜色 */
   --color-on-accent: #ffffff;
   --color-danger: #b3261e;
+  --color-ok: #3f9169;
   --color-danger-soft: #fbf1f0;
   --color-danger-strong: #99201a;
   /* 注意色:需要跳出素色层级的一次性提醒(如未保存提示),不参与主题配色 */
@@ -76,6 +77,7 @@
   --color-accent-soft: #2b2825;
   --color-on-accent: #1c1917;
   --color-danger: #e8968d;
+  --color-ok: #7cc9a2;
   --color-danger-soft: #3b2523;
   --color-danger-strong: #d4776e;
   --color-scrim: rgba(0, 0, 0, 0.55);

@@ -390,6 +390,8 @@ export const useSiteStore = defineStore("site", {
       imgPreviewRequireMark?: string;
       searchStyle?: "button" | "bar";
       searchPosition?: "bottom-right" | "bottom-left" | "topbar";
+      searchStyleM?: "button" | "bar";
+      searchPositionM?: "bottom-right" | "bottom-left" | "topbar";
       custom?: SitePluginEntry[];
     }) {
       if (!this.config) return;

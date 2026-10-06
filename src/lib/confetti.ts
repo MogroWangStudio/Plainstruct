@@ -31,18 +31,18 @@ interface Particle {
   life: number;
 }
 
-/** 各档抛洒参数:束位与每束粒数、初速区间、滞空时长、纸片尺寸倍率 */
-const LEVELS: Record<
-  Exclude<ConfettiLevel, "off">,
-  {
-    bursts: { x: number; y: number; dir: number; count: number }[];
-    speedBase: number;
-    speedVar: number;
-    lifeBase: number;
-    lifeVar: number;
-    size: number;
-  }
-> = {
+/** 各档抛洒参数:开场束 + 可选的持续喷射流(流按间隔重复出束) */
+interface LevelSpec {
+  bursts: { x: number; y: number; dir: number; count: number }[];
+  /** 持续喷射流:{x, y, dir, count, every, until} —— every 毫秒一束,until 毫秒后停 */
+  streams?: { x: number; y: number; dir: number; count: number; every: number; until: number }[];
+  speedBase: number;
+  speedVar: number;
+  lifeBase: number;
+  lifeVar: number;
+  size: number;
+}
+const LEVELS: Record<Exclude<ConfettiLevel, "off">, LevelSpec> = {
   light: {
     bursts: [
       { x: 0.12, y: 0.72, dir: 1, count: 20 },
@@ -67,10 +67,17 @@ const LEVELS: Record<
     size: 1,
   },
   grand: {
+    // 夸张档:开场两角斜上 + 之后底部左右与顶部持续对喷,双倍夸张
     bursts: [
       { x: 0.1, y: 0.72, dir: 1, count: 74 },
       { x: 0.9, y: 0.72, dir: -1, count: 74 },
       { x: 0.5, y: 0.82, dir: 0, count: 46 },
+    ],
+    streams: [
+      { x: 0.08, y: 1.04, dir: 1, count: 14, every: 220, until: 1500 },
+      { x: 0.92, y: 1.04, dir: -1, count: 14, every: 220, until: 1500 },
+      { x: 0.2, y: -0.04, dir: 1, count: 10, every: 260, until: 1300 },
+      { x: 0.8, y: -0.04, dir: -1, count: 10, every: 260, until: 1300 },
     ],
     speedBase: 12,
     speedVar: 9,
@@ -146,6 +153,8 @@ export function fireConfetti(level: ConfettiLevel = "standard"): void {
   for (const b of L.bursts) {
     burst(particles, w * b.x, h * b.y, b.dir, b.count, start, L);
   }
+  // 持续喷射流的下一次出束时刻(夸张档:上下对喷)
+  const streamNext = (L.streams ?? []).map(() => start + 260);
 
   let prev = start;
   function frame(now: number) {
@@ -153,6 +162,14 @@ export function fireConfetti(level: ConfettiLevel = "standard"): void {
     const dt = Math.min((now - prev) / (1000 / 60), 3);
     prev = now;
     ctx!.clearRect(0, 0, w, h);
+
+    // 喷射流:到点就从屏外上/下缘再抛一束,直到各自截止
+    (L.streams ?? []).forEach((st, i) => {
+      if (now - start <= st.until && now >= streamNext[i]) {
+        streamNext[i] = now + st.every;
+        burst(particles, w * st.x, h * st.y, st.dir, st.count, now, L);
+      }
+    });
 
     let alive = false;
     for (const p of particles) {

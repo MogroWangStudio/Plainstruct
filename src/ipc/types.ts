@@ -132,6 +132,10 @@ export interface SitePluginsConfig {
   searchStyle?: "button" | "bar";
   /** 搜索入口位置:bottom-right(缺省)/ bottom-left / topbar(顶栏最右侧) */
   searchPosition?: "bottom-right" | "bottom-left" | "topbar";
+  /** 移动端搜索入口形式,缺省沿用 PC 配置 */
+  searchStyleM?: "button" | "bar";
+  /** 移动端搜索入口位置,缺省沿用 PC 配置 */
+  searchPositionM?: "bottom-right" | "bottom-left" | "topbar";
   custom?: SitePluginEntry[];
 }
 

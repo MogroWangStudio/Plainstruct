@@ -335,6 +335,8 @@ const plugins = computed(() =>
         imgPreviewRequireMark: "mws_ps_imgpreview",
         searchStyle: "button",
         searchPosition: "bottom-right",
+        searchStyleM: undefined,
+        searchPositionM: undefined,
         custom: [],
       },
 );
@@ -420,6 +422,36 @@ async function removePlugin(id: string, name: string) {
             ]"
             align="left"
             @update:model-value="(v: string) => site.savePlugins({ searchPosition: v as 'bottom-right' | 'bottom-left' | 'topbar' })"
+          />
+        </label>
+
+        <!-- 移动端独立设置:缺省沿用上方 PC 配置 -->
+        <label class="flex flex-col gap-1">
+          <span class="field-label">{{ t("theme.pluginSearchStyleM") }}</span>
+          <SelectMenu
+            :model-value="plugins.searchStyleM ?? ''"
+            :options="[
+              { value: '', label: t('theme.pluginSearchStyle') + ' · ' + (plugins.searchStyle === 'bar' ? t('theme.pluginSearchStyleBar') : t('theme.pluginSearchStyleButton')) },
+              { value: 'button', label: t('theme.pluginSearchStyleButton') },
+              { value: 'bar', label: t('theme.pluginSearchStyleBar') },
+            ]"
+            align="left"
+            @update:model-value="(v: string) => site.savePlugins({ searchStyleM: (v || undefined) as 'button' | 'bar' | undefined })"
+          />
+          <p class="opt-hint">{{ t("theme.pluginSearchStyleMHint") }}</p>
+        </label>
+        <label class="flex flex-col gap-1">
+          <span class="field-label">{{ t("theme.pluginSearchPositionM") }}</span>
+          <SelectMenu
+            :model-value="plugins.searchPositionM ?? ''"
+            :options="[
+              { value: '', label: t('theme.pluginSearchPosition') + ' · ' + (plugins.searchPosition === 'bottom-right' ? t('theme.pluginSearchPosBr') : plugins.searchPosition === 'bottom-left' ? t('theme.pluginSearchPosBl') : t('theme.pluginSearchPosTop')) },
+              { value: 'bottom-right', label: t('theme.pluginSearchPosBr') },
+              { value: 'bottom-left', label: t('theme.pluginSearchPosBl') },
+              { value: 'topbar', label: t('theme.pluginSearchPosTop') },
+            ]"
+            align="left"
+            @update:model-value="(v: string) => site.savePlugins({ searchPositionM: (v || undefined) as 'bottom-right' | 'bottom-left' | 'topbar' | undefined })"
           />
         </label>
 

@@ -13,6 +13,7 @@ import { useUiStore } from "@/stores/ui";
 import { ipc } from "@/ipc/ipc";
 import type { ConfettiLevel, EditorBreakKey, EditorFontMode, EditorIndentKey, Locale, UiFontMode } from "@/ipc/types";
 import { APP_THEMES, type AppThemeSwatch } from "@/lib/app-themes";
+import { fireConfetti } from "@/lib/confetti";
 import { formatSize } from "@/lib/format";
 import AppIcon from "@/components/AppIcon.vue";
 import SelectMenu from "@/components/SelectMenu.vue";
@@ -656,13 +657,22 @@ function openRelease(url: string) {
                     <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.confetti") }}</p>
                     <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.confettiHint") }}</p>
                   </div>
-                  <SelectMenu
-                    :model-value="app.settings.confetti ?? 'standard'"
-                    :options="confettiOptions"
-                    align="right"
-                    class="shrink-0"
-                    @update:model-value="app.setConfetti($event as ConfettiLevel)"
-                  />
+                  <div class="flex shrink-0 items-center gap-2">
+                    <SelectMenu
+                      :model-value="app.settings.confetti ?? 'standard'"
+                      :options="confettiOptions"
+                      align="right"
+                      @update:model-value="app.setConfetti($event as ConfettiLevel)"
+                    />
+                    <button
+                      type="button"
+                      class="btn-icon !h-8 !w-8"
+                      :title="t('settings.confettiPreview')"
+                      @click="fireConfetti(app.settings.confetti ?? 'standard')"
+                    >
+                      <AppIcon name="eye" :size="15" />
+                    </button>
+                  </div>
                 </div>
 
                 <!-- 弹窗背景模糊 -->
