@@ -641,8 +641,8 @@ async readSiteConfig(): Promise<SiteConfig> {
   },
 
   /** 与 Rust 端行为一致:拖入的文件字节(base64)落至 content/asset/,重名加序号,
-   *  返回实际落盘的 content/ 相对路径;扩展名白名单与 Rust 一致 */
-  async importSiteImageData(name: string, base64: string): Promise<string> {
+   *  返回实际落盘的 content/ 相对路径;仅拒绝可执行类扩展名 */
+  async importSiteAssetData(name: string, base64: string): Promise<string> {
     // 文件名合法化:去掉 Windows 非法字符与控制字符(与 fsutil::safe_name 同规则)
     const clean =
       name
@@ -652,8 +652,8 @@ async readSiteConfig(): Promise<SiteConfig> {
         .replace(/[\u0000-\u001f\u007f]/g, " ")
         .trim() || "untitled";
     const ext = clean.slice(clean.lastIndexOf(".") + 1).toLowerCase();
-    if (!["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(ext)) {
-      throw new Error(`不支持的图片类型:${clean}`);
+    if (["exe", "dll", "bat", "cmd", "com", "msi", "scr", "ps1", "app", "jar", "sh"].includes(ext)) {
+      throw new Error(`不支持的文件类型:${clean}`);
     }
     if (!base64) throw new Error("文件内容为空");
     const dir = "asset";
@@ -667,9 +667,23 @@ async readSiteConfig(): Promise<SiteConfig> {
     let final = clean;
     let i = 2;
     while (taken.has(final)) final = `${stem}-${i++}${suffix}`;
-    files.set(prefix + final, `(站点图片 ${final})`);
+    files.set(prefix + final, `(站点文件 ${final})`);
     touchFile(prefix + final);
     return `${dir}/${final}`;
+  },
+
+  /** 与 Rust 端行为一致:批量导入磁盘文件到 content/asset/(重名加序号),返回实际文件名 */
+  async importSiteAssets(srcPaths: string[]): Promise<string[]> {
+    const names: string[] = [];
+    for (const src of srcPaths) {
+      const name = src.split(/[\\/]/).pop() ?? "";
+      if (!name) continue;
+      const ext = name.slice(name.lastIndexOf(".") + 1).toLowerCase();
+      if (["exe", "dll", "bat", "cmd", "com", "msi", "scr", "ps1", "app", "jar", "sh"].includes(ext)) continue;
+      const imported = await this.importSiteAssetData(name, "c2l0ZQ==");
+      names.push(imported.split("/").pop() ?? imported);
+    }
+    return names;
   },
 
   async clearBuild(_root: string): Promise<void> {

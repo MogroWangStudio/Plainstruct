@@ -1194,3 +1194,28 @@ body[data-hv-pager="底色"] .ps-pager-item:hover {
   transform: none;
   box-shadow: none;
 }
+
+/* ---------- 页脚:说明 / 友情链接 / 构建信息(主题配置按项开关) ---------- */
+
+.ps-footer {
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.ps-footer-note {
+  margin: 0;
+}
+
+.ps-footer-build {
+  margin: 0;
+  font-size: 11.5px;
+}
+
+.ps-footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}

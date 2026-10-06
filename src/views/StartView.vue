@@ -160,7 +160,7 @@ async function openRecent(path: string) {
     <Teleport to="body">
       <Transition name="modal">
         <div v-if="showWizard" class="fixed inset-0 z-50 flex items-center justify-center p-6">
-          <div class="absolute inset-0 bg-[var(--color-scrim)]" @click="showWizard = false" />
+          <div class="modal-scrim absolute inset-0" />
           <div class="modal-card panel relative max-h-[calc(100vh-80px)] w-full max-w-[440px] overflow-y-auto shadow-window">
             <header class="px-6 pb-2 pt-5">
               <h2 class="text-[calc(16px*var(--ui-font-scale))] font-semibold">{{ t("wizard.title") }}</h2>

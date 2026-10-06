@@ -54,6 +54,54 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* 长条搜索框:入口即输入框 + 搜索按钮;输入不弹面板,回车/点击后才出结果 */
+.ps-search-bar .ps-search-field {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  outline: none;
+}
+.ps-search-bar .ps-search-field::placeholder {
+  color: inherit;
+  opacity: 0.55;
+}
+.ps-search-bar .ps-search-go {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+.ps-search-bar .ps-search-go:hover {
+  background: rgba(125, 125, 125, 0.18);
+}
+/* 文档主题 PC 端:并入侧栏,站点标题下方整行展示(窄屏随断点迁回顶栏) */
+.ps-search-entry.ps-in-sidebar {
+  position: static;
+  opacity: 1;
+  transform: none;
+  margin: 14px 8px 0;
+  width: auto;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  box-shadow: none;
+}
+.ps-search-bar.ps-in-sidebar {
+  width: auto;
+}
 .ps-pos-br {
   right: 18px;
   bottom: 18px;

@@ -15,6 +15,14 @@ export function isImageFile(p: string): boolean {
   return /\.(png|jpe?g|gif|webp|svg|avif|bmp|ico)$/i.test(p);
 }
 
+/** 资产导入拒绝的可执行扩展名:静态站资产只做展示与下载,不收可执行内容 */
+const ASSET_IMPORT_BLOCKLIST = /\.(exe|dll|bat|cmd|com|msi|scr|ps1|app|jar|sh)$/i;
+
+/** 是否为可导入资产页的文件(不限于图片;仅拒绝可执行类) */
+export function isImportableAsset(p: string): boolean {
+  return !ASSET_IMPORT_BLOCKLIST.test(p);
+}
+
 /** 站点资产目录名(新建站点用 asset,旧站点的 images 仍兼容识别) */
 export const ASSET_DIR = "asset";
 

@@ -45,6 +45,8 @@ export interface AppSettings {
   editorIndentWidth?: number;
   /** 发布成功彩带程度,默认 standard(标准) */
   confetti?: ConfettiLevel;
+  /** 弹窗遮罩的背景模糊,默认开启;个性化设置可关 */
+  modalBlur?: boolean;
 }
 
 export interface RecentSite {

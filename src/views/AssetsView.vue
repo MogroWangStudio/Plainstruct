@@ -6,7 +6,7 @@ import { useI18n } from "vue-i18n";
 import { collectDocPaths } from "@/lib/builder";
 import { formatSize } from "@/lib/format";
 import { moveImageRefs, countImageRefs, findImageRefs, replaceImageRefs, type ImageRef } from "@/lib/imageRefs";
-import { basename, dirname, ASSET_MIME } from "@/lib/paths";
+import { basename, dirname, ASSET_MIME, isImageFile, isImportableAsset } from "@/lib/paths";
 import { siteUrl } from "@/lib/preview";
 import { toCssPx } from "@/lib/scale";
 import { ipc } from "@/ipc/ipc";
@@ -30,20 +30,29 @@ const images = computed<TreeNode[]>(() => site.assetGroups.flatMap((g) => g.imag
 
 /* ---------- 导入:右上角按钮选取 / 拖入文件快速导入 ---------- */
 
-/** 可导入的图片扩展名(与后端 import_site_image_data 的白名单一致) */
-const IMPORT_EXTS = ["png", "jpg", "jpeg", "gif", "webp", "svg"];
+/** 文件名是否可导入(仅拒绝可执行类,图片/文档/音视频等均可作为站点资产) */
+function importable(name: string): boolean {
+  return isImportableAsset(name);
+}
 
-/** 右上角导入按钮:选取图片文件,统一复制到站点 asset 文件夹 */
+/** 非图片文件的缩略占位:显示大写扩展名(无扩展名显示「文件」) */
+function fileBadge(name: string): string {
+  if (isImageFile(name)) return name;
+  const ext = name.slice(name.lastIndexOf(".") + 1);
+  return ext && ext !== name ? ext.toUpperCase() : "文件";
+}
+
+/** 右上角导入按钮:选取文件,统一复制到站点 asset 文件夹(不限图片类型) */
 async function importFromPicker() {
-  const files = await ipc.pickImages();
+  const files = await ipc.pickAssetFiles();
   if (!files?.length) return;
   try {
-    const names = await site.importSiteImages(files);
+    const names = await site.importSiteAssets(files);
     if (!names.length) {
       ui.toast(t("assets.importEmpty"), "info");
       return;
     }
-    // 选中刚导入的图片:详情面板即现预览,可顺手移动到子文件夹
+    // 选中刚导入的文件:详情面板即现信息,可顺手移动到子文件夹
     selected.value = names.map((n) => `${site.assetDirs[0]?.path ?? "asset"}/${n}`);
     ui.toast(t("assets.importedCount", { n: names.length }), "success");
   } catch (e) {
@@ -87,16 +96,16 @@ function onRootDrop(e: DragEvent) {
 async function importDroppedFiles(files: FileList | null | undefined) {
   const list = Array.from(files ?? []);
   if (!list.length) return;
-  const ok = list.filter((f) => IMPORT_EXTS.includes(f.name.split(".").pop()?.toLowerCase() ?? ""));
+  const ok = list.filter((f) => importable(f.name));
   const skipped = list.length - ok.length;
   if (!ok.length) {
     ui.toast(t("assets.importUnsupported"), "error");
     return;
   }
   try {
-    // 逐张读取字节后交给后端落盘:WebView 拿不到拖入文件的磁盘路径,字节是唯一通路
+    // 逐个读取字节后交给后端落盘:WebView 拿不到拖入文件的磁盘路径,字节是唯一通路
     const paths: string[] = [];
-    for (const f of ok) paths.push(await site.importSiteImageData(f.name, await fileToBase64(f)));
+    for (const f of ok) paths.push(await site.importSiteAssetData(f.name, await fileToBase64(f)));
     selected.value = paths;
     ui.toast(
       skipped
@@ -734,13 +743,13 @@ async function removeFolder(g: { dir: string; label: string; images: TreeNode[] 
             >
               <span class="row-thumb">
                 <img
-                  v-if="thumbUrl(img.path) && !brokenThumbs.has(img.path)"
+                  v-if="isImageFile(img.name) && thumbUrl(img.path) && !brokenThumbs.has(img.path)"
                   :src="thumbUrl(img.path)"
                   :alt="img.name"
                   loading="lazy"
                   @error="brokenThumbs.add(img.path)"
                 />
-                <span v-else class="thumb-fallback">{{ img.name }}</span>
+                <span v-else class="thumb-fallback">{{ fileBadge(img.name) }}</span>
               </span>
               <span class="min-w-0 flex-1">
                 <span class="block truncate text-[calc(12.5px*var(--ui-font-scale))] text-ink">{{ img.name }}</span>
@@ -779,13 +788,13 @@ async function removeFolder(g: { dir: string; label: string; images: TreeNode[] 
             >
               <div class="thumb">
                 <img
-                  v-if="thumbUrl(img.path) && !brokenThumbs.has(img.path)"
+                  v-if="isImageFile(img.name) && thumbUrl(img.path) && !brokenThumbs.has(img.path)"
                   :src="thumbUrl(img.path)"
                   :alt="img.name"
                   loading="lazy"
                   @error="brokenThumbs.add(img.path)"
                 />
-                <span v-else class="thumb-fallback">{{ img.name }}</span>
+                <span v-else class="thumb-fallback">{{ fileBadge(img.name) }}</span>
               </div>
               <p
                 class="truncate px-2 pt-1.5 text-[calc(12px*var(--ui-font-scale))]"
@@ -915,13 +924,13 @@ async function removeFolder(g: { dir: string; label: string; images: TreeNode[] 
 
         <div class="detail-preview mt-3">
           <img
-            v-if="thumbUrl(selectedNode.path) && !brokenThumbs.has(selectedNode.path)"
+            v-if="isImageFile(selectedNode.name) && thumbUrl(selectedNode.path) && !brokenThumbs.has(selectedNode.path)"
             :key="selectedNode.path"
             :src="thumbUrl(selectedNode.path)"
             :alt="selectedNode.name"
             @error="brokenThumbs.add(selectedNode.path)"
           />
-          <span v-else class="thumb-fallback h-full w-full">{{ selectedNode.name }}</span>
+          <span v-else class="thumb-fallback h-full w-full">{{ fileBadge(selectedNode.name) }}</span>
         </div>
         <p class="mono mt-2 break-all text-[calc(11px*var(--ui-font-scale))] text-ink-3">{{ selectedNode.path }}</p>
         <!-- 详细大小:人类可读 + 精确字节 -->
@@ -952,7 +961,7 @@ async function removeFolder(g: { dir: string; label: string; images: TreeNode[] 
     <Teleport to="body">
       <Transition name="modal">
         <div v-if="moveOpen" class="fixed inset-0 z-50 flex items-center justify-center p-6">
-          <div class="absolute inset-0 bg-[var(--color-scrim)]" @click="moveOpen = false" />
+          <div class="modal-scrim absolute inset-0" />
           <div class="modal-card panel relative w-full max-w-[400px] shadow-window">
             <header class="px-6 pb-2 pt-5">
               <h2 class="text-[calc(16px*var(--ui-font-scale))] font-semibold">

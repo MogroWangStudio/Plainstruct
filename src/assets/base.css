@@ -443,3 +443,23 @@ body {
 .cm-searchMatch-selected {
   background: var(--color-line-strong) !important;
 }
+
+/* ---------- 弹窗遮罩:半透明压暗 + 背景模糊(个性化设置可关,减弱透明度时自动退化为纯色) ---------- */
+
+.modal-scrim {
+  background: var(--color-scrim);
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  backdrop-filter: blur(14px) saturate(1.3);
+}
+
+html[data-modal-blur="off"] .modal-scrim {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .modal-scrim {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}

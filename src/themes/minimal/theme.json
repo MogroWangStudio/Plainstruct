@@ -4,7 +4,7 @@
   "version": "4.0.0",
   "author": "MogroWang Studio",
   "type": "blog",
-  "description": "极简留白风:居中窄栏,间距分层,黑白克制。",
+  "description": "极简留白风：居中窄栏，间距分层，黑白克制。",
   "config": [
     {
       "key": "navMode",
@@ -30,7 +30,7 @@
     },
     {
       "key": "navMaxItems",
-      "label": "右上角导航最多显示(项)",
+      "label": "右上角导航最多显示（项）",
       "type": "number",
       "default": 6,
       "min": 1,
@@ -44,11 +44,11 @@
       "type": "boolean",
       "default": false,
       "category": "顶栏与导航",
-      "hint": "首页不显示(避免与站点名重复);窗口宽度 ≤640px 时自动隐藏"
+      "hint": "首页不显示；窗口宽度 ≤640px 时自动隐藏"
     },
     {
       "key": "topbarWidthPct",
-      "label": "顶栏宽度(%)",
+      "label": "顶栏宽度（%）",
       "type": "number",
       "default": 75,
       "min": 50,
@@ -58,7 +58,7 @@
     },
     {
       "key": "topbarWidthPctM",
-      "label": "移动端顶栏宽度(%)",
+      "label": "移动端顶栏宽度（%）",
       "type": "number",
       "default": 92,
       "min": 50,
@@ -81,7 +81,7 @@
     },
     {
       "key": "topbarShapeWidth",
-      "label": "顶栏变形后宽度(px)",
+      "label": "顶栏变形后宽度（px）",
       "type": "number",
       "default": 720,
       "min": 360,
@@ -98,7 +98,7 @@
     },
     {
       "key": "topbarShapeWidthPctM",
-      "label": "移动端顶栏变形后宽度(%)",
+      "label": "移动端顶栏变形后宽度（%）",
       "type": "number",
       "default": 90,
       "min": 50,
@@ -131,7 +131,7 @@
     },
     {
       "key": "topbarEaseCustom",
-      "label": "自定义曲线(cubic-bezier)",
+      "label": "自定义曲线（cubic-bezier）",
       "type": "text",
       "default": "0.23, 1, 0.32, 1",
       "visibleIf": {
@@ -142,7 +142,7 @@
     },
     {
       "key": "topbarDuration",
-      "label": "顶栏变形时长(ms)",
+      "label": "顶栏变形时长（ms）",
       "type": "number",
       "default": 220,
       "min": 0,
@@ -152,7 +152,7 @@
     },
     {
       "key": "topbarScrollAt",
-      "label": "变形触发滚动量(px)",
+      "label": "变形触发滚动量（px）",
       "type": "number",
       "default": 24,
       "min": 0,
@@ -169,7 +169,7 @@
     },
     {
       "key": "topbarBlur",
-      "label": "顶栏背景模糊(px)",
+      "label": "顶栏背景模糊（px）",
       "type": "number",
       "default": 12,
       "min": 0,
@@ -179,7 +179,7 @@
     },
     {
       "key": "topbarFill",
-      "label": "顶栏填充不透明度(%)",
+      "label": "顶栏填充不透明度（%）",
       "type": "number",
       "default": 86,
       "min": 0,
@@ -192,7 +192,7 @@
       "label": "顶栏显示归档入口",
       "type": "boolean",
       "default": true,
-      "hint": "顶栏导航末尾出现「归档」链接,进入全站归档页(所有非隐藏文章,支持列表/分类/卡片流三种视图切换)",
+      "hint": "顶栏导航末尾出现「归档」链接，进入全站归档页",
       "category": "顶栏与导航"
     },
     {
@@ -201,7 +201,7 @@
       "type": "boolean",
       "default": false,
       "category": "顶栏与导航",
-      "hint": "开启后窗口宽度 ≤640px 时顶栏导航收进目录按钮,点击展开导航与归档入口;顶栏过满时使用"
+      "hint": "窗口宽度 ≤640px 时导航收进目录按钮，点击展开"
     },
     {
       "key": "navHover",
@@ -233,7 +233,7 @@
     },
     {
       "key": "logoWidthPx",
-      "label": "Logo 宽度(px)",
+      "label": "Logo 宽度（px）",
       "type": "number",
       "default": 20,
       "min": 16,
@@ -243,7 +243,7 @@
     },
     {
       "key": "logoHeightPx",
-      "label": "Logo 高度(px)",
+      "label": "Logo 高度（px）",
       "type": "number",
       "default": 20,
       "min": 16,
@@ -253,7 +253,7 @@
     },
     {
       "key": "logoRadius",
-      "label": "Logo 圆角(px)",
+      "label": "Logo 圆角（px）",
       "type": "number",
       "default": 4,
       "min": 0,
@@ -263,7 +263,7 @@
     },
     {
       "key": "logoWidthPxM",
-      "label": "移动端 Logo 宽度(px)",
+      "label": "移动端 Logo 宽度（px）",
       "type": "number",
       "default": 22,
       "min": 16,
@@ -274,7 +274,7 @@
     },
     {
       "key": "logoHeightPxM",
-      "label": "移动端 Logo 高度(px)",
+      "label": "移动端 Logo 高度（px）",
       "type": "number",
       "default": 22,
       "min": 16,
@@ -311,7 +311,7 @@
     },
     {
       "key": "contentWidth",
-      "label": "正文宽度(px)",
+      "label": "正文宽度（px）",
       "type": "number",
       "default": 560,
       "min": 520,
@@ -321,7 +321,7 @@
     },
     {
       "key": "navColumns",
-      "label": "文章卡片并排(个)",
+      "label": "文章卡片并排（个）",
       "type": "number",
       "default": 1,
       "min": 1,
@@ -331,7 +331,7 @@
     },
     {
       "key": "navColumnsM",
-      "label": "移动端卡片并排(个)",
+      "label": "移动端卡片并排（个）",
       "type": "number",
       "default": 1,
       "min": 1,
@@ -342,7 +342,7 @@
     },
     {
       "key": "coverHeight",
-      "label": "封面图高度(px)",
+      "label": "封面图高度（px）",
       "type": "number",
       "default": 220,
       "min": 120,
@@ -352,21 +352,21 @@
     },
     {
       "key": "coverHeightM",
-      "label": "移动端封面图高度(px)",
+      "label": "移动端封面图高度（px）",
       "type": "number",
       "default": 160,
       "min": 100,
       "max": 420,
       "step": 10,
       "category": "布局",
-      "hint": "窗口宽度 ≤640px 时生效;开启固定封面比例后由比例裁切"
+      "hint": "窗口宽度 ≤640px 时生效；固定封面比例开启后由比例裁切"
     },
     {
       "key": "coverFixedRatio",
       "label": "固定封面图显示比例",
       "type": "boolean",
       "default": false,
-      "hint": "开启后卡片封面按下方所选比例裁切显示,不再使用「封面图高度」",
+      "hint": "开启后封面按所选比例裁切，不再使用封面图高度",
       "category": "布局"
     },
     {
@@ -401,7 +401,7 @@
     },
     {
       "key": "homeWidthPct",
-      "label": "主页卡片流宽度(%)",
+      "label": "主页卡片流宽度（%）",
       "type": "number",
       "default": 75,
       "min": 50,
@@ -411,7 +411,7 @@
     },
     {
       "key": "homeWidthPctM",
-      "label": "移动端主页卡片流宽度(%)",
+      "label": "移动端主页卡片流宽度（%）",
       "type": "number",
       "default": 92,
       "min": 50,
@@ -432,18 +432,18 @@
     },
     {
       "key": "homeGroupMax",
-      "label": "分类卡片流每组最多显示(篇)",
+      "label": "分类卡片流每组最多显示（篇）",
       "type": "number",
       "default": 0,
       "min": 0,
       "max": 30,
       "step": 1,
       "category": "布局",
-      "hint": "主页「卡片流按分类分组」时每组最多展示的篇数,0 = 不限制;超出时组尾出现「查看更多」进入该分类页"
+      "hint": "主页卡片流按分类分组时每组最多展示的篇数，0 = 不限制"
     },
     {
       "key": "cardFontSizePc",
-      "label": "卡片流字号(px)",
+      "label": "卡片流字号（px）",
       "type": "number",
       "default": 16,
       "min": 13,
@@ -454,7 +454,7 @@
     },
     {
       "key": "cardFontSizeM",
-      "label": "移动端卡片流字号(px)",
+      "label": "移动端卡片流字号（px）",
       "type": "number",
       "default": 16,
       "min": 12,
@@ -495,7 +495,7 @@
     },
     {
       "key": "cardShadowX",
-      "label": "阴影 X 偏移(px)",
+      "label": "阴影 X 偏移（px）",
       "type": "number",
       "default": 0,
       "min": -24,
@@ -509,7 +509,7 @@
     },
     {
       "key": "cardShadowY",
-      "label": "阴影 Y 偏移(px)",
+      "label": "阴影 Y 偏移（px）",
       "type": "number",
       "default": 2,
       "min": -24,
@@ -523,7 +523,7 @@
     },
     {
       "key": "cardShadowBlur",
-      "label": "阴影模糊(px)",
+      "label": "阴影模糊（px）",
       "type": "number",
       "default": 8,
       "min": 0,
@@ -537,7 +537,7 @@
     },
     {
       "key": "cardShadowSpread",
-      "label": "阴影扩散(px)",
+      "label": "阴影扩散（px）",
       "type": "number",
       "default": 0,
       "min": -20,
@@ -551,7 +551,7 @@
     },
     {
       "key": "cardShadowOpacity",
-      "label": "阴影不透明度(%)",
+      "label": "阴影不透明度（%）",
       "type": "number",
       "default": 9,
       "min": 0,
@@ -595,7 +595,7 @@
     },
     {
       "key": "cardShadowHoverX",
-      "label": "悬停阴影 X 偏移(px)",
+      "label": "悬停阴影 X 偏移（px）",
       "type": "number",
       "default": 0,
       "min": -24,
@@ -609,7 +609,7 @@
     },
     {
       "key": "cardShadowHoverY",
-      "label": "悬停阴影 Y 偏移(px)",
+      "label": "悬停阴影 Y 偏移（px）",
       "type": "number",
       "default": 2,
       "min": -24,
@@ -623,7 +623,7 @@
     },
     {
       "key": "cardShadowHoverBlur",
-      "label": "悬停阴影模糊(px)",
+      "label": "悬停阴影模糊（px）",
       "type": "number",
       "default": 8,
       "min": 0,
@@ -637,7 +637,7 @@
     },
     {
       "key": "cardShadowHoverSpread",
-      "label": "悬停阴影扩散(px)",
+      "label": "悬停阴影扩散（px）",
       "type": "number",
       "default": 0,
       "min": -20,
@@ -651,7 +651,7 @@
     },
     {
       "key": "cardShadowHoverOpacity",
-      "label": "悬停阴影不透明度(%)",
+      "label": "悬停阴影不透明度（%）",
       "type": "number",
       "default": 9,
       "min": 0,
@@ -696,7 +696,7 @@
     },
     {
       "key": "cardHoverEaseCustom",
-      "label": "自定义曲线(cubic-bezier)",
+      "label": "自定义曲线（cubic-bezier）",
       "type": "text",
       "default": "0.23, 1, 0.32, 1",
       "visibleIf": {
@@ -707,7 +707,7 @@
     },
     {
       "key": "cardHoverDuration",
-      "label": "卡片悬停时长(ms)",
+      "label": "卡片悬停时长（ms）",
       "type": "number",
       "default": 240,
       "min": 80,
@@ -727,11 +727,11 @@
         "交错上浮"
       ],
       "category": "卡片外观",
-      "hint": "卡片流进入页面时的浮现方式;交错上浮按卡片顺序依次浮现,系统减弱动态时不播放"
+      "hint": "卡片流进入页面时的浮现方式，系统减弱动态时不播放"
     },
     {
       "key": "fontSizePc",
-      "label": "正文字号(桌面端)",
+      "label": "正文字号（桌面端）",
       "type": "number",
       "default": 16,
       "min": 13,
@@ -741,7 +741,7 @@
     },
     {
       "key": "fontSizeM",
-      "label": "正文字号(移动端)",
+      "label": "正文字号（移动端）",
       "type": "number",
       "default": 15,
       "min": 12,
@@ -772,7 +772,7 @@
     },
     {
       "key": "customFont",
-      "label": "自定义字体(font-family)",
+      "label": "自定义字体（font-family）",
       "type": "text",
       "default": "",
       "visibleIf": {
@@ -792,7 +792,7 @@
         "底色"
       ],
       "category": "颜色与字体",
-      "hint": "加深 = 悬停时下划线/虚线颜色变实(主题原行为)"
+      "hint": "加深 = 悬停时下划线/虚线颜色变实（主题原行为）"
     },
     {
       "key": "tocEnabled",
@@ -895,7 +895,7 @@
     },
     {
       "key": "tocClickEaseCustom",
-      "label": "自定义曲线 (x1, y1, x2, y2)",
+      "label": "自定义曲线 (x1, y1, x2, y2）",
       "type": "text",
       "default": "0.23, 1, 0.32, 1",
       "category": "目录与动效",
@@ -913,7 +913,7 @@
       "max": 1000,
       "step": 20,
       "category": "目录与动效",
-      "hint": "单位 ms;淡化过渡为淡出与淡入各一半"
+      "hint": "单位 ms；淡化过渡为淡出与淡入各一半"
     },
     {
       "key": "showDate",
@@ -951,7 +951,7 @@
       "type": "boolean",
       "default": true,
       "category": "内容显示",
-      "hint": "页面下滚后出现,点击平滑回到顶部"
+      "hint": "页面下滚后出现，点击平滑回到顶部"
     },
     {
       "key": "backTopPosition",
@@ -971,7 +971,7 @@
       "type": "text",
       "default": "",
       "category": "页脚",
-      "hint": "显示在每页底部的一行说明文字,留空不显示"
+      "hint": "显示在每页底部的一行说明文字，留空不显示"
     },
     {
       "key": "footerBuild",
@@ -995,7 +995,7 @@
         "equals": true
       },
       "category": "页脚",
-      "hint": "点击格式输入框旁的令牌按钮插入占位符,构建时自动替换为实际值"
+      "hint": "点击格式输入框旁的令牌按钮插入占位符，构建时自动替换为实际值"
     },
     {
       "key": "footerLinks",
@@ -1003,7 +1003,7 @@
       "type": "textarea",
       "default": "",
       "category": "页脚",
-      "hint": "每行一条:名称|链接|图标地址(图标可选),如 素构|https://example.com|https://example.com/logo.svg"
+      "hint": "每行一条：名称|链接|图标地址（图标可选）"
     }
   ]
 }

@@ -4,7 +4,7 @@
   "version": "4.0.0",
   "type": "docs",
   "author": "MogroWang Studio",
-  "description": "命令行风:等宽排印,暗色窗口,提示符导航。",
+  "description": "命令行风：等宽排印，暗色窗口，提示符导航。",
   "config": [
     {
       "key": "accentColor",
@@ -28,7 +28,7 @@
     },
     {
       "key": "customFont",
-      "label": "自定义字体(font-family)",
+      "label": "自定义字体（font-family）",
       "type": "text",
       "default": "",
       "visibleIf": {
@@ -46,7 +46,7 @@
     },
     {
       "key": "fontSizePc",
-      "label": "正文字号(桌面端)",
+      "label": "正文字号（桌面端）",
       "type": "number",
       "default": 14,
       "min": 12,
@@ -56,7 +56,7 @@
     },
     {
       "key": "fontSizeM",
-      "label": "正文字号(移动端)",
+      "label": "正文字号（移动端）",
       "type": "number",
       "default": 14,
       "min": 12,
@@ -67,7 +67,7 @@
     },
     {
       "key": "contentWidth",
-      "label": "正文宽度(px)",
+      "label": "正文宽度（px）",
       "type": "number",
       "default": 780,
       "min": 620,
@@ -87,7 +87,7 @@
     },
     {
       "key": "sidebarWidthM",
-      "label": "移动端抽屉宽度(%)",
+      "label": "移动端抽屉宽度（%）",
       "type": "number",
       "default": 84,
       "min": 60,
@@ -222,6 +222,46 @@
       "default": true,
       "category": "内容显示",
       "hint": "文档配置头选择了 AIGC 声明时显示"
+    },
+    {
+      "key": "footerNote",
+      "label": "页脚说明",
+      "type": "text",
+      "default": "",
+      "category": "页脚",
+      "hint": "显示在每页底部的一行文字，留空不显示"
+    },
+    {
+      "key": "footerBuild",
+      "label": "显示构建版本与日期",
+      "type": "boolean",
+      "default": false,
+      "category": "页脚"
+    },
+    {
+      "key": "footerBuildFormat",
+      "label": "构建信息格式",
+      "type": "text",
+      "default": "构建于 {date} {time}",
+      "tokens": [
+        "{version}",
+        "{date}",
+        "{time}"
+      ],
+      "visibleIf": {
+        "key": "footerBuild",
+        "equals": true
+      },
+      "category": "页脚",
+      "hint": "点击令牌按钮插入占位符，构建时自动替换为实际值"
+    },
+    {
+      "key": "footerLinks",
+      "label": "友情链接",
+      "type": "textarea",
+      "default": "",
+      "category": "页脚",
+      "hint": "每行一条：名称|链接|图标地址（图标可选）"
     }
   ]
 }

@@ -170,6 +170,7 @@ export function compileTheme(bundle: ThemeBundle): (ctx: PageContext) => string 
     return encodePath(prefix + path);
   });
   hb.registerHelper("eq", (a: unknown, b: unknown) => a === b);
+  hb.registerHelper("or", (...args: unknown[]) => args.slice(0, -1).some(Boolean));
 
   const layout = hb.compile(bundle.files["templates/layout.hbs"], { noEscape: false });
   return (ctx: PageContext) =>

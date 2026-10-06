@@ -51,31 +51,69 @@
   }
 
   function build() {
-    var host = document.body;
-    if (entryPosition === "top") {
-      // 顶栏最右侧:优先并入主题顶栏,找不到再固定右上角
-      var bar = document.querySelector(".blog-topbar, .ps-topbar, header");
-      if (bar) {
-        host = bar;
-      }
-    }
-    var entry;
+    var entryInput = null;
+    var entry = document.createElement("div");
     if (entryStyle === "bar") {
-      // 长条文本框式:毛玻璃胶囊,点击即展开搜索面板
-      entry = el("button", "ps-search-entry ps-search-bar", host);
-      entry.innerHTML = ICON.replace('width="20" height="20"', 'width="15" height="15"') + "<span>" + T.placeholder + "</span>";
+      // 长条搜索框:入口直接输入文本,点搜索按钮(或回车)后才弹出结果面板
+      entry.className = "ps-search-entry ps-search-bar";
+      entry.setAttribute("role", "search");
+      entry.innerHTML = ICON.replace('width="20" height="20"', 'width="15" height="15"');
+      entryInput = el("input", "ps-search-field", entry);
+      entryInput.type = "text";
+      entryInput.placeholder = T.placeholder;
+      entryInput.setAttribute("aria-label", T.openAria);
+      entryInput.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          submitEntry(entryInput);
+        }
+      });
+      var go = el("button", "ps-search-go", entry);
+      go.innerHTML = ICON.replace('width="20" height="20"', 'width="14" height="14"');
+      go.setAttribute("aria-label", T.openAria);
+      go.addEventListener("click", function (e) {
+        e.stopPropagation(); // 不冒泡到入口的聚焦处理,避免与结果面板抢焦点
+        submitEntry(entryInput);
+      });
     } else {
-      entry = el("button", "ps-search-entry ps-search-fab", host);
+      entry.className = "ps-search-entry ps-search-fab";
       entry.innerHTML = ICON;
     }
     entry.id = "ps-search-fab";
-    if (entryPosition === "top" && host !== document.body) {
-      entry.classList.add("ps-in-topbar");
-    } else {
-      entry.classList.add(entryPosition === "bl" ? "ps-pos-bl" : entryPosition === "top" ? "ps-pos-top" : "ps-pos-br");
-    }
     entry.setAttribute("aria-label", T.openAria);
-    entry.addEventListener("click", show);
+    if (entryStyle === "bar") {
+      // 点击胶囊空白处只聚焦输入框,不再直接开面板
+      entry.addEventListener("click", function () { entryInput.focus(); });
+    } else {
+      entry.addEventListener("click", function () { show(); });
+    }
+
+    if (entryPosition === "top") {
+      // 顶栏最右侧:博客并入主题顶栏;文档主题(有 .ps-sidebar)在 PC 端改入侧栏、
+      // 站点标题下方整行展示,窄屏(≤900px 侧栏折叠时)回到顶栏 —— 随断点迁移
+      var mqDesktop = window.matchMedia("(min-width: 900px)");
+      var reposition = function () {
+        var sidebar = document.querySelector(".ps-sidebar");
+        var nav = sidebar ? sidebar.querySelector(".ps-nav") : null;
+        var bar = document.querySelector(".blog-topbar, .ps-topbar, header");
+        entry.classList.remove("ps-in-topbar", "ps-in-sidebar", "ps-pos-top");
+        if (sidebar && nav && mqDesktop.matches) {
+          entry.classList.add("ps-in-sidebar");
+          sidebar.insertBefore(entry, nav);
+        } else if (bar) {
+          entry.classList.add("ps-in-topbar");
+          bar.appendChild(entry);
+        } else {
+          entry.classList.add("ps-pos-top");
+          document.body.appendChild(entry);
+        }
+      };
+      reposition();
+      try { mqDesktop.addEventListener("change", reposition); } catch (err) { mqDesktop.addListener(reposition); }
+    } else {
+      entry.classList.add(entryPosition === "bl" ? "ps-pos-bl" : "ps-pos-br");
+      document.body.appendChild(entry);
+    }
     requestAnimationFrame(function () { entry.classList.add("ps-ready"); });
 
     overlay = el("div", "", document.body);
@@ -248,15 +286,27 @@
   }
 
   /* ---------- 开合 ---------- */
-  function show() {
-    if (open) return;
+  function show(prefill) {
+    if (open) {
+      // 已开着面板时携带新词(入口搜索框回车再次提交):直接以新词重查
+      if (typeof prefill === "string") {
+        input.value = prefill;
+        render(prefill.trim());
+      }
+      return;
+    }
     open = true;
     ensureData();
     overlay.classList.add("ps-open");
     document.documentElement.style.overflow = "hidden";
-    input.value = "";
-    render("");
+    input.value = typeof prefill === "string" ? prefill : "";
+    render(input.value.trim());
     requestAnimationFrame(function () { input.focus(); });
+  }
+
+  /** 入口搜索框提交:带着已输入的关键词打开结果面板 */
+  function submitEntry(field) {
+    show(String(field.value || "").trim());
   }
 
   function hide() {

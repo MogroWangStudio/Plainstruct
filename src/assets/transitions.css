@@ -39,7 +39,7 @@
   transform: translateY(4px);
 }
 
-/* ---------- 模态:从内容尺度浮现 ---------- */
+/* ---------- 模态:从内容尺度浮现(非线性缓出,离场走镜像缓入) ---------- */
 .modal-enter-active {
   transition:
     opacity var(--duration-base) var(--ease-plain),
@@ -56,7 +56,7 @@
 }
 .modal-enter-from .modal-card,
 .modal-leave-to .modal-card {
-  transform: scale(0.98) translateY(4px);
+  transform: scale(0.96) translateY(10px);
 }
 .modal-card {
   transition:

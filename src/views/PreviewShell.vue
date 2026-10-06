@@ -279,6 +279,27 @@ function reloadSite() {
   else frame.value.src = siteSrc;
 }
 
+/* ---------- 立即重建:预览壳层没有 bootstrap,请求主窗口构建,完成后经事件原位刷新 ---------- */
+
+const buildPending = ref(false);
+let buildPendingTimer = 0;
+
+async function requestBuild() {
+  if (!inTauri || buildPending.value) return;
+  buildPending.value = true;
+  try {
+    const { emitTo } = await import("@tauri-apps/api/event");
+    await emitTo("main", Events.PreviewBuildRequested, {});
+  } catch {
+    /* 发送失败恢复按钮,可重试 */
+    buildPending.value = false;
+    return;
+  }
+  // 构建完成会收到 PreviewRebuilt 并复位;超时兜底防主窗口未打开站点时按钮永久禁用
+  window.clearTimeout(buildPendingTimer);
+  buildPendingTimer = window.setTimeout(() => (buildPending.value = false), 8000);
+}
+
 /* ---------- 安卓侧滑返回:壳层动画层 ---------- */
 
 const gestureP = ref(0); // 0 静止;>0 右滑滑出;<0 后退目标页从左侧入场
@@ -441,7 +462,10 @@ onMounted(() => {
         /* 显示失败交由创建端兜底定时器 */
       }
       try {
-        unlistenRebuilt = await listen(Events.PreviewRebuilt, () => reloadSite());
+        unlistenRebuilt = await listen(Events.PreviewRebuilt, () => {
+          buildPending.value = false;
+          reloadSite();
+        });
       } catch {
         /* 监听失败不影响预览 */
       }
@@ -453,6 +477,7 @@ onBeforeUnmount(() => {
   resizeObserver?.disconnect();
   window.removeEventListener("message", onWindowMessage);
   unlistenRebuilt?.();
+  window.clearTimeout(buildPendingTimer);
   stopGesture();
 });
 </script>
@@ -501,6 +526,16 @@ onBeforeUnmount(() => {
           <span>{{ t("previewShell.mobile") }}</span>
         </button>
       </div>
+      <button
+        v-if="inTauri"
+        class="btn-icon build-btn"
+        :class="{ pending: buildPending }"
+        :disabled="buildPending"
+        :title="t('previewShell.build')"
+        @click="requestBuild"
+      >
+        <AppIcon :name="buildPending ? 'refresh' : 'box'" :size="15" />
+      </button>
       <div v-if="onWindows" class="win-controls">
         <button class="btn-icon" :title="t('titlebar.minimize')" @click="winAction('minimize')">
           <AppIcon name="minus" :size="14" />
@@ -682,6 +717,23 @@ onBeforeUnmount(() => {
   gap: 1px;
   flex: none;
   margin-left: 2px;
+}
+
+/* 构建按钮:点击后转入等待态缓慢自转,构建完成事件或超时后复位 */
+.build-btn.pending svg {
+  animation: build-spin 1400ms cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+
+@keyframes build-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .build-btn.pending svg {
+    animation: none;
+  }
 }
 .win-controls .close:hover {
   background: var(--color-danger);

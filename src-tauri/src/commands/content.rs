@@ -520,9 +520,9 @@ pub fn import_site_image_to(window: tauri::WebviewWindow, state: State<'_, AppSt
 
 /// 导入拖拽读取的文件字节到 content/asset/(自动创建,重名自动加序号),
 /// 返回实际落盘的 content/ 相对路径 —— WebView 拿不到拖入文件的磁盘路径,
-/// 前端把 File 对象读为字节后以 base64 传入;扩展名白名单与 is_importable 的图片项一致。
+/// 前端把 File 对象读为字节后以 base64 传入;仅拒绝可执行类,其余类型均可作为站点资产。
 #[tauri::command]
-pub fn import_site_image_data(window: tauri::WebviewWindow, state: State<'_, AppState>, name: String, data: String) -> Result<String, String> {
+pub fn import_site_asset_data(window: tauri::WebviewWindow, state: State<'_, AppState>, name: String, data: String) -> Result<String, String> {
     ensure_main(&window)?;
     let root = state.site_root()?;
     use base64::engine::general_purpose::STANDARD as B64;
@@ -534,8 +534,8 @@ pub fn import_site_image_data(window: tauri::WebviewWindow, state: State<'_, App
         .and_then(|e| e.to_str())
         .map(|e| e.to_ascii_lowercase())
         .unwrap_or_default();
-    if !matches!(ext.as_str(), "png" | "jpg" | "jpeg" | "gif" | "webp" | "svg") {
-        return Err(format!("不支持的图片类型:{name}"));
+    if matches!(ext.as_str(), "exe" | "dll" | "bat" | "cmd" | "com" | "msi" | "scr" | "ps1" | "app" | "jar" | "sh") {
+        return Err(format!("不支持的文件类型:{name}"));
     }
     let bytes = B64.decode(data.as_bytes()).map_err(|e| format!("文件数据解码失败:{e}"))?;
     if bytes.is_empty() {
@@ -549,4 +549,36 @@ pub fn import_site_image_data(window: tauri::WebviewWindow, state: State<'_, App
         .strip_prefix(content_root(&root))
         .map_err(|_| "路径计算失败".into())
         .map(|p| p.to_string_lossy().replace('\\', "/"))
+}
+
+/// 批量导入磁盘文件到 content/asset/(自动创建,重名自动加序号),返回落盘后的
+/// 实际文件名(与传入顺序对应,跳过目录与可执行类)—— 资产页「导入文件」按钮专用。
+#[tauri::command]
+pub fn import_site_assets(window: tauri::WebviewWindow, state: State<'_, AppState>, src_paths: Vec<String>) -> Result<Vec<String>, String> {
+    ensure_main(&window)?;
+    let root = state.site_root()?;
+    let dest_parent = safe_join(&content_root(&root), "asset")?;
+    std::fs::create_dir_all(&dest_parent).map_err(|e| e.to_string())?;
+
+    const BLOCKED: [&str; 11] = ["exe", "dll", "bat", "cmd", "com", "msi", "scr", "ps1", "app", "jar", "sh"];
+    let mut names = Vec::new();
+    for src in &src_paths {
+        let src_path = PathBuf::from(src);
+        if !src_path.is_file() {
+            continue;
+        }
+        let ext = src_path
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e.to_ascii_lowercase())
+            .unwrap_or_default();
+        if BLOCKED.contains(&ext.as_str()) {
+            continue;
+        }
+        let name = src_path.file_name().ok_or("非法路径")?.to_os_string();
+        let target = unique_path(&dest_parent.join(name));
+        std::fs::copy(&src_path, &target).map_err(|e| e.to_string())?;
+        names.push(target.file_name().unwrap_or_default().to_string_lossy().to_string());
+    }
+    Ok(names)
 }

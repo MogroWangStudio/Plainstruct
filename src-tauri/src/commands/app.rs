@@ -124,6 +124,7 @@ pub(crate) fn settings_defaults() -> Value {
         "editorBreakKey": "enter",
         "editorIndentKey": "tab",
         "editorIndentWidth": 2,
+        "modalBlur": true,
         "confetti": "standard",
     })
 }

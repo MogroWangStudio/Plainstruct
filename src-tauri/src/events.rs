@@ -8,3 +8,6 @@ pub const CLOSE_REQUESTED: &str = "plainstruct://close-requested";
 /// 构建完成通知独立预览窗口原位刷新(仅前端 emit/listen,Rust 侧作常量镜像)
 #[allow(dead_code)]
 pub const PREVIEW_REBUILT: &str = "plainstruct://preview-rebuilt";
+/// 预览窗口请求主窗口立即重新构建(仅前端 emit/listen,Rust 侧作常量镜像)
+#[allow(dead_code)]
+pub const PREVIEW_BUILD_REQUESTED: &str = "plainstruct://preview-build-requested";

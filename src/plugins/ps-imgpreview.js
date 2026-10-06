@@ -33,6 +33,7 @@
   var sourceImg = null; // 打开时的源图(隐藏,关闭时恢复)
   var opened = false;
   var reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var pixel = false; // 本次预览的渲染方式:false = 抗锯齿(默认),true = 像素(点对点)
 
   var ICON = {
     minus: '<path d="M5 12h14"/>',
@@ -118,6 +119,8 @@
   /** 以视口点 p 为缩放中心改变倍率(保持该点下的内容不动) */
   function zoomAt(px, py, next) {
     var s = Math.min(MAX, Math.max(MIN, next));
+    // 像素渲染:≥100% 时吸附整数倍 —— 一个图像像素对应整数个屏幕像素,点对点清晰可见
+    if (pixel && s >= 1) s = Math.max(1, Math.round(s));
     var k = s / st.scale;
     var cx = window.innerWidth / 2 + st.tx;
     var cy = window.innerHeight / 2 + st.ty;
@@ -311,7 +314,6 @@
   function buildBar(host) {
     var bar = document.createElement("div");
     bar.className = "ps-lb-bar";
-    var pixel = false; // 本次预览的渲染方式:false = 抗锯齿(默认),true = 像素
     var out = btn(ICON.minus, T.zoomOut, function () {
       setMode("ps-lb-spring");
       zoomAt(window.innerWidth / 2, window.innerHeight / 2, st.scale / 1.5);
@@ -335,13 +337,18 @@
       st.rot += 90; // 累积角度:取模会让 270°→0° 沿原路倒转一大圈
       apply();
     });
-    // 渲染方式:像素放大(关闭插值,像素网格清晰)与抗锯齿放大(默认)切换
+    // 渲染方式:像素放大(点对点,关闭插值,像素网格清晰)与抗锯齿放大(默认)切换
     var pixelBtn = btn(ICON.pixel, T.pixelOff, function () {
       pixel = !pixel;
       img.style.imageRendering = pixel ? "pixelated" : "";
       pixelBtn.classList.toggle("is-active", pixel);
       pixelBtn.title = pixel ? T.pixelOn : T.pixelOff;
       pixelBtn.setAttribute("aria-pressed", String(pixel));
+      // 切入像素渲染时,当前倍率 ≥100% 就吸附到最近整数倍,立即呈现点对点效果
+      if (pixel && st.scale >= 1) {
+        setMode("ps-lb-spring");
+        zoomAt(window.innerWidth / 2, window.innerHeight / 2, st.scale);
+      }
     });
     pixelBtn.setAttribute("aria-pressed", "false");
     var dl = btn(ICON.download, T.download, function () {
@@ -482,7 +489,8 @@
             st.tx = 0;
             st.ty = 0;
           } else {
-            var target = 2.5;
+            // 像素渲染下双击到 200%(整数倍点对点),抗锯齿保持 250%
+            var target = pixel ? 2 : 2.5;
             var k = target / st.scale;
             var cx = window.innerWidth / 2 + st.tx;
             var cy = window.innerHeight / 2 + st.ty;

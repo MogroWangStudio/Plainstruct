@@ -63,20 +63,20 @@ export const useSiteStore = defineStore("site", {
     },
 
     /** 资产分组:每个资产目录的根层与各子文件夹各成一组(资产页分组展示与移动目标)。
-     *  空文件夹也列入(新建文件夹后立即可见、可作为拖放目标),images 可能为空数组。 */
+     *  空文件夹也列入(新建文件夹后立即可见、可作为拖放目标),files 可能为空数组。 */
     assetGroups(state): { dir: string; label: string; images: TreeNode[] }[] {
       const groups: { dir: string; label: string; images: TreeNode[] }[] = [];
-      const imagesIn = (node: TreeNode) =>
-        (node.children ?? []).filter((n) => n.type === "file" && isImageFile(n.name));
+      // 资产页收纳全部文件类型(不限于图片),字段名沿用 images 以减少联动改动
+      const filesIn = (node: TreeNode) => (node.children ?? []).filter((n) => n.type === "file");
       const walk = (node: TreeNode, base: string) => {
         for (const c of node.children ?? []) {
           if (c.type !== "dir") continue;
-          groups.push({ dir: c.path, label: c.path.slice(base.length + 1), images: imagesIn(c) });
+          groups.push({ dir: c.path, label: c.path.slice(base.length + 1), images: filesIn(c) });
           walk(c, base);
         }
       };
       for (const d of state.tree.filter((n) => n.type === "dir" && isAssetDirName(n.name))) {
-        groups.push({ dir: d.path, label: "", images: imagesIn(d) });
+        groups.push({ dir: d.path, label: "", images: filesIn(d) });
         walk(d, d.path);
       }
       return groups;
@@ -357,11 +357,22 @@ export const useSiteStore = defineStore("site", {
 
     /** 导入拖拽读取的文件字节(base64):落至 content/asset/,刷新树并触发重建,
      *  返回实际落盘路径(重名自动加序号)——资产页拖放导入专用 */
-    async importSiteImageData(name: string, base64: string) {
-      const actual = await ipc.importSiteImageData(name, base64);
+    async importSiteAssetData(name: string, base64: string) {
+      const actual = await ipc.importSiteAssetData(name, base64);
       await this.refreshTree();
       void useBuilderStore().onSiteChanged();
       return actual;
+    },
+
+    /** 批量导入磁盘文件到 content/asset/:刷新树并触发重建,返回实际落盘文件名
+     *  ——资产页「导入文件」按钮专用(不限图片类型) */
+    async importSiteAssets(srcPaths: string[]) {
+      const names = await ipc.importSiteAssets(srcPaths);
+      if (names.length) {
+        await this.refreshTree();
+        void useBuilderStore().onSiteChanged();
+      }
+      return names;
     },
 
     /* ---------- 站点插件 ---------- */

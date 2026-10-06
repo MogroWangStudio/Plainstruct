@@ -103,8 +103,9 @@ function submit() {
 
 <template>
   <Teleport to="body">
-    <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center p-6">
-      <div class="absolute inset-0 bg-[var(--color-scrim)]" @click="emit('cancel')" />
+    <Transition name="modal">
+      <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center p-6">
+      <div class="modal-scrim absolute inset-0" />
       <div class="modal-card panel relative flex max-h-[86vh] w-full max-w-[400px] flex-col shadow-window" style="max-width: 400px">
         <header class="flex items-center justify-between px-5 pb-3 pt-4">
           <h2 class="text-[calc(15px*var(--ui-font-scale))] font-semibold">{{ t("tree.newDocTitle") }}</h2>
@@ -165,5 +166,6 @@ function submit() {
         </footer>
       </div>
     </div>
+    </Transition>
   </Teleport>
 </template>

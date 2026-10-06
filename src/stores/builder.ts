@@ -2,7 +2,7 @@ import { defineStore } from "pinia";
 import type { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { LogicalPosition } from "@tauri-apps/api/dpi";
 import type { BuildReport } from "@/ipc/types";
-import { Events } from "@/ipc/events";
+import { Events, listen } from "@/ipc/events";
 import { buildSite } from "@/lib/builder";
 import { useSiteStore } from "./site";
 import { useThemeStore } from "./theme";
@@ -27,6 +27,18 @@ interface State {
 let rebuildTimer: ReturnType<typeof setTimeout> | null = null;
 /** 浏览器 mock 下打开的壳层标签页(命名窗口,可复用与关闭) */
 let browserPreviewTab: Window | null = null;
+/** 预览窗口「立即重建」请求的监听只绑定一次(预览窗口可能反复开关) */
+let previewBuildListenerBound = false;
+
+/** 监听独立预览窗口的构建请求:绕过防抖立即重建,完成后由构建流程
+ *  通知预览窗口原位刷新(预览壳层没有 bootstrap,构建只能托主窗口代劳) */
+function bindPreviewBuildListener() {
+  if (previewBuildListenerBound) return;
+  previewBuildListenerBound = true;
+  void listen(Events.PreviewBuildRequested, () => {
+    void useBuilderStore().build();
+  });
+}
 
 export const useBuilderStore = defineStore("builder", {
   state: (): State => ({
@@ -88,6 +100,7 @@ export const useBuilderStore = defineStore("builder", {
       const site = useSiteStore();
       const app = useAppStore();
       if (!site.root) return;
+      bindPreviewBuildListener();
       // 浏览器 mock:以命名标签页打开壳层页面(site:// 协议不可用,壳层仅演示界面形态;
       // 命名窗口让重复打开复用同一标签,与 Tauri 侧 getByLabel 的语义一致)
       if (app.platform === "browser") {

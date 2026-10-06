@@ -39,6 +39,8 @@ export interface AppearanceSettings {
   uiFontWeight?: number;
   editorFont?: EditorFontMode;
   editorFontCustom?: string;
+  /** 弹窗遮罩的背景模糊(默认开) */
+  modalBlur?: boolean;
 }
 
 /** 编辑器写作偏好(空白标记、键位、自动保存行为与预览刷新动画) */
@@ -153,6 +155,7 @@ export const useAppStore = defineStore("app", {
           editorBreakKey: "enter",
           editorIndentKey: "tab",
           editorIndentWidth: 2,
+          modalBlur: true,
         }
       );
     },
@@ -396,6 +399,9 @@ export const useAppStore = defineStore("app", {
 
       // 界面字重:落到基础字重变量,标题/按钮等显式加重的元素不受影响
       root.style.setProperty("--font-weight-ui", String(normalizeUiFontWeight(uiFontWeight)));
+
+      // 弹窗遮罩的背景模糊开关:data 属性驱动 base.css 的 .modal-scrim 规则
+      root.dataset.modalBlur = this.settings.modalBlur === false ? "off" : "on";
 
       let ui: string | undefined;
       if (uiFont === "custom") ui = (uiFontCustom ?? "").trim() || undefined;

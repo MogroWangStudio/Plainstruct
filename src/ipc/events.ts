@@ -6,6 +6,8 @@ export const Events = {
   PublishLog: "plainstruct://publish-log",
   CloseRequested: "plainstruct://close-requested",
   PreviewRebuilt: "plainstruct://preview-rebuilt",
+  /** 预览窗口请求主窗口立即重新构建(预览壳层无 bootstrap,只能托主窗口构建) */
+  PreviewBuildRequested: "plainstruct://preview-build-requested",
 } as const;
 
 export type SyncProgressEvent = typeof Events.SyncProgress;

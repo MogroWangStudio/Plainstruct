@@ -645,18 +645,16 @@ function renderOnePage(
       folderListHtml: isBlog ? extras?.folderListHtml : undefined,
       folderView: isBlog ? extras?.folderView : undefined,
       // 页脚友情链接(主题配置按行解析;站内图标路径按页面深度换算相对地址)
-      footerLinks: isBlog
-        ? parseFooterLinks(config.footerLinks).map((l) => ({
-            ...l,
-            icon: l.icon
-              ? /^(https?:|data:)/i.test(l.icon)
-                ? l.icon
-                : encodePath(relPosix(outDir, l.icon))
-              : undefined,
-          }))
-        : undefined,
-      // 构建信息(版本/日期/时间 + 按格式替换令牌后的文案),博客页脚按配置展示
-      build: isBlog ? buildInfoOf(config) : undefined,
+      footerLinks: parseFooterLinks(config.footerLinks).map((l) => ({
+        ...l,
+        icon: l.icon
+          ? /^(https?:|data:)/i.test(l.icon)
+            ? l.icon
+            : encodePath(relPosix(outDir, l.icon))
+          : undefined,
+      })),
+      // 构建信息(版本/日期/时间 + 按格式替换令牌后的文案),页脚按主题配置展示
+      build: buildInfoOf(config),
       // 归档页:三种视图的数据全部按页深换算
       isArchive: !!extras?.archive || undefined,
       archive: extras?.archive

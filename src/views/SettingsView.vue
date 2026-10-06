@@ -664,6 +664,23 @@ function openRelease(url: string) {
                     @update:model-value="app.setConfetti($event as ConfettiLevel)"
                   />
                 </div>
+
+                <!-- 弹窗背景模糊 -->
+                <div class="settings-row" style="--i: 7">
+                  <div class="min-w-0">
+                    <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.modalBlur") }}</p>
+                    <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.modalBlurHint") }}</p>
+                  </div>
+                  <label class="flex cursor-pointer items-center gap-2">
+                    <input
+                      type="checkbox"
+                      class="checkbox-input"
+                      :checked="app.settings.modalBlur !== false"
+                      @change="app.setAppearance({ modalBlur: ($event.target as HTMLInputElement).checked })"
+                    />
+                    <span class="text-[calc(12px*var(--ui-font-scale))] text-ink-2">{{ t("settings.modalBlurOn") }}</span>
+                  </label>
+                </div>
               </div>
             </template>
 

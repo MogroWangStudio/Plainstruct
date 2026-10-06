@@ -7,7 +7,8 @@ defineProps<{ title: string; width?: number }>();
   <Teleport to="body">
     <div class="fixed inset-0 z-50 flex items-center justify-center p-6">
       <Transition name="scrim" appear>
-        <div class="absolute inset-0 bg-[var(--color-scrim)]" @click="$emit('cancel')" />
+        <!-- 遮罩不响应点击:误触空白不关窗,关闭一律走右上角按钮 / Esc / 显式按钮 -->
+        <div class="modal-scrim absolute inset-0" />
       </Transition>
       <Transition name="modal" appear>
         <div

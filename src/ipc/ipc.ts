@@ -217,11 +217,17 @@ export const ipc = {
   },
   /** 导入拖拽读取的文件字节(base64)到站点 asset/(重名自动加序号),
    *  返回实际落盘的 content/ 相对路径 —— WebView 拿不到拖入文件的磁盘路径,
-   *  拖放导入只能把字节传给后端落盘 */
-  importSiteImageData(name: string, base64: string): Promise<string> {
+   *  拖放导入只能把字节传给后端落盘;仅拒绝可执行类,其余类型均可 */
+  importSiteAssetData(name: string, base64: string): Promise<string> {
     return inTauri
-      ? invoke<string>("import_site_image_data", { name, data: base64 })
-      : mock.importSiteImageData(name, base64);
+      ? invoke<string>("import_site_asset_data", { name, data: base64 })
+      : mock.importSiteAssetData(name, base64);
+  },
+  /** 批量导入磁盘文件到站点 asset/(重名自动加序号),返回实际落盘文件名 —— 资产页导入按钮专用 */
+  importSiteAssets(srcPaths: string[]): Promise<string[]> {
+    return inTauri
+      ? invoke<string[]>("import_site_assets", { srcPaths })
+      : mock.importSiteAssets(srcPaths);
   },
 
   /* ---------- 构建 ---------- */
@@ -363,6 +369,13 @@ export const ipc = {
       multiple: true,
       filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "gif", "webp", "svg", "avif"] }],
     });
+    return Array.isArray(files) ? files : files ? [files] : null;
+  },
+  /** 资产页导入:多选任意文件(mock 环境返回示例路径走通流程) */
+  async pickAssetFiles(): Promise<string[] | null> {
+    if (!inTauri) return ["C:/Users/me/Pictures/photo-1.png", "C:/Docs/manual.pdf"];
+    const { open } = await import("@tauri-apps/plugin-dialog");
+    const files = await open({ multiple: true });
     return Array.isArray(files) ? files : files ? [files] : null;
   },
   async pickImportFiles(): Promise<string[] | null> {
