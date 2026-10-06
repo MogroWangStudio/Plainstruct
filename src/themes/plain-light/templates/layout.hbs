@@ -59,6 +59,9 @@
       </a>
       {{#if config.showDescription}}{{#if site.description}}<p class="ps-site-desc">{{site.description}}</p>{{/if}}{{/if}}
       <nav class="ps-nav">{{> nav}}</nav>
+      <button class="ps-sidebar-toggle" type="button" aria-expanded="true">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+      </button>
     </aside>
     <main class="ps-main">
       {{> page}}
@@ -154,6 +157,27 @@
         }
       });
     })();
-  </script>
+      (function () {
+      /* 侧栏折叠开关:桌面端侧栏右缘滑出式按钮,折叠后正文占满全宽;状态记忆在 localStorage */
+      var body = document.body;
+      var btn = document.querySelector(".ps-sidebar-toggle");
+      if (!btn) return;
+      var KEY = "ps-sidebar-collapsed";
+      var collapsed = false;
+      try { collapsed = localStorage.getItem(KEY) === "1"; } catch (err) {}
+      var apply = function () {
+        body.classList.toggle("ps-sidebar-collapsed", collapsed);
+        btn.setAttribute("aria-expanded", collapsed ? "false" : "true");
+        btn.setAttribute("aria-label", collapsed ? "展开侧栏" : "折叠侧栏");
+        btn.title = collapsed ? "展开侧栏" : "折叠侧栏";
+        try { localStorage.setItem(KEY, collapsed ? "1" : "0"); } catch (err) {}
+      };
+      apply();
+      btn.addEventListener("click", function () {
+        collapsed = !collapsed;
+        apply();
+      });
+    })();
+</script>
 </body>
 </html>

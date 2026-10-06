@@ -1333,3 +1333,87 @@ body[data-nav-current="左侧标记"] a.ps-nav-dir.current {
     justify-content: flex-end;
   }
 }
+
+/* ---------- 4.0 侧栏折叠开关:桌面端侧栏右缘滑出式按钮,折叠后正文占满全宽 ---------- */
+
+.ps-sidebar-toggle {
+  position: fixed;
+  top: 50%;
+  left: var(--ps-sidebar-w, 260px);
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 56px;
+  padding: 0;
+  border: 1px solid var(--ps-line);
+  border-left: none;
+  border-radius: 0 6px 6px 0;
+  background: var(--ps-surface);
+  color: var(--ps-ink-3);
+  cursor: pointer;
+  transform: translateY(-50%);
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.06);
+  transition:
+    left 300ms cubic-bezier(0.23, 1, 0.32, 1),
+    background-color 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.ps-sidebar-toggle:hover {
+  background: var(--ps-chip, var(--ps-surface));
+  color: var(--ps-ink);
+}
+
+.ps-sidebar-toggle:active {
+  transform: translateY(-50%) scale(0.94);
+}
+
+.ps-sidebar-toggle:focus-visible {
+  outline: 2px solid var(--ps-accent);
+  outline-offset: 1px;
+}
+
+.ps-sidebar-toggle svg {
+  transition: transform 300ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* 折叠态:侧栏负移出屏(多让 1px 藏住右边框),开关贴回左缘,箭头转向 */
+@media (min-width: 901px) {
+  .ps-sidebar {
+    transition: margin-left 300ms cubic-bezier(0.23, 1, 0.32, 1);
+  }
+
+  body.ps-sidebar-collapsed .ps-sidebar {
+    margin-left: calc(-1 * var(--ps-sidebar-w, 260px) - 1px);
+  }
+}
+
+body.ps-sidebar-collapsed .ps-sidebar-toggle {
+  left: 0;
+}
+
+body.ps-sidebar-collapsed .ps-sidebar-toggle svg {
+  transform: rotate(180deg);
+}
+
+/* 移动端:抽屉行为不变,开关隐藏 */
+@media (max-width: 900px) {
+  .ps-sidebar-toggle {
+    display: none;
+  }
+
+  body.ps-sidebar-collapsed .ps-sidebar {
+    margin-left: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ps-sidebar,
+  .ps-sidebar-toggle,
+  .ps-sidebar-toggle svg {
+    transition: none;
+  }
+}
