@@ -64,10 +64,12 @@
       </a>
       {{#if site.description}}<p class="ps-site-desc">{{site.description}}</p>{{/if}}
       <nav class="ps-nav">{{> nav}}</nav>
-      <button class="ps-sidebar-toggle" type="button" aria-expanded="true">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
-      </button>
     </aside>
+    <!-- 折叠开关:作为侧栏的兄弟节点固定在侧栏内部底角(左下/右下,由 data-toggle-pc 配置);
+         不放进 aside 内 —— sticky 侧栏会形成叠放上下文,把按钮压在正文之下导致点击无效 -->
+    <button class="ps-sidebar-toggle" type="button" aria-expanded="true">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+    </button>
     <main class="ps-main">
       {{> page}}
       {{#if (or config.footerNote config.footerBuild config.showFooterCredit page.footerLinks.length)}}

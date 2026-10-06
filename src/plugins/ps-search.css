@@ -304,6 +304,16 @@ html[data-ps-dark] .ps-search-note {
 }
 
 /* ---------- 移动端:贴顶全宽 ---------- */
+/* 入口按钮压扁为圆角矩形条:与各主题移动端的列表按钮(目录按钮)同款呼应,
+   断点取双端较大者 900px(文档主题移动断点即 900;博客主题 640 起同步生效) */
+@media (max-width: 900px) {
+  .ps-search-fab {
+    width: 60px;
+    height: 36px;
+    border-radius: 11px;
+  }
+}
+
 @media (max-width: 640px) {
   #ps-search-overlay {
     padding-top: 8vh;

@@ -1132,6 +1132,29 @@ body[data-hv-pager="底色"] .ps-pager-item:hover {
   gap: 6px;
 }
 
+/* 友链条目:图标 + 名称(此前无条目样式,图标按原始尺寸渲染破版) */
+.ps-footer-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ps-ink-2);
+  font-size: 12.5px;
+  text-decoration: none;
+  transition: color 160ms ease, opacity 160ms ease;
+}
+
+.ps-footer-link:hover {
+  color: var(--ps-accent);
+}
+
+.ps-footer-link-icon {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  object-fit: cover;
+}
+
+
 /* ---------- 当前文档效果(body data-nav-current 驱动;「默认」与主题原样式一致,不写规则) ---------- */
 
 body[data-nav-current="无"] .ps-nav-link.current,
@@ -1219,12 +1242,12 @@ body[data-nav-current="下划线"] a.ps-nav-dir.current {
   text-underline-offset: 5px;
 }
 
-/* ---------- 4.0 移动端顶栏:目录按钮对齐搜索按钮(圆形毛玻璃),当前文档标题移到站点标识下方 ---------- */
+/* ---------- 4.0 移动端顶栏:目录按钮对齐搜索按钮(扁圆角矩形条),当前文档标题移到站点标识下方 ---------- */
 
 @media (max-width: 900px) {
   :root {
-    /* 两行布局:目录按钮 44 + 行距 4 + 当前标题行 18 + 上下内边距 16 */
-    --ps-topbar-h: 82px;
+    /* 两行布局:目录按钮 36 + 行距 4 + 当前标题行 18 + 上下内边距 16 */
+    --ps-topbar-h: 74px;
   }
 
   .ps-topbar {
@@ -1235,12 +1258,12 @@ body[data-nav-current="下划线"] a.ps-nav-dir.current {
     padding-bottom: 8px;
   }
 
-  /* 目录按钮:与搜索按钮同款圆形毛玻璃(同尺寸 44px,阴影与描边一致) */
+  /* 目录按钮:与搜索按钮同款扁圆角矩形条(60×36,毛玻璃、描边、阴影一致) */
   .ps-menu-btn {
-    width: 44px;
-    height: 44px;
-    border: none;
-    border-radius: 50%;
+    width: 60px;
+    height: 36px;
+    border: 1px solid var(--ps-line);
+    border-radius: 11px;
     background: color-mix(in srgb, var(--ps-surface) 72%, transparent);
     -webkit-backdrop-filter: blur(14px) saturate(1.5);
     backdrop-filter: blur(14px) saturate(1.5);
@@ -1264,27 +1287,28 @@ body[data-nav-current="下划线"] a.ps-nav-dir.current {
   }
 }
 
-/* ---------- 4.0 侧栏折叠开关:桌面端侧栏右缘滑出式按钮,折叠后正文占满全宽 ---------- */
+/* ---------- 4.1 侧栏折叠开关:固定在侧栏内部底角(右下/左下,折叠后正文占满全宽) ----------
+   按钮是侧栏的兄弟节点而非子元素:sticky 侧栏会形成叠放上下文,正文列的页面
+   过渡动画(fill: both 持有的 transform/clip-path)会永久把内部按钮盖住导致点击无效 */
 
 .ps-sidebar-toggle {
   position: fixed;
-  top: 50%;
-  left: var(--ps-sidebar-w, 260px);
-  z-index: 45;
+  /* 右下角(默认):贴侧栏右缘内侧 */
+  left: calc(var(--ps-sidebar-w, 260px) - 46px);
+  bottom: 16px;
+  z-index: 60;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 56px;
+  width: 30px;
+  height: 30px;
   padding: 0;
   border: 1px solid var(--ps-line);
-  border-left: none;
-  border-radius: 0 6px 6px 0;
+  border-radius: 8px;
   background: var(--ps-surface);
   color: var(--ps-ink-3);
   cursor: pointer;
-  transform: translateY(var(--tg-y, -50%));
-  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   transition:
     left 300ms cubic-bezier(0.23, 1, 0.32, 1),
     background-color 160ms ease,
@@ -1298,7 +1322,7 @@ body[data-nav-current="下划线"] a.ps-nav-dir.current {
 }
 
 .ps-sidebar-toggle:active {
-  transform: translateY(var(--tg-y, -50%)) scale(0.94);
+  transform: scale(0.94);
 }
 
 .ps-sidebar-toggle:focus-visible {
@@ -1310,6 +1334,15 @@ body[data-nav-current="下划线"] a.ps-nav-dir.current {
   /* fill="none" 的透明区域默认不参与命中,点击会穿透到下层:关闭以让整个按钮可点 */
   pointer-events: none;
   transition: transform 300ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* 左下角预设 */
+body[data-toggle-pc="左下角"] .ps-sidebar-toggle {
+  left: 16px;
+}
+
+body[data-toggle-pc="隐藏"] .ps-sidebar-toggle {
+  display: none;
 }
 
 /* 折叠态:侧栏负移出屏(多让 1px 藏住右边框),开关贴回左缘,箭头转向 */
@@ -1324,7 +1357,7 @@ body[data-nav-current="下划线"] a.ps-nav-dir.current {
 }
 
 body.ps-sidebar-collapsed .ps-sidebar-toggle {
-  left: 0;
+  left: 16px;
 }
 
 body.ps-sidebar-collapsed .ps-sidebar-toggle svg {
@@ -1338,22 +1371,24 @@ body.ps-sidebar-collapsed .ps-sidebar-toggle svg {
     top: 18px;
     right: 12px;
     left: auto;
+    bottom: auto;
     width: 28px;
     height: 28px;
     border: 1px solid var(--ps-line);
     border-radius: 50%;
-    /* 复位纵向偏移:否则 :active 的 translateY(var(--tg-y)) 会让按钮按下瞬间上跳,
-       pointerup 落在按钮之外,click 永远无法触发 */
-    --tg-y: 0;
-    transform: none;
     box-shadow: none;
+    /* 桌面折叠态残留的箭头转向在移动端复位(收起方向恒指左) */
+    transform: none;
+  }
+
+  .ps-sidebar-toggle:active {
+    transform: scale(0.94);
   }
 
   body[data-toggle-m="隐藏"] .ps-sidebar-toggle {
     display: none;
   }
 
-  /* 桌面折叠态残留的箭头转向在移动端复位(收起方向恒指左) */
   body.ps-sidebar-collapsed .ps-sidebar-toggle svg {
     transform: none;
   }
@@ -1368,30 +1403,8 @@ body.ps-sidebar-collapsed .ps-sidebar-toggle svg {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .ps-sidebar,
-  .ps-sidebar-toggle,
-  .ps-sidebar-toggle svg {
-    transition: none;
-  }
-}
-
-/* ---------- 4.0 折叠开关位置(桌面端):data-toggle-pc 配置驱动 ---------- */
-
-body[data-toggle-pc="侧栏顶部"] .ps-sidebar-toggle {
-  --tg-y: 0;
-  top: 18px;
-}
-
-body[data-toggle-pc="侧栏底部"] .ps-sidebar-toggle {
-  --tg-y: 0;
-  top: auto;
-  bottom: 18px;
-}
-
-body[data-toggle-pc="隐藏"] .ps-sidebar-toggle {
-  display: none;
-}
+/* 旧版折叠开关位置预设(侧栏边缘/顶部/底部)已被侧栏内部底角方案取代:
+   旧配置值无对应规则,自动回退为默认的右下角;「隐藏」在新基础规则中处理 */
 
 /* ---------- 4.0 站点标识配置:Logo 与站点标题的大小、显隐、位置(data 属性驱动) ---------- */
 

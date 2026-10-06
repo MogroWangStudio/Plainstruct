@@ -2,6 +2,7 @@
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useAppStore } from "@/stores/app";
+import { useBuilderStore } from "@/stores/builder";
 import { usePublishStore } from "@/stores/publish";
 import { useSiteStore } from "@/stores/site";
 import AppIcon from "./AppIcon.vue";
@@ -12,6 +13,7 @@ const { t } = useI18n();
 const app = useAppStore();
 const site = useSiteStore();
 const publish = usePublishStore();
+const builder = useBuilderStore();
 
 const maximized = ref(false);
 
@@ -20,6 +22,8 @@ const showWindowControls = computed(() => app.platform === "windows");
 const onMac = computed(() => app.platform === "macos");
 /** 悬停提示「返回主菜单」+ 手型光标:站点打开且不在设置页时可用 */
 const canGoBack = computed(() => site.open && app.view !== "settings");
+/** 「预览站点」悬停入口:站点构建完毕(已有产物)后出现,点击打开/切到独立预览窗口 */
+const showPreviewEntry = computed(() => canGoBack.value && builder.report !== null);
 /** 「查看发布状态」悬停入口:存在发布上下文(进行中/已完成/失败)时出现 */
 const showPublishEntry = computed(
   () =>
@@ -52,6 +56,11 @@ async function goToStart() {
 
 function goPublish() {
   app.setView("publish");
+}
+
+/** 预览站点:打开独立预览窗口;已在则原位刷新产物并切过去 */
+function goPreview() {
+  void builder.openOrRefreshPreviewWindow();
 }
 </script>
 
@@ -87,6 +96,13 @@ function goPublish() {
           <AppIcon name="arrowLeft" :size="14" class="brand-back-arrow" />
           <span>{{ t("titlebar.backToMenu") }}</span>
         </button>
+        <!-- 站点构建完毕后,预览入口以竖线隔开显示在返回主菜单之后 -->
+        <template v-if="showPreviewEntry">
+          <span class="brand-back-sep" aria-hidden="true">|</span>
+          <button type="button" class="brand-link" @click.stop="goPreview">
+            {{ t("titlebar.previewSite") }}
+          </button>
+        </template>
       </span>
     </div>
 

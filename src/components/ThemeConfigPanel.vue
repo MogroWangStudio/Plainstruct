@@ -6,6 +6,8 @@ import { useI18n } from "vue-i18n";
 import type { ThemeField } from "@/ipc/types";
 import { navMaxOf, topNavItems, type NavPickerItem } from "@/lib/builder";
 import { normalizePlugins } from "@/lib/plugins";
+import { siteUrl } from "@/lib/preview";
+import { useAppStore } from "@/stores/app";
 import { useSiteStore } from "@/stores/site";
 import { useThemeStore } from "@/stores/theme";
 import { useUiStore } from "@/stores/ui";
@@ -18,6 +20,7 @@ const { t } = useI18n();
 const theme = useThemeStore();
 const site = useSiteStore();
 const ui = useUiStore();
+const app = useAppStore();
 
 function onField(field: ThemeField, value: string | number | boolean) {
   void theme.setConfigValue(field.key, value);
@@ -280,6 +283,37 @@ function removeLinkRow(field: ThemeField, i: number) {
   onField(field, linksToText(rows));
 }
 
+/* ---------- 友链图标的站点资产选择:弹出资产网格,点选即写入图标路径 ---------- */
+
+const assetPickerOpen = ref(false);
+const assetPickerField = ref<ThemeField | null>(null);
+const assetPickerIndex = ref(0);
+
+/** 站内图标路径(非外链)在资产服务下可预览;外链 URL 交由 <img> 直接加载 */
+function isSiteIconPath(icon: string): boolean {
+  return Boolean(icon) && !/^(https?:|data:|mailto:)/i.test(icon);
+}
+
+function iconThumb(icon: string): string {
+  if (!isSiteIconPath(icon) || app.platform === "browser") return "";
+  return siteUrl(app.platform, `content/${icon}`);
+}
+
+function openAssetPicker(field: ThemeField, i: number) {
+  assetPickerField.value = field;
+  assetPickerIndex.value = i;
+  assetPickerOpen.value = true;
+}
+
+function pickAsset(path: string) {
+  if (assetPickerField.value) updateLink(assetPickerField.value, assetPickerIndex.value, "icon", path);
+  assetPickerOpen.value = false;
+}
+
+function clearLinkIcon(field: ThemeField, i: number) {
+  updateLink(field, i, "icon", "");
+}
+
 /* navlist(博客顶栏导航):可选项与构建同源 -- 完整导航树,文件夹默认折叠,点箭头展开 */
 const navOptions = computed<NavPickerItem[]>(() => topNavItems(site.tree, site.docsCache));
 
@@ -504,7 +538,7 @@ async function removePlugin(id: string, name: string) {
         </label>
         <p class="opt-hint">{{ t("theme.pluginSearchHint") }}</p>
 
-        <label class="flex flex-col gap-1">
+        <label v-if="deviceMode === 'pc'" class="flex flex-col gap-1">
           <span class="field-label">{{ t("theme.pluginSearchStyle") }}</span>
           <SelectMenu
             :model-value="plugins.searchStyle"
@@ -516,7 +550,7 @@ async function removePlugin(id: string, name: string) {
             @update:model-value="(v: string) => site.savePlugins({ searchStyle: v as 'button' | 'bar' })"
           />
         </label>
-        <label class="flex flex-col gap-1">
+        <label v-if="deviceMode === 'pc'" class="flex flex-col gap-1">
           <span class="field-label">{{ t("theme.pluginSearchPosition") }}</span>
           <SelectMenu
             :model-value="plugins.searchPosition"
@@ -530,8 +564,8 @@ async function removePlugin(id: string, name: string) {
           />
         </label>
 
-        <!-- 移动端独立设置:缺省沿用上方 PC 配置 -->
-        <label class="flex flex-col gap-1">
+        <!-- 移动端独立设置:缺省沿用上方 PC 配置;仅在移动端标签显示 -->
+        <label v-if="deviceMode === 'm'" class="flex flex-col gap-1">
           <span class="field-label">{{ t("theme.pluginSearchStyleM") }}</span>
           <SelectMenu
             :model-value="plugins.searchStyleM ?? ''"
@@ -545,7 +579,7 @@ async function removePlugin(id: string, name: string) {
           />
           <p class="opt-hint">{{ t("theme.pluginSearchStyleMHint") }}</p>
         </label>
-        <label class="flex flex-col gap-1">
+        <label v-if="deviceMode === 'm'" class="flex flex-col gap-1">
           <span class="field-label">{{ t("theme.pluginSearchPositionM") }}</span>
           <SelectMenu
             :model-value="plugins.searchPositionM ?? ''"
@@ -741,12 +775,36 @@ async function removePlugin(id: string, name: string) {
               @change="updateLink(field, i, 'url', ($event.target as HTMLInputElement).value)"
             />
             <input
-              class="input h-7 w-28 shrink-0 text-[calc(12px*var(--ui-font-scale))]"
+              class="input h-7 w-24 shrink-0 text-[calc(12px*var(--ui-font-scale))]"
               type="text"
               :value="row.icon"
               :placeholder="t('theme.linkIcon')"
               @change="updateLink(field, i, 'icon', ($event.target as HTMLInputElement).value)"
             />
+            <!-- 从站点资产选图:按钮内预览当前站内图标,无图标时显示图片图标 -->
+            <button
+              type="button"
+              class="btn-icon h-7 w-7 shrink-0"
+              :title="t('theme.linkPickAsset')"
+              @click="openAssetPicker(field, i)"
+            >
+              <img
+                v-if="row.icon && iconThumb(row.icon)"
+                :src="iconThumb(row.icon)"
+                class="h-4 w-4 rounded object-cover"
+                alt=""
+              />
+              <AppIcon v-else name="image" :size="13" />
+            </button>
+            <button
+              v-if="row.icon"
+              type="button"
+              class="btn-icon h-7 w-7 shrink-0"
+              :title="t('theme.linkIconClear')"
+              @click="clearLinkIcon(field, i)"
+            >
+              <AppIcon name="x" :size="12" />
+            </button>
             <button
               type="button"
               class="btn-icon h-7 w-7 shrink-0 hover:!text-danger"
@@ -837,6 +895,32 @@ async function removePlugin(id: string, name: string) {
         <button class="btn btn-secondary" @click="pickerOpen = false">{{ t("common.cancel") }}</button>
         <button class="btn btn-primary" @click="confirmPicker">{{ t("common.confirm") }}</button>
       </template>
+    </Modal>
+
+    <!-- 友链图标资产选择:网格列出站点资产目录下的文件,点选即写入图标路径 -->
+    <Modal v-if="assetPickerOpen" :title="t('theme.linkPickAssetTitle')" :width="460" @cancel="assetPickerOpen = false">
+      <div v-if="site.assetFiles.length" class="asset-grid">
+        <button
+          v-for="f in site.assetFiles"
+          :key="f.path"
+          type="button"
+          class="asset-cell"
+          :title="f.path"
+          @click="pickAsset(f.path)"
+        >
+          <span class="asset-thumb">
+            <img
+              v-if="iconThumb(f.path)"
+              :src="iconThumb(f.path)"
+              :alt="f.name"
+              loading="lazy"
+            />
+            <span v-else class="text-[calc(11px*var(--ui-font-scale))] text-ink-3">{{ f.name }}</span>
+          </span>
+          <span class="asset-name">{{ f.name }}</span>
+        </button>
+      </div>
+      <p v-else class="py-6 text-center text-[calc(13px*var(--ui-font-scale))] text-ink-3">{{ t("theme.linkPickAssetEmpty") }}</p>
     </Modal>
   </div>
 </template>
@@ -985,6 +1069,70 @@ async function removePlugin(id: string, name: string) {
 .navlist-caret-sp {
   width: 18px;
   flex-shrink: 0;
+}
+
+/* ---------- 友链图标资产选择网格 ---------- */
+.asset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 10px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+.asset-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg, 10px);
+  background: transparent;
+  cursor: pointer;
+  transition:
+    border-color var(--duration-fast) var(--ease-plain),
+    background-color var(--duration-fast) var(--ease-plain),
+    transform 100ms ease-out;
+}
+.asset-cell:hover {
+  border-color: var(--color-accent);
+  background: var(--color-surface-2);
+}
+.asset-cell:active {
+  transform: scale(0.97);
+}
+.asset-cell:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+.asset-thumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: 6px;
+  background: var(--color-surface-2);
+}
+.asset-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.asset-name {
+  overflow: hidden;
+  font-size: calc(11px * var(--ui-font-scale));
+  color: var(--color-ink-2);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+}
+@media (prefers-reduced-motion: reduce) {
+  .asset-cell {
+    transition: none;
+  }
+  .asset-cell:active {
+    transform: none;
+  }
 }
 
 /* ---------- 数值原地编辑:数字与输入态共用同一格位(布局零位移)。

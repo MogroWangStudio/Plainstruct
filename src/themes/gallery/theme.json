@@ -8,14 +8,14 @@
   "config": [
     {
       "key": "showLogoPc",
-      "label": "显示站点 Logo（桌面端）",
+      "label": "显示站点 Logo",
       "type": "boolean",
       "default": true,
       "category": "站点标识"
     },
     {
       "key": "showLogoM",
-      "label": "显示站点 Logo（移动端）",
+      "label": "显示站点 Logo",
       "type": "boolean",
       "default": true,
       "category": "站点标识",
@@ -23,14 +23,14 @@
     },
     {
       "key": "showTitlePc",
-      "label": "显示站点标题（桌面端）",
+      "label": "显示站点标题",
       "type": "boolean",
       "default": true,
       "category": "站点标识"
     },
     {
       "key": "showTitleM",
-      "label": "显示站点标题（移动端）",
+      "label": "显示站点标题",
       "type": "boolean",
       "default": true,
       "category": "站点标识",
@@ -38,7 +38,7 @@
     },
     {
       "key": "logoSizePc",
-      "label": "Logo 大小（桌面端）",
+      "label": "Logo 大小",
       "type": "number",
       "default": 26,
       "min": 16,
@@ -48,7 +48,7 @@
     },
     {
       "key": "logoSizeM",
-      "label": "Logo 大小（移动端）",
+      "label": "Logo 大小",
       "type": "number",
       "default": 26,
       "min": 16,
@@ -59,7 +59,7 @@
     },
     {
       "key": "logoPosPc",
-      "label": "Logo 位置（桌面端）",
+      "label": "Logo 位置",
       "type": "select",
       "default": "标题左侧",
       "options": [
@@ -70,7 +70,7 @@
     },
     {
       "key": "logoPosM",
-      "label": "Logo 位置（移动端）",
+      "label": "Logo 位置",
       "type": "select",
       "default": "标题左侧",
       "options": [
@@ -102,7 +102,7 @@
     },
     {
       "key": "customFont",
-      "label": "自定义字体（font-family）",
+      "label": "自定义字体",
       "type": "text",
       "default": "",
       "visibleIf": {
@@ -113,7 +113,7 @@
     },
     {
       "key": "fontSizePc",
-      "label": "正文字号（桌面端）",
+      "label": "正文字号",
       "type": "number",
       "default": 15.5,
       "min": 12,
@@ -123,7 +123,7 @@
     },
     {
       "key": "fontSizeM",
-      "label": "正文字号（移动端）",
+      "label": "正文字号",
       "type": "number",
       "default": 15.5,
       "min": 12,
@@ -134,13 +134,14 @@
     },
     {
       "key": "contentWidth",
-      "label": "正文宽度（px）",
+      "label": "正文宽度",
       "type": "number",
       "default": 740,
       "min": 600,
       "max": 920,
       "step": 20,
-      "category": "布局"
+      "category": "布局",
+      "hint": "单位：px"
     },
     {
       "key": "sidebarWidth",
@@ -154,7 +155,7 @@
     },
     {
       "key": "sidebarWidthM",
-      "label": "移动端抽屉宽度（%）",
+      "label": "抽屉宽度",
       "type": "number",
       "default": 84,
       "min": 60,
@@ -165,21 +166,20 @@
     },
     {
       "key": "sidebarTogglePc",
-      "label": "折叠开关位置（桌面端）",
+      "label": "折叠开关位置",
       "type": "select",
-      "default": "侧栏边缘",
+      "default": "右下角",
       "options": [
-        "侧栏边缘",
-        "侧栏顶部",
-        "侧栏底部",
+        "右下角",
+        "左下角",
         "隐藏"
       ],
       "category": "布局",
-      "hint": "侧栏右缘滑出式开关的贴附位置；「隐藏」时不显示开关"
+      "hint": "显示在侧栏内部的折叠按钮（默认右下角，可选左下角）；「隐藏」时不显示开关。旧配置中的边缘/顶部/底部位置自动按右下角处理。"
     },
     {
       "key": "sidebarToggleM",
-      "label": "折叠开关位置（移动端）",
+      "label": "折叠开关位置",
       "type": "select",
       "default": "抽屉顶部",
       "options": [

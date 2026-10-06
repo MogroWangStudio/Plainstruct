@@ -157,7 +157,7 @@ function confirm() {
         </div>
         <p class="opt-hint">{{ t("imageInsert.sizeHint") }}</p>
         <label class="flex flex-col gap-1">
-          <span class="field-label">{{ t("imageInsert.class") }}</span>
+          <span class="field-label">{{ t("imageInsert.klass") }}</span>
           <input v-model="state.klass" class="input mono" type="text" spellcheck="false" placeholder="mws_ps_imgpreview" />
           <p class="opt-hint">{{ t("imageInsert.classHint") }}</p>
         </label>

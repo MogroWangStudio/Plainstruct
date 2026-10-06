@@ -11,7 +11,7 @@ const editor = useEditorStore();
 const publish = usePublishStore();
 
 /* ---------- 问候语:随机起句,周期轮换(仅空闲态可见,轮换在后台持续) ---------- */
-const GREETING_KEYS = Array.from({ length: 7 }, (_, i) => `titlebar.greeting${i}`);
+const GREETING_KEYS = Array.from({ length: 14 }, (_, i) => `titlebar.greeting${i}`);
 const BLESSING_KEYS = Array.from({ length: 4 }, (_, i) => `titlebar.blessing${i}`);
 const greetIdx = ref(Math.floor(Math.random() * GREETING_KEYS.length));
 let greetTimer: ReturnType<typeof setInterval> | null = null;

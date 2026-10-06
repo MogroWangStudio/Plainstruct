@@ -124,6 +124,11 @@ body.ps-home .blog-main {
   }
   body[data-topbar-mnav="true"] .blog-mnav-btn {
     display: inline-flex;
+    /* 与搜索按钮同款扁圆角矩形条(60×36),移动端列表/搜索视觉呼应 */
+    width: 60px;
+    height: 36px;
+    border-radius: 11px;
+    background: color-mix(in srgb, currentColor 8%, transparent);
   }
 }
 .blog-mnav {

@@ -403,6 +403,9 @@ export const useSiteStore = defineStore("site", {
           imgPreviewRequireMark: patch.imgPreviewRequireMark ?? current.imgPreviewRequireMark,
           searchStyle: patch.searchStyle ?? current.searchStyle,
           searchPosition: patch.searchPosition ?? current.searchPosition,
+          // 移动端独立设置:缺省 undefined(沿用 PC 配置),旧版本在此处丢失导致移动端设置无效
+          searchStyleM: patch.searchStyleM ?? current.searchStyleM,
+          searchPositionM: patch.searchPositionM ?? current.searchPositionM,
           custom: patch.custom ?? current.custom,
         },
       });

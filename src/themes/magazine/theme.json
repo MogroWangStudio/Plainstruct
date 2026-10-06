@@ -30,13 +30,14 @@
     },
     {
       "key": "navMaxItems",
-      "label": "右上角导航最多显示（项）",
+      "label": "右上角导航最多显示",
       "type": "number",
       "default": 6,
       "min": 1,
       "max": 12,
       "step": 1,
-      "category": "顶栏与导航"
+      "category": "顶栏与导航",
+      "hint": "单位：项"
     },
     {
       "key": "topbarPageTitle",
@@ -48,17 +49,18 @@
     },
     {
       "key": "topbarWidthPct",
-      "label": "顶栏宽度（%）",
+      "label": "顶栏宽度",
       "type": "number",
       "default": 75,
       "min": 50,
       "max": 100,
       "step": 5,
-      "category": "顶栏与导航"
+      "category": "顶栏与导航",
+      "hint": "单位：%"
     },
     {
       "key": "topbarWidthPctM",
-      "label": "移动端顶栏宽度（%）",
+      "label": "顶栏宽度",
       "type": "number",
       "default": 92,
       "min": 50,
@@ -81,7 +83,7 @@
     },
     {
       "key": "topbarShapeWidth",
-      "label": "顶栏变形后宽度（px）",
+      "label": "顶栏变形后宽度",
       "type": "number",
       "default": 720,
       "min": 360,
@@ -94,11 +96,12 @@
           "圆角矩形"
         ]
       },
-      "category": "顶栏与导航"
+      "category": "顶栏与导航",
+      "hint": "单位：px"
     },
     {
       "key": "topbarShapeWidthPctM",
-      "label": "移动端顶栏变形后宽度（%）",
+      "label": "顶栏变形后宽度",
       "type": "number",
       "default": 90,
       "min": 50,
@@ -131,7 +134,7 @@
     },
     {
       "key": "topbarEaseCustom",
-      "label": "自定义曲线（cubic-bezier）",
+      "label": "自定义曲线",
       "type": "text",
       "default": "0.23, 1, 0.32, 1",
       "visibleIf": {
@@ -142,23 +145,25 @@
     },
     {
       "key": "topbarDuration",
-      "label": "顶栏变形时长（ms）",
+      "label": "顶栏变形时长",
       "type": "number",
       "default": 220,
       "min": 0,
       "max": 800,
       "step": 20,
-      "category": "顶栏与导航"
+      "category": "顶栏与导航",
+      "hint": "单位：ms"
     },
     {
       "key": "topbarScrollAt",
-      "label": "变形触发滚动量（px）",
+      "label": "变形触发滚动量",
       "type": "number",
       "default": 24,
       "min": 0,
       "max": 400,
       "step": 4,
-      "category": "顶栏与导航"
+      "category": "顶栏与导航",
+      "hint": "单位：px"
     },
     {
       "key": "topbarBgColor",
@@ -169,23 +174,25 @@
     },
     {
       "key": "topbarBlur",
-      "label": "顶栏背景模糊（px）",
+      "label": "顶栏背景模糊",
       "type": "number",
       "default": 10,
       "min": 0,
       "max": 40,
       "step": 1,
-      "category": "顶栏与导航"
+      "category": "顶栏与导航",
+      "hint": "单位：px"
     },
     {
       "key": "topbarFill",
-      "label": "顶栏填充不透明度（%）",
+      "label": "顶栏填充不透明度",
       "type": "number",
       "default": 88,
       "min": 0,
       "max": 100,
       "step": 1,
-      "category": "顶栏与导航"
+      "category": "顶栏与导航",
+      "hint": "单位：%"
     },
     {
       "key": "showArchive",
@@ -233,37 +240,40 @@
     },
     {
       "key": "logoWidthPx",
-      "label": "Logo 宽度（px）",
+      "label": "Logo 宽度",
       "type": "number",
       "default": 30,
       "min": 16,
       "max": 128,
       "step": 2,
-      "category": "品牌与标识"
+      "category": "品牌与标识",
+      "hint": "单位：px"
     },
     {
       "key": "logoHeightPx",
-      "label": "Logo 高度（px）",
+      "label": "Logo 高度",
       "type": "number",
       "default": 30,
       "min": 16,
       "max": 128,
       "step": 2,
-      "category": "品牌与标识"
+      "category": "品牌与标识",
+      "hint": "单位：px"
     },
     {
       "key": "logoRadius",
-      "label": "Logo 圆角（px）",
+      "label": "Logo 圆角",
       "type": "number",
       "default": 2,
       "min": 0,
       "max": 26,
       "step": 1,
-      "category": "品牌与标识"
+      "category": "品牌与标识",
+      "hint": "单位：px"
     },
     {
       "key": "logoWidthPxM",
-      "label": "移动端 Logo 宽度（px）",
+      "label": "Logo 宽度",
       "type": "number",
       "default": 22,
       "min": 16,
@@ -274,7 +284,7 @@
     },
     {
       "key": "logoHeightPxM",
-      "label": "移动端 Logo 高度（px）",
+      "label": "Logo 高度",
       "type": "number",
       "default": 22,
       "min": 16,
@@ -311,27 +321,29 @@
     },
     {
       "key": "contentWidth",
-      "label": "正文宽度（px）",
+      "label": "正文宽度",
       "type": "number",
       "default": 720,
       "min": 520,
       "max": 900,
       "step": 20,
-      "category": "布局"
+      "category": "布局",
+      "hint": "单位：px"
     },
     {
       "key": "navColumns",
-      "label": "文章卡片并排（个）",
+      "label": "文章卡片并排",
       "type": "number",
       "default": 1,
       "min": 1,
       "max": 4,
       "step": 1,
-      "category": "布局"
+      "category": "布局",
+      "hint": "单位：个"
     },
     {
       "key": "navColumnsM",
-      "label": "移动端卡片并排（个）",
+      "label": "卡片并排",
       "type": "number",
       "default": 1,
       "min": 1,
@@ -342,17 +354,18 @@
     },
     {
       "key": "coverHeight",
-      "label": "封面图高度（px）",
+      "label": "封面图高度",
       "type": "number",
       "default": 220,
       "min": 120,
       "max": 420,
       "step": 20,
-      "category": "布局"
+      "category": "布局",
+      "hint": "单位：px"
     },
     {
       "key": "coverHeightM",
-      "label": "移动端封面图高度（px）",
+      "label": "封面图高度",
       "type": "number",
       "default": 160,
       "min": 100,
@@ -401,17 +414,18 @@
     },
     {
       "key": "homeWidthPct",
-      "label": "主页卡片流宽度（%）",
+      "label": "主页卡片流宽度",
       "type": "number",
       "default": 75,
       "min": 50,
       "max": 100,
       "step": 5,
-      "category": "布局"
+      "category": "布局",
+      "hint": "单位：%"
     },
     {
       "key": "homeWidthPctM",
-      "label": "移动端主页卡片流宽度（%）",
+      "label": "主页卡片流宽度",
       "type": "number",
       "default": 92,
       "min": 50,
@@ -432,7 +446,7 @@
     },
     {
       "key": "homeGroupMax",
-      "label": "分类卡片流每组最多显示（篇）",
+      "label": "分类卡片流每组最多显示",
       "type": "number",
       "default": 0,
       "min": 0,
@@ -443,7 +457,7 @@
     },
     {
       "key": "cardFontSizePc",
-      "label": "卡片流字号（px）",
+      "label": "卡片流字号",
       "type": "number",
       "default": 17,
       "min": 13,
@@ -454,7 +468,7 @@
     },
     {
       "key": "cardFontSizeM",
-      "label": "移动端卡片流字号（px）",
+      "label": "卡片流字号",
       "type": "number",
       "default": 17,
       "min": 12,
@@ -495,7 +509,7 @@
     },
     {
       "key": "cardShadowX",
-      "label": "阴影 X 偏移（px）",
+      "label": "阴影 X 偏移",
       "type": "number",
       "default": 0,
       "min": -24,
@@ -505,11 +519,12 @@
         "key": "cardShadow",
         "equals": "自定义"
       },
-      "category": "卡片外观"
+      "category": "卡片外观",
+      "hint": "单位：px"
     },
     {
       "key": "cardShadowY",
-      "label": "阴影 Y 偏移（px）",
+      "label": "阴影 Y 偏移",
       "type": "number",
       "default": 2,
       "min": -24,
@@ -519,11 +534,12 @@
         "key": "cardShadow",
         "equals": "自定义"
       },
-      "category": "卡片外观"
+      "category": "卡片外观",
+      "hint": "单位：px"
     },
     {
       "key": "cardShadowBlur",
-      "label": "阴影模糊（px）",
+      "label": "阴影模糊",
       "type": "number",
       "default": 8,
       "min": 0,
@@ -533,11 +549,12 @@
         "key": "cardShadow",
         "equals": "自定义"
       },
-      "category": "卡片外观"
+      "category": "卡片外观",
+      "hint": "单位：px"
     },
     {
       "key": "cardShadowSpread",
-      "label": "阴影扩散（px）",
+      "label": "阴影扩散",
       "type": "number",
       "default": 0,
       "min": -20,
@@ -547,11 +564,12 @@
         "key": "cardShadow",
         "equals": "自定义"
       },
-      "category": "卡片外观"
+      "category": "卡片外观",
+      "hint": "单位：px"
     },
     {
       "key": "cardShadowOpacity",
-      "label": "阴影不透明度（%）",
+      "label": "阴影不透明度",
       "type": "number",
       "default": 9,
       "min": 0,
@@ -561,7 +579,8 @@
         "key": "cardShadow",
         "equals": "自定义"
       },
-      "category": "卡片外观"
+      "category": "卡片外观",
+      "hint": "单位：%"
     },
     {
       "key": "cardShadowHover",
@@ -595,7 +614,7 @@
     },
     {
       "key": "cardShadowHoverX",
-      "label": "悬停阴影 X 偏移（px）",
+      "label": "悬停阴影 X 偏移",
       "type": "number",
       "default": 0,
       "min": -24,
@@ -605,11 +624,12 @@
         "key": "cardShadowHover",
         "equals": "自定义"
       },
-      "category": "卡片外观"
+      "category": "卡片外观",
+      "hint": "单位：px"
     },
     {
       "key": "cardShadowHoverY",
-      "label": "悬停阴影 Y 偏移（px）",
+      "label": "悬停阴影 Y 偏移",
       "type": "number",
       "default": 2,
       "min": -24,
@@ -619,11 +639,12 @@
         "key": "cardShadowHover",
         "equals": "自定义"
       },
-      "category": "卡片外观"
+      "category": "卡片外观",
+      "hint": "单位：px"
     },
     {
       "key": "cardShadowHoverBlur",
-      "label": "悬停阴影模糊（px）",
+      "label": "悬停阴影模糊",
       "type": "number",
       "default": 8,
       "min": 0,
@@ -633,11 +654,12 @@
         "key": "cardShadowHover",
         "equals": "自定义"
       },
-      "category": "卡片外观"
+      "category": "卡片外观",
+      "hint": "单位：px"
     },
     {
       "key": "cardShadowHoverSpread",
-      "label": "悬停阴影扩散（px）",
+      "label": "悬停阴影扩散",
       "type": "number",
       "default": 0,
       "min": -20,
@@ -647,11 +669,12 @@
         "key": "cardShadowHover",
         "equals": "自定义"
       },
-      "category": "卡片外观"
+      "category": "卡片外观",
+      "hint": "单位：px"
     },
     {
       "key": "cardShadowHoverOpacity",
-      "label": "悬停阴影不透明度（%）",
+      "label": "悬停阴影不透明度",
       "type": "number",
       "default": 9,
       "min": 0,
@@ -661,7 +684,8 @@
         "key": "cardShadowHover",
         "equals": "自定义"
       },
-      "category": "卡片外观"
+      "category": "卡片外观",
+      "hint": "单位：%"
     },
     {
       "key": "cardHover",
@@ -696,7 +720,7 @@
     },
     {
       "key": "cardHoverEaseCustom",
-      "label": "自定义曲线（cubic-bezier）",
+      "label": "自定义曲线",
       "type": "text",
       "default": "0.23, 1, 0.32, 1",
       "visibleIf": {
@@ -707,13 +731,14 @@
     },
     {
       "key": "cardHoverDuration",
-      "label": "卡片悬停时长（ms）",
+      "label": "卡片悬停时长",
       "type": "number",
       "default": 240,
       "min": 80,
       "max": 800,
       "step": 20,
-      "category": "卡片外观"
+      "category": "卡片外观",
+      "hint": "单位：ms"
     },
     {
       "key": "cardEntryAnim",
@@ -731,7 +756,7 @@
     },
     {
       "key": "fontSizePc",
-      "label": "正文字号（桌面端）",
+      "label": "正文字号",
       "type": "number",
       "default": 17,
       "min": 13,
@@ -741,7 +766,7 @@
     },
     {
       "key": "fontSizeM",
-      "label": "正文字号（移动端）",
+      "label": "正文字号",
       "type": "number",
       "default": 16,
       "min": 12,
@@ -772,7 +797,7 @@
     },
     {
       "key": "customFont",
-      "label": "自定义字体（font-family）",
+      "label": "自定义字体",
       "type": "text",
       "default": "",
       "visibleIf": {
@@ -895,7 +920,7 @@
     },
     {
       "key": "tocClickEaseCustom",
-      "label": "自定义曲线 (x1, y1, x2, y2）",
+      "label": "自定义曲线",
       "type": "text",
       "default": "0.23, 1, 0.32, 1",
       "category": "目录与动效",
