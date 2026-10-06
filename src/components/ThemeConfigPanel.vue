@@ -165,18 +165,29 @@ function rangeFill(field: ThemeField): string {
   return `${Math.min(100, Math.max(0, pct))}%`;
 }
 
-/* 数值双击编辑:直接键入精确值(回车/失焦提交,Esc 取消,越界收敛到滑块范围) */
+/* 数值双击编辑:输入框恒在数字原地(同一格位,布局零位移),双击前只读展示;
+   回车/失焦提交,Esc 取消,越界收敛到滑块范围 */
 const editingKey = ref<string | null>(null);
-const editInput = ref<HTMLInputElement | null>(null);
+let editEl: HTMLInputElement | null = null;
+
+/** v-for 内的函数引用:只捕获正处于编辑态的那个输入框 */
+function setEditRef(key: string, el: unknown) {
+  if (editingKey.value === key) editEl = (el as HTMLInputElement) ?? null;
+}
 
 watch(editingKey, async (k) => {
-  if (!k) return;
   await nextTick();
-  editInput.value?.focus();
-  editInput.value?.select();
+  if (k === null) {
+    editEl = null;
+    return;
+  }
+  editEl?.focus();
+  editEl?.select();
 });
 
 function commitEdit(field: ThemeField, e: Event) {
+  // 只读态点别处触发的 blur 不提交
+  if (editingKey.value !== field.key) return;
   const raw = (e.target as HTMLInputElement).value.trim();
   editingKey.value = null;
   const n = Number(raw);
@@ -484,7 +495,8 @@ async function removePlugin(id: string, name: string) {
           @update:model-value="(v: string) => onField(field, v)"
         />
 
-        <!-- 数值:拖动滑块;双击数字可直接输入;偏离默认值时出现一键重置 -->
+        <!-- 数值:拖动滑块;数字原地可编辑 —— 双击后同一格位就地进入输入态(不占整行),
+             编辑态以强调色描边 + 淡色光环绕浮现,非线性缓动;偏离默认值时一键重置 -->
         <div v-else-if="field.type === 'number'" class="flex items-center gap-3">
           <input
             type="range"
@@ -497,25 +509,19 @@ async function removePlugin(id: string, name: string) {
             @input="onField(field, Number(($event.target as HTMLInputElement).value))"
           />
           <input
-            v-if="editingKey === field.key"
-            ref="editInput"
-            class="input h-7 w-14 px-1 text-center text-[calc(12px*var(--ui-font-scale))]"
+            class="num-input mono"
+            :class="{ editing: editingKey === field.key }"
             type="text"
             inputmode="decimal"
+            :readonly="editingKey !== field.key"
             :value="String(fieldValue(field))"
+            :title="t('theme.numEditHint')"
+            :ref="(el) => setEditRef(field.key, el)"
+            @dblclick="editingKey = field.key"
             @keydown.enter="commitEdit(field, $event)"
             @keydown.esc="editingKey = null"
             @blur="commitEdit(field, $event)"
           />
-          <button
-            v-else
-            type="button"
-            class="mono w-14 cursor-text rounded text-center text-[calc(12px*var(--ui-font-scale))] text-ink-2 transition-colors hover:text-ink"
-            :title="t('theme.numEditHint')"
-            @dblclick="editingKey = field.key"
-          >
-            {{ fieldValue(field) }}
-          </button>
           <button
             v-if="Number(fieldValue(field)) !== Number(field.default ?? 0)"
             type="button"
@@ -799,5 +805,48 @@ async function removePlugin(id: string, name: string) {
 .navlist-caret-sp {
   width: 18px;
   flex-shrink: 0;
+}
+
+/* ---------- 数值原地编辑:数字与输入态共用同一格位(布局零位移)。
+   双击前只读展示,编辑态的描边 / 淡色光环 / 微缩放以非线性缓出浮现,
+   收起沿同一过渡回原样;系统减弱动态时直接切换 ---------- */
+.num-input {
+  flex: none;
+  width: 56px;
+  height: 28px;
+  padding: 0 2px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-ink-2);
+  font-size: calc(12px * var(--ui-font-scale));
+  text-align: center;
+  cursor: text;
+  outline: none;
+  transform: scale(1);
+  transition:
+    border-color 200ms var(--ease-plain),
+    background-color 200ms var(--ease-plain),
+    box-shadow 260ms var(--ease-plain),
+    color 140ms ease,
+    transform 260ms var(--ease-pop);
+}
+.num-input:hover:not(.editing) {
+  color: var(--color-ink);
+}
+.num-input.editing {
+  border-color: var(--color-accent);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 15%, transparent);
+  transform: scale(1.05);
+}
+@media (prefers-reduced-motion: reduce) {
+  .num-input {
+    transition: none;
+  }
+  .num-input.editing {
+    transform: none;
+  }
 }
 </style>
