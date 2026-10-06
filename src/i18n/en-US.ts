@@ -381,6 +381,7 @@ export default {
     linkPickAssetTitle: "Pick a site asset as icon",
     linkPickAssetEmpty: "No files in the asset folder yet — import some on the Assets page.",
     linkIconClear: "Clear icon",
+    pluginSearchFollowPc: "Follow PC setting",
     deviceLabel: "Config device",
     devicePc: "Desktop",
     deviceM: "Mobile",

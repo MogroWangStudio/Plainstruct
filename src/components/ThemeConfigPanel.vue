@@ -570,7 +570,7 @@ async function removePlugin(id: string, name: string) {
           <SelectMenu
             :model-value="plugins.searchStyleM ?? ''"
             :options="[
-              { value: '', label: t('theme.pluginSearchStyle') + ' · ' + (plugins.searchStyle === 'bar' ? t('theme.pluginSearchStyleBar') : t('theme.pluginSearchStyleButton')) },
+              { value: '', label: t('theme.pluginSearchFollowPc') },
               { value: 'button', label: t('theme.pluginSearchStyleButton') },
               { value: 'bar', label: t('theme.pluginSearchStyleBar') },
             ]"
@@ -584,7 +584,7 @@ async function removePlugin(id: string, name: string) {
           <SelectMenu
             :model-value="plugins.searchPositionM ?? ''"
             :options="[
-              { value: '', label: t('theme.pluginSearchPosition') + ' · ' + (plugins.searchPosition === 'bottom-right' ? t('theme.pluginSearchPosBr') : plugins.searchPosition === 'bottom-left' ? t('theme.pluginSearchPosBl') : t('theme.pluginSearchPosTop')) },
+              { value: '', label: t('theme.pluginSearchFollowPc') },
               { value: 'bottom-right', label: t('theme.pluginSearchPosBr') },
               { value: 'bottom-left', label: t('theme.pluginSearchPosBl') },
               { value: 'topbar', label: t('theme.pluginSearchPosTop') },

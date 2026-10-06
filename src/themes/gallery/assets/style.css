@@ -1540,3 +1540,107 @@ body.ps-sidebar-collapsed .ps-sidebar-toggle svg {
 .ps-nav-caret-sp svg {
   pointer-events: none;
 }
+
+/* ---------- 4.1 顶栏扩展:移动端当前文档标题对齐、下拉变形与桌面端折叠/常显顶栏 ---------- */
+
+/* 变形过渡:位置、尺寸与外观统一缓动(形状由 data-topbar-shape 驱动,滚动态由共享行为脚本标记) */
+.ps-topbar {
+  transition:
+    left 300ms cubic-bezier(0.23, 1, 0.32, 1),
+    right 300ms cubic-bezier(0.23, 1, 0.32, 1),
+    top 300ms cubic-bezier(0.23, 1, 0.32, 1),
+    height 300ms cubic-bezier(0.23, 1, 0.32, 1),
+    border-radius 300ms cubic-bezier(0.23, 1, 0.32, 1),
+    border-color 300ms cubic-bezier(0.23, 1, 0.32, 1),
+    box-shadow 300ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+@media (max-width: 900px) {
+  /* 当前文档标题(第二行)对齐:右对齐为缺省,可居中或左对齐 */
+  body[data-crumbs-align="居中"] .ps-crumbs {
+    justify-content: center;
+    padding-right: 0;
+  }
+
+  body[data-crumbs-align="左对齐"] .ps-crumbs {
+    justify-content: flex-start;
+    padding-right: 0;
+  }
+
+  /* 下拉变形(移动端):收成单行浮起条,第二行的当前文档标题隐去 */
+  body[data-topbar-shape="药丸"] .ps-topbar.is-scrolled .ps-crumbs,
+  body[data-topbar-shape="圆角矩形"] .ps-topbar.is-scrolled .ps-crumbs {
+    display: none;
+  }
+}
+
+/* 下拉变形(双端共用):浮起离顶,边框与阴影托起 */
+body[data-topbar-shape="药丸"] .ps-topbar.is-scrolled,
+body[data-topbar-shape="圆角矩形"] .ps-topbar.is-scrolled {
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  border: 1px solid var(--ps-line);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+}
+
+body[data-topbar-shape="药丸"] .ps-topbar.is-scrolled {
+  height: 52px;
+  border-radius: 999px;
+}
+
+body[data-topbar-shape="圆角矩形"] .ps-topbar.is-scrolled {
+  height: 56px;
+  border-radius: 16px;
+}
+
+/* 桌面端(≥901px):列表栏折叠时自动显示顶栏;可常显或不显示 */
+@media (min-width: 901px) {
+  .ps-topbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 70;
+    /* display 交给下方折叠/常显条件规则:缺省「折叠时显示」在侧栏展开时保持隐藏 */
+    align-items: center;
+    gap: 10px;
+    height: var(--ps-topbar-h);
+    padding: 0 16px;
+    background: color-mix(in srgb, var(--ps-bg) 82%, transparent);
+    border-bottom: 1px solid var(--ps-line);
+  }
+
+  body.ps-sidebar-collapsed .ps-topbar,
+  body[data-topbar-show-pc="常显"] .ps-topbar {
+    display: flex;
+  }
+
+  body[data-topbar-show-pc="不显示"] .ps-topbar {
+    display: none;
+  }
+
+  /* 顶栏内站点标识居左,当前文档标题居右(移动端为 brand 贴右的两行布局,此处复位) */
+  .ps-topbar .ps-topbar-brand {
+    margin-left: 0;
+  }
+
+  .ps-topbar .ps-crumbs {
+    display: flex;
+    margin-left: auto;
+    padding-right: 0;
+    font-size: 12.5px;
+  }
+
+  /* 顶栏出现时给固定顶栏让位 */
+  body.ps-sidebar-collapsed .ps-shell,
+  body[data-topbar-show-pc="常显"] .ps-shell {
+    padding-top: var(--ps-topbar-h);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ps-topbar {
+    transition: none;
+  }
+}

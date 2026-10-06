@@ -381,6 +381,7 @@ export default {
     linkPickAssetTitle: "选择站点资产作为图标",
     linkPickAssetEmpty: "资产目录还没有文件，先到资产页导入。",
     linkIconClear: "清除图标",
+    pluginSearchFollowPc: "沿用 PC 设置",
     deviceLabel: "配置设备",
     devicePc: "桌面端",
     deviceM: "移动端",

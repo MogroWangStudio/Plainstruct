@@ -179,6 +179,45 @@
       "hint": "窗口宽度 ≤900px 时抽屉头部的收起按钮；「隐藏」时通过点击遮罩关闭抽屉"
     },
     {
+      "key": "topbarShape",
+      "label": "顶栏下拉变形",
+      "type": "select",
+      "default": "无",
+      "options": [
+        "无",
+        "药丸",
+        "圆角矩形"
+      ],
+      "category": "布局",
+      "hint": "向下滚动超过一屏顶后,顶栏浮起变形:药丸收成胶囊条、圆角矩形收成圆角条;移动端顶栏与桌面端折叠/常显顶栏生效"
+    },
+    {
+      "key": "topbarShowPc",
+      "label": "顶栏显示",
+      "type": "select",
+      "default": "折叠时显示",
+      "options": [
+        "折叠时显示",
+        "常显",
+        "不显示"
+      ],
+      "category": "布局",
+      "hint": "桌面端(≥901px):列表栏折叠时自动显示顶栏(缺省);可改为始终显示或不显示"
+    },
+    {
+      "key": "topbarTitleAlignM",
+      "label": "当前文档标题对齐",
+      "type": "select",
+      "default": "右对齐",
+      "options": [
+        "右对齐",
+        "居中",
+        "左对齐"
+      ],
+      "category": "布局",
+      "hint": "移动端顶栏第二行的当前文档标题对齐方式"
+    },
+    {
       "key": "contentWidth",
       "label": "正文宽度",
       "type": "number",

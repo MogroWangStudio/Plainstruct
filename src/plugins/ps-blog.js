@@ -173,6 +173,15 @@
     window.addEventListener("scroll", syncBar, { passive: true });
     syncBar();
   }
+  /* 文档主题顶栏:同一套滚动态标记,下拉变形形态由主题配置(data-topbar-shape)驱动 */
+  var ptb = doc.querySelector(".ps-topbar");
+  if (ptb) {
+    var syncPTop = function () {
+      ptb.classList.toggle("is-scrolled", (window.scrollY || doc.documentElement.scrollTop || 0) > 24);
+    };
+    window.addEventListener("scroll", syncPTop, { passive: true });
+    syncPTop();
+  }
 
   /* ---------- 置顶按钮:下滚出现,点击平滑回顶;与搜索入口同角时竖列并排 ---------- */
   if (body.getAttribute("data-backtop") === "true") {
