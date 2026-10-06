@@ -162,8 +162,8 @@ body.font-custom {
 }
 
 .ps-logo {
-  width: 22px;
-  height: 22px;
+  width: var(--ps-logo-w, 22px);
+  height: auto;
   object-fit: contain;
 }
 
@@ -1283,54 +1283,76 @@ body[data-nav-current="加粗"] a.ps-nav-dir.current {
   font-weight: 700;
 }
 
-body[data-nav-current="左侧标记"] .ps-nav-link.current {
+/* 「下划线」为强调色下划线;旧值「左侧标记」按同效果兼容,用户改选后自然归位 */
+body[data-nav-current="左侧标记"] .ps-nav-link.current,
+body[data-nav-current="下划线"] .ps-nav-link.current {
   background: transparent;
   color: var(--ps-ink);
   font-weight: 600;
-  box-shadow: inset 2px 0 0 var(--ps-accent);
+  border-bottom-color: transparent;
+  text-decoration: underline;
+  text-decoration-color: var(--ps-accent);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 5px;
 }
 
-body[data-nav-current="左侧标记"] .ps-nav-link.current::before {
+body[data-nav-current="左侧标记"] .ps-nav-link.current::before,
+body[data-nav-current="下划线"] .ps-nav-link.current::before {
   content: none;
 }
 
-body[data-nav-current="左侧标记"] a.ps-nav-dir.current {
+body[data-nav-current="左侧标记"] a.ps-nav-dir.current,
+body[data-nav-current="下划线"] a.ps-nav-dir.current {
   color: var(--ps-ink);
   font-weight: 600;
-  box-shadow: inset 2px 0 0 var(--ps-accent);
+  text-decoration: underline;
+  text-decoration-color: var(--ps-accent);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 5px;
 }
 
 /* ---------- 4.0 移动端顶栏:目录按钮对齐搜索按钮(圆形毛玻璃),当前文档标题移到站点标识下方 ---------- */
 
 @media (max-width: 900px) {
   :root {
-    --ps-topbar-h: 84px;
+    /* 两行布局:目录按钮 44 + 行距 4 + 当前标题行 18 + 上下内边距 16 */
+    --ps-topbar-h: 82px;
   }
 
   .ps-topbar {
     height: var(--ps-topbar-h);
     flex-wrap: wrap;
-    row-gap: 2px;
+    row-gap: 4px;
     padding-top: 8px;
     padding-bottom: 8px;
   }
 
-  /* 目录按钮:与搜索按钮同一视觉语言 —— 圆形 + 半透明表面 + 背景模糊 */
+  /* 目录按钮:与搜索按钮同款圆形毛玻璃(同尺寸 44px,阴影与描边一致) */
   .ps-menu-btn {
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
+    border: none;
     border-radius: 50%;
     background: color-mix(in srgb, var(--ps-surface) 72%, transparent);
     -webkit-backdrop-filter: blur(14px) saturate(1.5);
     backdrop-filter: blur(14px) saturate(1.5);
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
   }
 
-  /* 当前文档路径:换行到第二行并右对齐,显示在站点标识(标题/logo)正下方 */
+  /* 当前文档标题:换到第二行右对齐,显示在站点标识(标题/logo)正下方;
+     右缘补 8px 与站点标识的内边距对齐,两者同轴 */
   .ps-crumbs {
     order: 3;
     flex-basis: 100%;
     justify-content: flex-end;
+    padding-right: 8px;
+  }
+
+  /* 站点名过长时截断,避免把第二行的当前标题挤出顶栏 */
+  .ps-topbar .ps-site-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }
 
@@ -1353,7 +1375,7 @@ body[data-nav-current="左侧标记"] a.ps-nav-dir.current {
   background: var(--ps-surface);
   color: var(--ps-ink-3);
   cursor: pointer;
-  transform: translateY(-50%);
+  transform: translateY(var(--tg-y, -50%));
   box-shadow: 2px 0 10px rgba(0, 0, 0, 0.06);
   transition:
     left 300ms cubic-bezier(0.23, 1, 0.32, 1),
@@ -1368,7 +1390,7 @@ body[data-nav-current="左侧标记"] a.ps-nav-dir.current {
 }
 
 .ps-sidebar-toggle:active {
-  transform: translateY(-50%) scale(0.94);
+  transform: translateY(var(--tg-y, -50%)) scale(0.94);
 }
 
 .ps-sidebar-toggle:focus-visible {
@@ -1377,6 +1399,8 @@ body[data-nav-current="左侧标记"] a.ps-nav-dir.current {
 }
 
 .ps-sidebar-toggle svg {
+  /* fill="none" 的透明区域默认不参与命中,点击会穿透到下层:关闭以让整个按钮可点 */
+  pointer-events: none;
   transition: transform 300ms cubic-bezier(0.23, 1, 0.32, 1);
 }
 
@@ -1399,14 +1423,40 @@ body.ps-sidebar-collapsed .ps-sidebar-toggle svg {
   transform: rotate(180deg);
 }
 
-/* 移动端:抽屉行为不变,开关隐藏 */
+/* 移动端:开关成为抽屉头部的收起按钮(data-toggle-m 配置,可隐藏) */
 @media (max-width: 900px) {
   .ps-sidebar-toggle {
+    position: absolute;
+    top: 18px;
+    right: 12px;
+    left: auto;
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--ps-line);
+    border-radius: 50%;
+    /* 复位纵向偏移:否则 :active 的 translateY(var(--tg-y)) 会让按钮按下瞬间上跳,
+       pointerup 落在按钮之外,click 永远无法触发 */
+    --tg-y: 0;
+    transform: none;
+    box-shadow: none;
+  }
+
+  body[data-toggle-m="隐藏"] .ps-sidebar-toggle {
     display: none;
+  }
+
+  /* 桌面折叠态残留的箭头转向在移动端复位(收起方向恒指左) */
+  body.ps-sidebar-collapsed .ps-sidebar-toggle svg {
+    transform: none;
   }
 
   body.ps-sidebar-collapsed .ps-sidebar {
     margin-left: 0;
+  }
+
+  /* 抽屉头部站点标识让位右上角的收起按钮 */
+  .ps-sidebar .ps-site {
+    padding-right: 44px;
   }
 }
 
@@ -1416,4 +1466,67 @@ body.ps-sidebar-collapsed .ps-sidebar-toggle svg {
   .ps-sidebar-toggle svg {
     transition: none;
   }
+}
+
+/* ---------- 4.0 折叠开关位置(桌面端):data-toggle-pc 配置驱动 ---------- */
+
+body[data-toggle-pc="侧栏顶部"] .ps-sidebar-toggle {
+  --tg-y: 0;
+  top: 18px;
+}
+
+body[data-toggle-pc="侧栏底部"] .ps-sidebar-toggle {
+  --tg-y: 0;
+  top: auto;
+  bottom: 18px;
+}
+
+body[data-toggle-pc="隐藏"] .ps-sidebar-toggle {
+  display: none;
+}
+
+/* ---------- 4.0 站点标识配置:Logo 与站点标题的大小、显隐、位置(data 属性驱动) ---------- */
+
+/* 桌面端(≥901px):侧栏头部站点标识的显隐与 Logo 位置 */
+@media (min-width: 901px) {
+  body[data-show-logo-pc="false"] .ps-sidebar .ps-logo {
+    display: none;
+  }
+
+  body[data-show-title-pc="false"] .ps-sidebar .ps-site-name {
+    display: none;
+  }
+
+  body[data-logo-pos-pc="标题上方"] .ps-site {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+/* 移动端(≤900px):抽屉头部与顶栏的站点标识显隐与 Logo 位置 */
+@media (max-width: 900px) {
+  body[data-show-logo-m="false"] .ps-logo {
+    display: none;
+  }
+
+  body[data-show-title-m="false"] .ps-site-name {
+    display: none;
+  }
+
+  body[data-logo-pos-m="标题上方"] .ps-site {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  body[data-logo-pos-m="标题上方"] .ps-topbar-brand {
+    flex-direction: column;
+    align-items: flex-end;
+  }
+}
+
+/* 按钮 svg 的透明填充区默认不参与命中,点击会穿透到下层:统一关闭,让整个按钮可点 */
+.ps-menu-btn svg,
+.ps-nav-caret svg,
+.ps-nav-caret-sp svg {
+  pointer-events: none;
 }

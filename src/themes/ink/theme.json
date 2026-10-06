@@ -7,6 +7,80 @@
   "description": "报刊衬线风：纸面留白，墨色排印，朱砂点睛。",
   "config": [
     {
+      "key": "showLogoPc",
+      "label": "显示站点 Logo（桌面端）",
+      "type": "boolean",
+      "default": true,
+      "category": "站点标识"
+    },
+    {
+      "key": "showLogoM",
+      "label": "显示站点 Logo（移动端）",
+      "type": "boolean",
+      "default": true,
+      "category": "站点标识",
+      "hint": "窗口宽度 ≤900px 时生效"
+    },
+    {
+      "key": "showTitlePc",
+      "label": "显示站点标题（桌面端）",
+      "type": "boolean",
+      "default": true,
+      "category": "站点标识"
+    },
+    {
+      "key": "showTitleM",
+      "label": "显示站点标题（移动端）",
+      "type": "boolean",
+      "default": true,
+      "category": "站点标识",
+      "hint": "窗口宽度 ≤900px 时生效"
+    },
+    {
+      "key": "logoSizePc",
+      "label": "Logo 大小（桌面端）",
+      "type": "number",
+      "default": 34,
+      "min": 16,
+      "max": 48,
+      "step": 1,
+      "category": "站点标识"
+    },
+    {
+      "key": "logoSizeM",
+      "label": "Logo 大小（移动端）",
+      "type": "number",
+      "default": 22,
+      "min": 16,
+      "max": 40,
+      "step": 1,
+      "category": "站点标识",
+      "hint": "窗口宽度 ≤900px 时生效"
+    },
+    {
+      "key": "logoPosPc",
+      "label": "Logo 位置（桌面端）",
+      "type": "select",
+      "default": "标题上方",
+      "options": [
+        "标题左侧",
+        "标题上方"
+      ],
+      "category": "站点标识"
+    },
+    {
+      "key": "logoPosM",
+      "label": "Logo 位置（移动端）",
+      "type": "select",
+      "default": "标题左侧",
+      "options": [
+        "标题左侧",
+        "标题上方"
+      ],
+      "category": "站点标识",
+      "hint": "窗口宽度 ≤900px 时生效"
+    },
+    {
       "key": "accentColor",
       "label": "强调色",
       "type": "color",
@@ -97,6 +171,32 @@
       "hint": "窗口宽度 ≤900px 时侧栏抽屉按视口百分比显示"
     },
     {
+      "key": "sidebarTogglePc",
+      "label": "折叠开关位置（桌面端）",
+      "type": "select",
+      "default": "侧栏边缘",
+      "options": [
+        "侧栏边缘",
+        "侧栏顶部",
+        "侧栏底部",
+        "隐藏"
+      ],
+      "category": "布局",
+      "hint": "侧栏右缘滑出式开关的贴附位置；「隐藏」时不显示开关"
+    },
+    {
+      "key": "sidebarToggleM",
+      "label": "折叠开关位置（移动端）",
+      "type": "select",
+      "default": "抽屉顶部",
+      "options": [
+        "抽屉顶部",
+        "隐藏"
+      ],
+      "category": "布局",
+      "hint": "窗口宽度 ≤900px 时抽屉头部的收起按钮；「隐藏」时通过点击遮罩关闭抽屉"
+    },
+    {
       "key": "pageTransition",
       "label": "页面过渡动画",
       "type": "select",
@@ -152,7 +252,7 @@
         "底色",
         "强调色",
         "加粗",
-        "左侧标记"
+        "下划线"
       ],
       "category": "悬停反馈",
       "hint": "当前文档在侧栏导航中的显示效果，「默认」保持主题原样式"

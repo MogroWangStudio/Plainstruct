@@ -2,13 +2,16 @@
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useAppStore } from "@/stores/app";
+import { usePublishStore } from "@/stores/publish";
 import { useSiteStore } from "@/stores/site";
 import AppIcon from "./AppIcon.vue";
 import BrandLogo from "./BrandLogo.vue";
+import BrandStatus from "./BrandStatus.vue";
 
 const { t } = useI18n();
 const app = useAppStore();
 const site = useSiteStore();
+const publish = usePublishStore();
 
 const maximized = ref(false);
 
@@ -17,6 +20,16 @@ const showWindowControls = computed(() => app.platform === "windows");
 const onMac = computed(() => app.platform === "macos");
 /** 悬停提示「返回主菜单」+ 手型光标:站点打开且不在设置页时可用 */
 const canGoBack = computed(() => site.open && app.view !== "settings");
+/** 「查看发布状态」悬停入口:存在发布上下文(进行中/已完成/失败)时出现 */
+const showPublishEntry = computed(
+  () =>
+    canGoBack.value &&
+    (publish.syncing ||
+      publish.checkingDeploy ||
+      publish.deployState !== "idle" ||
+      publish.result !== null ||
+      publish.error !== null),
+);
 
 async function winAction(action: "minimize" | "toggleMaximize" | "close") {
   const { getCurrentWindow } = await import("@tauri-apps/api/window");
@@ -36,6 +49,10 @@ async function goToStart() {
     await site.close();
   }
 }
+
+function goPublish() {
+  app.setView("publish");
+}
 </script>
 
 <template>
@@ -53,14 +70,23 @@ async function goToStart() {
     >
       <span class="brand-id flex items-center gap-2">
         <BrandLogo :size="20" :gaze-scale-x="onMac ? 0.5 : 1" class="shrink-0" />
-        <span class="text-[calc(13px*var(--ui-font-scale))] font-semibold tracking-tight">{{ t("app.name") }}</span>
+        <!-- 「素构」二字让位给状态区:保存倒计时/保存状态、发布进度与吉祥物问候、祝福语都在这里即时呈现 -->
+        <BrandStatus />
         <span v-if="site.open && site.config" class="text-[calc(13px*var(--ui-font-scale))] text-ink-3">/</span>
         <span v-if="site.open && site.config" class="text-[calc(13px*var(--ui-font-scale))] text-ink-2">{{ site.config.name }}</span>
       </span>
-      <!-- 悬停提示:以非线性缓动浮现的「返回主菜单」(设置页中禁用,不显示) -->
-      <span v-if="canGoBack" class="brand-back" aria-hidden="true">
-        <AppIcon name="arrowLeft" :size="14" class="brand-back-arrow" />
-        <span>{{ t("titlebar.backToMenu") }}</span>
+      <!-- 悬停提示:发布有上下文时多出「查看发布状态」,与「返回主菜单」以竖线分隔并留出空隙 -->
+      <span v-if="canGoBack" class="brand-back">
+        <template v-if="showPublishEntry">
+          <button type="button" class="brand-link" @click.stop="goPublish">
+            {{ t("titlebar.viewPublish") }}
+          </button>
+          <span class="brand-back-sep" aria-hidden="true">|</span>
+        </template>
+        <button type="button" class="brand-link" @click.stop="goToStart">
+          <AppIcon name="arrowLeft" :size="14" class="brand-back-arrow" />
+          <span>{{ t("titlebar.backToMenu") }}</span>
+        </button>
       </span>
     </div>
 
@@ -137,6 +163,35 @@ async function goToStart() {
 .brand.can-back:hover .brand-back {
   opacity: 1;
   transform: translateY(-50%) translateX(0);
+}
+/* 悬停项是真实按钮:与品牌区的点击(返回主菜单)解耦,竖线分隔并留出呼吸空隙 */
+.brand-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 2px;
+  border: none;
+  background: transparent;
+  color: var(--color-ink-2);
+  font-size: calc(13px * var(--ui-font-scale));
+  white-space: nowrap;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: color var(--duration-fast) var(--ease-plain);
+}
+.brand-link:hover {
+  color: var(--color-ink);
+}
+.brand-link:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+  border-radius: 4px;
+}
+.brand-back-sep {
+  color: var(--color-ink-3);
+  opacity: 0.6;
+  margin: 0 7px;
+  pointer-events: none;
 }
 .brand-back-arrow {
   transition: transform var(--duration-slow) var(--ease-plain);

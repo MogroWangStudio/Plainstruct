@@ -12,6 +12,7 @@
       --ps-sidebar-w: {{config.sidebarWidth}}px;
       --ps-doc-w: {{config.contentWidth}}px;
       --ps-drawer-w: {{config.sidebarWidthM}}vw;
+      --ps-logo-w: {{config.logoSizePc}}px;
     }
   </style>
 
@@ -23,13 +24,17 @@
     }
 
     @media (max-width: 900px) {
+      :root {
+        --ps-logo-w: {{config.logoSizeM}}px;
+      }
+
       body {
         font-size: {{config.fontSizeM}}px;
       }
     }
   </style>
 </head>
-  <body class="font-{{config.bodyFont}}{{#if (eq config.pageTransition "淡入")}} ps-anim-fade{{/if}}{{#if (eq config.pageTransition "淡入上浮")}} ps-anim-rise{{/if}}{{#if (eq config.pageTransition "缩放浮现")}} ps-anim-zoom{{/if}}{{#if (eq config.pageTransition "滑入")}} ps-anim-slide{{/if}}{{#if (eq config.pageTransition "弹性浮现")}} ps-anim-spring{{/if}}{{#if (eq config.pageTransition "模糊聚焦")}} ps-anim-blur{{/if}}{{#if (eq config.pageTransition "翻页")}} ps-anim-flip{{/if}}{{#if (eq config.pageTransition "揭开")}} ps-anim-wipe{{/if}}"{{#if (eq config.bodyFont "custom")}} style="--ps-font-body: {{config.customFont}}"{{/if}} data-hv-nav="{{config.navHover}}" data-hv-logo="{{config.logoHover}}" data-hv-title="{{config.titleHover}}" data-hv-link="{{config.linkHover}}" data-hv-pager="{{config.pagerHover}}" data-loading="{{config.loadingAnim}}" data-nav-current="{{config.navCurrent}}">
+  <body class="font-{{config.bodyFont}}{{#if (eq config.pageTransition "淡入")}} ps-anim-fade{{/if}}{{#if (eq config.pageTransition "淡入上浮")}} ps-anim-rise{{/if}}{{#if (eq config.pageTransition "缩放浮现")}} ps-anim-zoom{{/if}}{{#if (eq config.pageTransition "滑入")}} ps-anim-slide{{/if}}{{#if (eq config.pageTransition "弹性浮现")}} ps-anim-spring{{/if}}{{#if (eq config.pageTransition "模糊聚焦")}} ps-anim-blur{{/if}}{{#if (eq config.pageTransition "翻页")}} ps-anim-flip{{/if}}{{#if (eq config.pageTransition "揭开")}} ps-anim-wipe{{/if}}"{{#if (eq config.bodyFont "custom")}} style="--ps-font-body: {{config.customFont}}"{{/if}} data-hv-nav="{{config.navHover}}" data-hv-logo="{{config.logoHover}}" data-hv-title="{{config.titleHover}}" data-hv-link="{{config.linkHover}}" data-hv-pager="{{config.pagerHover}}" data-loading="{{config.loadingAnim}}" data-nav-current="{{config.navCurrent}}" data-toggle-pc="{{config.sidebarTogglePc}}" data-toggle-m="{{config.sidebarToggleM}}" data-show-logo-pc="{{config.showLogoPc}}" data-show-logo-m="{{config.showLogoM}}" data-show-title-pc="{{config.showTitlePc}}" data-show-title-m="{{config.showTitleM}}" data-logo-pos-pc="{{config.logoPosPc}}" data-logo-pos-m="{{config.logoPosM}}">
   {{#unless (eq config.loadingAnim "关闭")}}<div class="ps-loader" aria-hidden="true"><span class="ps-loader-spin"></span></div>{{/unless}}
   <header class="ps-topbar">
     <button class="ps-menu-btn" type="button" aria-label="文档列表" aria-expanded="false" aria-controls="ps-sidebar">
@@ -162,6 +167,9 @@
       var body = document.body;
       var btn = document.querySelector(".ps-sidebar-toggle");
       if (!btn) return;
+      var drawer = document.querySelector(".ps-sidebar");
+      var drawerMask = document.querySelector(".ps-mask");
+      var drawerBtn = document.querySelector(".ps-menu-btn");
       var KEY = "ps-sidebar-collapsed";
       var collapsed = false;
       try { collapsed = localStorage.getItem(KEY) === "1"; } catch (err) {}
@@ -174,6 +182,13 @@
       };
       apply();
       btn.addEventListener("click", function () {
+        /* 移动端抽屉打开时,该按钮充当抽屉头部的收起按钮 */
+        if (drawer && drawer.classList.contains("open")) {
+          drawer.classList.remove("open");
+          if (drawerMask) drawerMask.classList.remove("show");
+          if (drawerBtn) drawerBtn.setAttribute("aria-expanded", "false");
+          return;
+        }
         collapsed = !collapsed;
         apply();
       });

@@ -29,6 +29,8 @@ let rebuildTimer: ReturnType<typeof setTimeout> | null = null;
 let browserPreviewTab: Window | null = null;
 /** 预览窗口「立即重建」请求的监听只绑定一次(预览窗口可能反复开关) */
 let previewBuildListenerBound = false;
+/** 预览窗口的生命周期监听只在窗口未被跟踪时绑定(webview 重载后监听器会丢失,复用窗口时需补绑) */
+let previewWindowWatched = false;
 
 /** 监听独立预览窗口的构建请求:绕过防抖立即重建,完成后由构建流程
  *  通知预览窗口原位刷新(预览壳层没有 bootstrap,构建只能托主窗口代劳) */
@@ -58,11 +60,12 @@ export const useBuilderStore = defineStore("builder", {
       this.$reset();
     },
 
-    async build() {
+    /** 构建站点;返回是否成功(失败已 toast,调用方可据此决定后续动作) */
+    async build(): Promise<boolean> {
       const site = useSiteStore();
       const theme = useThemeStore();
       const ui = useUiStore();
-      if (!site.config || this.building) return;
+      if (!site.config || this.building) return false;
       // 钉死发起构建时的站点根:落盘命令携 root 交后端校验,构建期间切站时
       // 旧构建被拒绝,产物不会写入新站点目录
       const root = site.root;
@@ -72,16 +75,18 @@ export const useBuilderStore = defineStore("builder", {
         const bundle = await theme.ensureActiveBundle();
         const report = await buildSite(site.config, bundle, root);
         // 构建期间已切换/关闭站点:丢弃过期结果,不污染新会话
-        if (site.root !== root) return;
+        if (site.root !== root) return false;
         this.report = report;
         this.previewNonce++;
         // 独立预览窗口若开着,同步加载最新构建产物
         void this.refreshPreviewWindow();
+        return true;
       } catch (e) {
         // 站点已切换:旧构建被后端拒绝属预期,静默即可
-        if (site.root !== root) return;
+        if (site.root !== root) return false;
         this.error = ipcErr(e);
         ui.toast(this.error, "error");
+        return false;
       } finally {
         this.building = false;
         // 构建期间若有文档保存,补一次重建,避免该次改动被跳过
@@ -106,15 +111,28 @@ export const useBuilderStore = defineStore("builder", {
       if (app.platform === "browser") {
         const title = `${site.config?.name ?? "Plainstruct"} · ${i18n.global.t("build.preview")}`;
         browserPreviewTab = window.open(previewShellUrl(app, title), "plainstruct-preview");
-        browserPreviewTab?.focus();
-        this.previewWindowOpen = true;
+        // 弹窗被拦截时 open 返回 null:不开就不同步开关状态,避免按钮卡在「已开启」
+        if (browserPreviewTab) {
+          browserPreviewTab.focus();
+          this.previewWindowOpen = true;
+        }
         return;
       }
       try {
         const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
         const existing = await WebviewWindow.getByLabel("site-preview");
+        // 窗口被关闭后的同步兜底:tauri://destroyed 可能因 webview 重载而丢失,
+        // 复用窗口时补绑生命周期监听(标志位防止重复绑定)
+        const markClosed = () => {
+          previewWindowWatched = false;
+          this.previewWindowOpen = false;
+        };
         if (existing) {
           this.previewWindowOpen = true;
+          if (!previewWindowWatched) {
+            previewWindowWatched = true;
+            void watchPreviewWindow(existing, markClosed);
+          }
           await this.notifyPreviewRebuilt();
           await existing.unminimize().catch(() => undefined);
           await existing.setFocus();
@@ -139,7 +157,10 @@ export const useBuilderStore = defineStore("builder", {
           dragDropEnabled: false,
         });
         this.previewWindowOpen = true;
-        void watchPreviewWindow(win, () => (this.previewWindowOpen = false));
+        previewWindowWatched = true;
+        void watchPreviewWindow(win, markClosed);
+        // 创建失败(如 label 冲突)走异步 error 事件而非 throw:复位开关状态
+        void win.once("tauri://error", markClosed);
         // 兜底:壳层启动失败时窗口将永不显示,2s 后强制显示以便暴露问题
         setTimeout(() => void win.show().catch(() => undefined), 2000);
       } catch {
@@ -147,21 +168,36 @@ export const useBuilderStore = defineStore("builder", {
       }
     },
 
-    /** 切到独立预览窗口(不改变开合;最小化/隐藏时先还原再聚焦) */
-    async focusPreviewWindow() {
+    /**
+     * 切到独立预览窗口(不改变开合;最小化/隐藏时先还原再聚焦)。
+     * 返回是否真的切换成功 —— 窗口实际不存在(状态脱节/标签页已关)时返回 false,
+     * 调用方可回退为重新打开。
+     */
+    async focusPreviewWindow(): Promise<boolean> {
       if (useAppStore().platform === "browser") {
-        browserPreviewTab?.focus();
-        return;
+        if (browserPreviewTab && !browserPreviewTab.closed) {
+          browserPreviewTab.focus();
+          return true;
+        }
+        // 壳层标签页已被用户关闭:开关状态复位,由调用方重新打开
+        this.previewWindowOpen = false;
+        return false;
       }
       try {
         const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
         const existing = await WebviewWindow.getByLabel("site-preview");
-        if (!existing) return;
+        if (!existing) {
+          // 窗口已不存在但标志仍为开:复位,让按钮回到「未开启」语义
+          this.previewWindowOpen = false;
+          return false;
+        }
         await existing.unminimize().catch(() => undefined);
         await existing.show().catch(() => undefined);
         await existing.setFocus();
+        return true;
       } catch {
         /* 非 Tauri 环境忽略 */
+        return false;
       }
     },
 

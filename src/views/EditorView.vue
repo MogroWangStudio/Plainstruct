@@ -19,14 +19,12 @@ const editor = useEditorStore();
 const app = useAppStore();
 const builder = useBuilderStore();
 
-/** 独立预览窗口:未开则先构建再打开;已开则切到独立窗口(不关闭 —— 关窗只能由用户主动进行) */
+/** 独立预览窗口:未开则先构建再打开;已开则切到独立窗口(不关闭 —— 关窗只能由用户主动进行)。
+ *  标志与实际窗口脱节(窗口已被关掉)时 focus 返回 false,回退为重新打开;
+ *  构建失败时不打开窗口,避免壳层加载到过期或缺失的产物 */
 async function togglePreviewWindow() {
-  if (builder.previewWindowOpen) {
-    await builder.focusPreviewWindow();
-    return;
-  }
-  await builder.build();
-  await builder.openOrRefreshPreviewWindow();
+  if (builder.previewWindowOpen && (await builder.focusPreviewWindow())) return;
+  if (await builder.build()) await builder.openOrRefreshPreviewWindow();
 }
 
 /** 选中图片的预览地址;浏览器 mock 无 site:// 资源服务,降级为文件名占位 */
