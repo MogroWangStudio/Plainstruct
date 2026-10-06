@@ -220,10 +220,9 @@ function parseLinks(raw: string): LinkRow[] {
     });
 }
 
-/** 行对象 → 行文本(空行剔除,图标留空不写尾管道) */
+/** 行对象 → 行文本(所见即所得:空行保留,构建端本就忽略不完整行;图标留空不写尾管道) */
 function linksToText(rows: LinkRow[]): string {
   return rows
-    .filter((r) => r.name || r.url)
     .map((r) => [r.name, r.url, r.icon].filter(Boolean).join("|"))
     .join("\n");
 }
