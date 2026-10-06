@@ -1223,3 +1223,113 @@ body[data-hv-pager="底色"] .ps-pager-item:hover {
   justify-content: center;
   gap: 6px;
 }
+
+/* ---------- 当前文档效果(body data-nav-current 驱动;「默认」与主题原样式一致,不写规则) ---------- */
+
+body[data-nav-current="无"] .ps-nav-link.current,
+body[data-nav-current="无"] a.ps-nav-dir.current {
+  background: transparent;
+  color: var(--ps-ink-2);
+  font-weight: 400;
+  border-bottom-color: transparent;
+  box-shadow: none;
+}
+
+body[data-nav-current="无"] .ps-nav-link.current::before {
+  content: none;
+}
+
+body[data-nav-current="无"] .ps-nav-dir.current {
+  color: var(--ps-ink-3);
+}
+
+body[data-nav-current="底色"] .ps-nav-link.current {
+  background: var(--ps-chip);
+  color: var(--ps-ink);
+  font-weight: 600;
+}
+
+body[data-nav-current="底色"] .ps-nav-link.current::before {
+  content: none;
+}
+
+body[data-nav-current="底色"] a.ps-nav-dir.current {
+  color: var(--ps-ink);
+  font-weight: 600;
+}
+
+body[data-nav-current="强调色"] .ps-nav-link.current {
+  background: transparent;
+  color: var(--ps-accent);
+  font-weight: 600;
+}
+
+body[data-nav-current="强调色"] a.ps-nav-dir.current {
+  color: var(--ps-accent);
+}
+
+body[data-nav-current="加粗"] .ps-nav-link.current {
+  background: transparent;
+  color: var(--ps-ink);
+  font-weight: 700;
+}
+
+body[data-nav-current="加粗"] .ps-nav-link.current::before {
+  content: none;
+}
+
+body[data-nav-current="加粗"] a.ps-nav-dir.current {
+  color: var(--ps-ink);
+  font-weight: 700;
+}
+
+body[data-nav-current="左侧标记"] .ps-nav-link.current {
+  background: transparent;
+  color: var(--ps-ink);
+  font-weight: 600;
+  box-shadow: inset 2px 0 0 var(--ps-accent);
+}
+
+body[data-nav-current="左侧标记"] .ps-nav-link.current::before {
+  content: none;
+}
+
+body[data-nav-current="左侧标记"] a.ps-nav-dir.current {
+  color: var(--ps-ink);
+  font-weight: 600;
+  box-shadow: inset 2px 0 0 var(--ps-accent);
+}
+
+/* ---------- 4.0 移动端顶栏:目录按钮对齐搜索按钮(圆形毛玻璃),当前文档标题移到站点标识下方 ---------- */
+
+@media (max-width: 900px) {
+  :root {
+    --ps-topbar-h: 84px;
+  }
+
+  .ps-topbar {
+    height: var(--ps-topbar-h);
+    flex-wrap: wrap;
+    row-gap: 2px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+
+  /* 目录按钮:与搜索按钮同一视觉语言 —— 圆形 + 半透明表面 + 背景模糊 */
+  .ps-menu-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--ps-surface) 72%, transparent);
+    -webkit-backdrop-filter: blur(14px) saturate(1.5);
+    backdrop-filter: blur(14px) saturate(1.5);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  }
+
+  /* 当前文档路径:换行到第二行并右对齐,显示在站点标识(标题/logo)正下方 */
+  .ps-crumbs {
+    order: 3;
+    flex-basis: 100%;
+    justify-content: flex-end;
+  }
+}

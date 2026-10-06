@@ -142,6 +142,22 @@
       "category": "悬停反馈"
     },
     {
+      "key": "navCurrent",
+      "label": "当前文档效果",
+      "type": "select",
+      "default": "默认",
+      "options": [
+        "默认",
+        "无",
+        "底色",
+        "强调色",
+        "加粗",
+        "左侧标记"
+      ],
+      "category": "悬停反馈",
+      "hint": "当前文档在侧栏导航中的显示效果，「默认」保持主题原样式"
+    },
+    {
       "key": "logoHover",
       "label": "Logo 悬停反馈",
       "type": "select",
@@ -258,10 +274,10 @@
     {
       "key": "footerLinks",
       "label": "友情链接",
-      "type": "textarea",
+      "type": "links",
       "default": "",
       "category": "页脚",
-      "hint": "每行一条：名称|链接|图标地址（图标可选）"
+      "hint": "逐条添加名称、链接与图标（图标可选）"
     }
   ]
 }

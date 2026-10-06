@@ -200,6 +200,53 @@ function insertToken(field: ThemeField, token: string) {
   onField(field, String(fieldValue(field) ?? "") + token);
 }
 
+/* ---------- links 字段(友情链接等):可视化逐条编辑,存储保持「名称|链接|图标」行文本 ---------- */
+
+interface LinkRow {
+  name: string;
+  url: string;
+  icon: string;
+}
+
+/** 行文本 → 行对象(名称|链接|图标,图标可选) */
+function parseLinks(raw: string): LinkRow[] {
+  return String(raw ?? "")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .map((l) => {
+      const seg = l.split("|").map((s) => s.trim());
+      return { name: seg[0] ?? "", url: seg[1] ?? "", icon: seg[2] ?? "" };
+    });
+}
+
+/** 行对象 → 行文本(空行剔除,图标留空不写尾管道) */
+function linksToText(rows: LinkRow[]): string {
+  return rows
+    .filter((r) => r.name || r.url)
+    .map((r) => [r.name, r.url, r.icon].filter(Boolean).join("|"))
+    .join("\n");
+}
+
+function updateLink(field: ThemeField, i: number, key: keyof LinkRow, value: string) {
+  const rows = parseLinks(String(fieldValue(field) ?? ""));
+  if (!rows[i]) return;
+  rows[i] = { ...rows[i], [key]: value };
+  onField(field, linksToText(rows));
+}
+
+function addLinkRow(field: ThemeField) {
+  const rows = parseLinks(String(fieldValue(field) ?? ""));
+  rows.push({ name: "", url: "", icon: "" });
+  onField(field, linksToText(rows));
+}
+
+function removeLinkRow(field: ThemeField, i: number) {
+  const rows = parseLinks(String(fieldValue(field) ?? ""));
+  rows.splice(i, 1);
+  onField(field, linksToText(rows));
+}
+
 /* navlist(博客顶栏导航):可选项与构建同源 -- 完整导航树,文件夹默认折叠,点箭头展开 */
 const navOptions = computed<NavPickerItem[]>(() => topNavItems(site.tree, site.docsCache));
 
@@ -613,6 +660,49 @@ async function removePlugin(id: string, name: string) {
           />
           <span class="text-[calc(13px*var(--ui-font-scale))] text-ink-2">{{ field.label }}</span>
         </label>
+
+        <!-- links 字段:友情链接可视化逐条编辑(名称/链接/图标各一框,行文本存储兼容) -->
+        <div v-else-if="field.type === 'links'" class="flex flex-col gap-2">
+          <div
+            v-for="(row, i) in parseLinks(String(fieldValue(field) ?? ''))"
+            :key="i"
+            class="flex items-center gap-1.5"
+          >
+            <input
+              class="input h-7 w-20 shrink-0 text-[calc(12px*var(--ui-font-scale))]"
+              type="text"
+              :value="row.name"
+              :placeholder="t('theme.linkName')"
+              @change="updateLink(field, i, 'name', ($event.target as HTMLInputElement).value)"
+            />
+            <input
+              class="input h-7 min-w-0 flex-1 text-[calc(12px*var(--ui-font-scale))]"
+              type="text"
+              :value="row.url"
+              :placeholder="t('theme.linkUrl')"
+              @change="updateLink(field, i, 'url', ($event.target as HTMLInputElement).value)"
+            />
+            <input
+              class="input h-7 w-28 shrink-0 text-[calc(12px*var(--ui-font-scale))]"
+              type="text"
+              :value="row.icon"
+              :placeholder="t('theme.linkIcon')"
+              @change="updateLink(field, i, 'icon', ($event.target as HTMLInputElement).value)"
+            />
+            <button
+              type="button"
+              class="btn-icon h-7 w-7 shrink-0 hover:!text-danger"
+              :title="t('common.delete')"
+              @click="removeLinkRow(field, i)"
+            >
+              <AppIcon name="trash" :size="12" />
+            </button>
+          </div>
+          <button type="button" class="btn btn-secondary w-fit" @click="addLinkRow(field)">
+            <AppIcon name="plus" :size="13" />
+            {{ t("theme.linkAdd") }}
+          </button>
+        </div>
 
         <!-- 多行文本:如页脚友情链接(每行一条) -->
         <textarea

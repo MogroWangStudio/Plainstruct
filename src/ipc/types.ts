@@ -172,7 +172,7 @@ export interface TreeNode {
   children?: TreeNode[];
 }
 
-export type ThemeFieldType = "color" | "text" | "textarea" | "number" | "select" | "boolean" | "navlist";
+export type ThemeFieldType = "color" | "text" | "textarea" | "number" | "select" | "boolean" | "navlist" | "links";
 
 export interface ThemeField {
   key: string;

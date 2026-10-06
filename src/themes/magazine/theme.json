@@ -1000,10 +1000,10 @@
     {
       "key": "footerLinks",
       "label": "友情链接",
-      "type": "textarea",
+      "type": "links",
       "default": "",
       "category": "页脚",
-      "hint": "每行一条：名称|链接|图标地址（图标可选）"
+      "hint": "逐条添加名称、链接与图标（图标可选）"
     }
   ]
 }
