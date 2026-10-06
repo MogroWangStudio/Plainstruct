@@ -57,26 +57,60 @@ const sections = computed<Section[]>(() => {
 });
 
 /** 渲染分组:分类主题每组一个圆角边框容器;无分类的旧主题合成单个无标题组平铺 */
+
+/* ---------- 设备端切换:面板吸顶栏的「桌面端 / 移动端」分段开关,选择记忆 ---------- */
+
+/** 移动端专属字段:key 以 M 结尾(fontSizeM/navColumnsM/sidebarWidthM/logoWidthPxM...) */
+function isMobileField(f: ThemeField): boolean {
+  return /M$/.test(f.key);
+}
+
+/** 当前设备标签:桌面端显示双端共用 + 桌面专属字段,移动端只显示移动端独立设置 */
+const deviceMode = ref<"pc" | "m">(
+  (() => {
+    try {
+      return localStorage.getItem("ps-config-device") === "m" ? ("m" as const) : ("pc" as const);
+    } catch {
+      return "pc" as const;
+    }
+  })(),
+);
+
+watch(deviceMode, (v) => {
+  try {
+    localStorage.setItem("ps-config-device", v);
+  } catch {
+    /* 存储不可用时忽略,仅本次会话内生效 */
+  }
+});
+
+/** 按设备标签筛字段 */
+function byDevice(f: ThemeField): boolean {
+  return deviceMode.value === "m" ? isMobileField(f) : !isMobileField(f);
+}
+
 const groupedRows = computed<{ id?: string; label?: string; fields: ThemeField[] }[]>(() => {
   const fields = theme.activeMeta?.config ?? [];
   if (!fields.some((f) => f.category)) {
     return [
-      { fields: fields.filter((f) => isVisible(f)) },
+      { fields: fields.filter((f) => isVisible(f) && byDevice(f)) },
       { id: PLUGINS_ID, label: t("theme.pluginsCategory"), fields: [] },
     ];
   }
   const out: { id?: string; label?: string; fields: ThemeField[] }[] = [];
   for (const section of sections.value) {
-    const groupFields = section.fields.filter((f) => isVisible(f));
+    const groupFields = section.fields.filter((f) => isVisible(f) && byDevice(f));
     if (!groupFields.length && section.id !== PLUGINS_ID) continue;
     out.push({ id: section.id, label: section.label, fields: groupFields });
   }
   return out;
 });
 
-/** 顶部快速跳转按钮:只列当前有可见配置的分类(插件分组恒在) */
+/** 顶部快速跳转按钮:只列当前设备标签下有可见配置的分类(插件分组恒在) */
 const navSections = computed(() =>
-  sections.value.filter((s) => s.id === PLUGINS_ID || s.fields.some((f) => isVisible(f))),
+  sections.value.filter(
+    (s) => s.id === PLUGINS_ID || s.fields.some((f) => isVisible(f) && byDevice(f)),
+  ),
 );
 
 /* 悬浮分类栏:圆角矩形浮层,滚动时内容从其下方穿过。分组标题的让位距离
@@ -422,10 +456,35 @@ async function removePlugin(id: string, name: string) {
       :style="{ '--cat-top': `${catTop}px` }"
       :aria-label="t('theme.catNav')"
     >
+      <!-- 设备端切换:桌面端显示双端共用 + 桌面专属设置,移动端只列移动端独立设置 -->
+      <div class="device-seg" role="group" :aria-label="t('theme.deviceLabel')">
+        <button
+          type="button"
+          class="device-btn"
+          :class="{ active: deviceMode === 'pc' }"
+          @click="deviceMode = 'pc'"
+        >
+          <AppIcon name="monitor" :size="13" />
+          {{ t("theme.devicePc") }}
+        </button>
+        <button
+          type="button"
+          class="device-btn"
+          :class="{ active: deviceMode === 'm' }"
+          @click="deviceMode = 'm'"
+        >
+          <AppIcon name="smartphone" :size="13" />
+          {{ t("theme.deviceM") }}
+        </button>
+      </div>
+      <span class="cat-sep" aria-hidden="true"></span>
       <button v-for="s in navSections" :key="s.id" type="button" class="cat-chip" @click="jumpTo(s.id)">
         {{ s.label }}
       </button>
     </nav>
+
+    <!-- 移动端标签提示:此处只列移动端独立设置,双端共用项请回桌面端标签修改 -->
+    <p v-if="deviceMode === 'm'" class="device-hint">{{ t("theme.deviceHintM") }}</p>
 
     <!-- 分组:圆角矩形边框把每组配置框起来;无分类的旧主题合成单个无标题组 -->
     <section v-for="group in groupedRows" :key="group.id ?? '__flat__'" class="cat-group">
@@ -968,6 +1027,62 @@ async function removePlugin(id: string, name: string) {
   }
   .num-input.editing {
     transform: none;
+  }
+}
+
+/* ---------- 设备端分段开关:吸顶分类栏首位,桌面端/移动端独立配置视图切换 ---------- */
+.device-seg {
+  display: flex;
+  flex-shrink: 0;
+  padding: 2px;
+  background: var(--color-surface-2);
+  border-radius: 7px;
+}
+.device-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 9px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--color-ink-2);
+  font-size: calc(11.5px * var(--ui-font-scale));
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-plain),
+    color var(--duration-fast) var(--ease-plain),
+    box-shadow var(--duration-fast) var(--ease-plain);
+}
+.device-btn:hover {
+  color: var(--color-ink);
+}
+.device-btn.active {
+  background: var(--color-surface);
+  color: var(--color-ink);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14);
+}
+.device-btn:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+.cat-sep {
+  flex-shrink: 0;
+  align-self: stretch;
+  margin: 3px 4px;
+  background: var(--color-line);
+}
+.device-hint {
+  margin: 0;
+  font-size: calc(11.5px * var(--ui-font-scale));
+  line-height: 1.6;
+  color: var(--color-ink-3);
+}
+@media (prefers-reduced-motion: reduce) {
+  .device-btn {
+    transition: none;
   }
 }
 </style>
