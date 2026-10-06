@@ -217,6 +217,7 @@ pub fn run() {
             commands::import_files,
             commands::import_site_images,
             commands::import_site_image_to,
+            commands::import_site_image_data,
             commands::read_folder_configs,
             commands::write_folder_config,
             // 构建

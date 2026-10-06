@@ -517,3 +517,36 @@ pub fn import_site_image_to(window: tauri::WebviewWindow, state: State<'_, AppSt
         .map_err(|_| "路径计算失败".into())
         .map(|p| p.to_string_lossy().replace('\\', "/"))
 }
+
+/// 导入拖拽读取的文件字节到 content/asset/(自动创建,重名自动加序号),
+/// 返回实际落盘的 content/ 相对路径 —— WebView 拿不到拖入文件的磁盘路径,
+/// 前端把 File 对象读为字节后以 base64 传入;扩展名白名单与 is_importable 的图片项一致。
+#[tauri::command]
+pub fn import_site_image_data(window: tauri::WebviewWindow, state: State<'_, AppState>, name: String, data: String) -> Result<String, String> {
+    ensure_main(&window)?;
+    let root = state.site_root()?;
+    use base64::engine::general_purpose::STANDARD as B64;
+    use base64::Engine;
+
+    let name = safe_name(&name);
+    let ext = PathBuf::from(&name)
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_ascii_lowercase())
+        .unwrap_or_default();
+    if !matches!(ext.as_str(), "png" | "jpg" | "jpeg" | "gif" | "webp" | "svg") {
+        return Err(format!("不支持的图片类型:{name}"));
+    }
+    let bytes = B64.decode(data.as_bytes()).map_err(|e| format!("文件数据解码失败:{e}"))?;
+    if bytes.is_empty() {
+        return Err("文件内容为空".into());
+    }
+    let dest_parent = safe_join(&content_root(&root), "asset")?;
+    std::fs::create_dir_all(&dest_parent).map_err(|e| e.to_string())?;
+    let target = unique_path(&dest_parent.join(&name));
+    std::fs::write(&target, &bytes).map_err(|e| e.to_string())?;
+    target
+        .strip_prefix(content_root(&root))
+        .map_err(|_| "路径计算失败".into())
+        .map(|p| p.to_string_lossy().replace('\\', "/"))
+}

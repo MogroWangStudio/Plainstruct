@@ -355,6 +355,15 @@ export const useSiteStore = defineStore("site", {
       return actual;
     },
 
+    /** 导入拖拽读取的文件字节(base64):落至 content/asset/,刷新树并触发重建,
+     *  返回实际落盘路径(重名自动加序号)——资产页拖放导入专用 */
+    async importSiteImageData(name: string, base64: string) {
+      const actual = await ipc.importSiteImageData(name, base64);
+      await this.refreshTree();
+      void useBuilderStore().onSiteChanged();
+      return actual;
+    },
+
     /* ---------- 站点插件 ---------- */
 
     /** 预载启用插件的文件内容(站点打开与插件增删、开关切换后调用) */

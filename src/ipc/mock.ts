@@ -640,6 +640,38 @@ async readSiteConfig(): Promise<SiteConfig> {
     return target;
   },
 
+  /** 与 Rust 端行为一致:拖入的文件字节(base64)落至 content/asset/,重名加序号,
+   *  返回实际落盘的 content/ 相对路径;扩展名白名单与 Rust 一致 */
+  async importSiteImageData(name: string, base64: string): Promise<string> {
+    // 文件名合法化:去掉 Windows 非法字符与控制字符(与 fsutil::safe_name 同规则)
+    const clean =
+      name
+        .split(/[\\/:*?"<>|]/)
+        .join("")
+        // eslint-disable-next-line no-control-regex
+        .replace(/[\u0000-\u001f\u007f]/g, " ")
+        .trim() || "untitled";
+    const ext = clean.slice(clean.lastIndexOf(".") + 1).toLowerCase();
+    if (!["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(ext)) {
+      throw new Error(`不支持的图片类型:${clean}`);
+    }
+    if (!base64) throw new Error("文件内容为空");
+    const dir = "asset";
+    const prefix = `${currentRoot}/content/${dir}/`;
+    const taken = new Set(
+      [...files.keys()].filter((k) => k.startsWith(prefix)).map((k) => k.slice(prefix.length)),
+    );
+    const dot = clean.lastIndexOf(".");
+    const stem = dot > 0 ? clean.slice(0, dot) : clean;
+    const suffix = dot > 0 ? clean.slice(dot) : "";
+    let final = clean;
+    let i = 2;
+    while (taken.has(final)) final = `${stem}-${i++}${suffix}`;
+    files.set(prefix + final, `(站点图片 ${final})`);
+    touchFile(prefix + final);
+    return `${dir}/${final}`;
+  },
+
   async clearBuild(_root: string): Promise<void> {
     buildFiles = new Map();
   },

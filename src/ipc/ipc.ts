@@ -215,6 +215,14 @@ export const ipc = {
       ? invoke<string>("import_site_image_to", { src, dest })
       : mock.importSiteImageTo(src, dest);
   },
+  /** 导入拖拽读取的文件字节(base64)到站点 asset/(重名自动加序号),
+   *  返回实际落盘的 content/ 相对路径 —— WebView 拿不到拖入文件的磁盘路径,
+   *  拖放导入只能把字节传给后端落盘 */
+  importSiteImageData(name: string, base64: string): Promise<string> {
+    return inTauri
+      ? invoke<string>("import_site_image_data", { name, data: base64 })
+      : mock.importSiteImageData(name, base64);
+  },
 
   /* ---------- 构建 ---------- */
   /** 构建三命令均需传发起构建时的站点根:后端校验与当前站点根一致才执行,

@@ -28,6 +28,101 @@ const ui = useUiStore();
 /** 站点资产(asset,兼容旧 images)下的全部图片文件(含子文件夹,与分组同源) */
 const images = computed<TreeNode[]>(() => site.assetGroups.flatMap((g) => g.images));
 
+/* ---------- 导入:右上角按钮选取 / 拖入文件快速导入 ---------- */
+
+/** 可导入的图片扩展名(与后端 import_site_image_data 的白名单一致) */
+const IMPORT_EXTS = ["png", "jpg", "jpeg", "gif", "webp", "svg"];
+
+/** 右上角导入按钮:选取图片文件,统一复制到站点 asset 文件夹 */
+async function importFromPicker() {
+  const files = await ipc.pickImages();
+  if (!files?.length) return;
+  try {
+    const names = await site.importSiteImages(files);
+    if (!names.length) {
+      ui.toast(t("assets.importEmpty"), "info");
+      return;
+    }
+    // 选中刚导入的图片:详情面板即现预览,可顺手移动到子文件夹
+    selected.value = names.map((n) => `${site.assetDirs[0]?.path ?? "asset"}/${n}`);
+    ui.toast(t("assets.importedCount", { n: names.length }), "success");
+  } catch (e) {
+    ui.toast(t("ui.operationFailed", { msg: ipc.errText(e) }), "error");
+  }
+}
+
+/** 从访达/资源管理器拖入的 OS 文件拖拽才带 Files 类型 —— 内部图片拖拽不触发导入 */
+function isFileDrag(e: DragEvent): boolean {
+  return Array.from(e.dataTransfer?.types ?? []).includes("Files");
+}
+
+/** 拖入计数:进入子元素与离开父元素成对抵消,归零即拖拽离开页面 */
+const dragDepth = ref(0);
+const fileDragActive = computed(() => dragDepth.value > 0);
+
+function onRootDragEnter(e: DragEvent) {
+  if (!isFileDrag(e)) return;
+  e.preventDefault();
+  dragDepth.value++;
+}
+
+function onRootDragOver(e: DragEvent) {
+  if (!isFileDrag(e)) return;
+  e.preventDefault(); // 允许在页面任意位置松手;内部图片拖拽仍由分组各自的 dragover 接管
+  if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+}
+
+function onRootDragLeave(e: DragEvent) {
+  if (!isFileDrag(e)) return;
+  dragDepth.value = Math.max(0, dragDepth.value - 1);
+}
+
+function onRootDrop(e: DragEvent) {
+  if (!isFileDrag(e)) return;
+  e.preventDefault();
+  dragDepth.value = 0;
+  void importDroppedFiles(e.dataTransfer?.files);
+}
+
+async function importDroppedFiles(files: FileList | null | undefined) {
+  const list = Array.from(files ?? []);
+  if (!list.length) return;
+  const ok = list.filter((f) => IMPORT_EXTS.includes(f.name.split(".").pop()?.toLowerCase() ?? ""));
+  const skipped = list.length - ok.length;
+  if (!ok.length) {
+    ui.toast(t("assets.importUnsupported"), "error");
+    return;
+  }
+  try {
+    // 逐张读取字节后交给后端落盘:WebView 拿不到拖入文件的磁盘路径,字节是唯一通路
+    const paths: string[] = [];
+    for (const f of ok) paths.push(await site.importSiteImageData(f.name, await fileToBase64(f)));
+    selected.value = paths;
+    ui.toast(
+      skipped
+        ? t("assets.importedSkipped", { n: paths.length, skip: skipped })
+        : t("assets.importedCount", { n: paths.length }),
+      "success",
+    );
+  } catch (e) {
+    ui.toast(t("ui.operationFailed", { msg: ipc.errText(e) }), "error");
+  }
+}
+
+/** File → base64(去掉 data URL 前缀),交给后端解码落盘 */
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const url = String(reader.result ?? "");
+      const i = url.indexOf(",");
+      resolve(i >= 0 ? url.slice(i + 1) : url);
+    };
+    reader.onerror = () => reject(reader.error ?? new Error(file.name));
+    reader.readAsDataURL(file);
+  });
+}
+
 /* ---------- 双视图:卡片(分组)/ 列表(分组) ---------- */
 
 const viewMode = ref<"card" | "list">("card");
@@ -528,15 +623,25 @@ async function removeFolder(g: { dir: string; label: string; images: TreeNode[] 
 </script>
 
 <template>
-  <div class="flex h-full min-h-0 flex-col bg-bg">
+  <div
+    class="relative flex h-full min-h-0 flex-col bg-bg"
+    @dragenter="onRootDragEnter"
+    @dragover="onRootDragOver"
+    @dragleave="onRootDragLeave"
+    @drop="onRootDrop"
+  >
     <!-- 头部 -->
     <header class="flex h-14 shrink-0 items-center gap-4 border-b border-line bg-surface px-5">
       <div class="min-w-0">
         <h1 class="text-[calc(15px*var(--ui-font-scale))] font-semibold leading-tight">{{ t("assets.title") }}</h1>
         <p class="truncate text-[calc(12px*var(--ui-font-scale))] text-ink-3">{{ t("assets.subtitle") }}</p>
       </div>
-      <!-- 顶栏右侧:视图切换 / 新建文件夹 / 刷新 -->
+      <!-- 顶栏右侧:导入图片 / 视图切换 / 新建文件夹 / 刷新 -->
       <div class="ml-auto flex items-center gap-1">
+        <button class="btn btn-secondary mr-1 !h-8 px-3" :title="t('assets.importTitle')" @click="importFromPicker">
+          <AppIcon name="upload" :size="14" />
+          {{ t("assets.import") }}
+        </button>
         <button
           class="btn-icon !h-8 !w-8"
           :title="viewMode === 'card' ? t('tree.assetListView') : t('tree.assetCardView')"
@@ -552,6 +657,16 @@ async function removeFolder(g: { dir: string; label: string; images: TreeNode[] 
         </button>
       </div>
     </header>
+
+    <!-- 拖入遮罩:从访达/资源管理器拖图片文件到页面任意位置,松手即导入;
+         pointer-events 放行让落点事件仍达页面,内部图片拖拽不带 Files 类型、不触发 -->
+    <div v-if="fileDragActive" class="drop-overlay" aria-hidden="true">
+      <div class="drop-card">
+        <AppIcon name="upload" :size="26" />
+        <p class="drop-title">{{ t("assets.dropImport") }}</p>
+        <p class="drop-hint">{{ t("assets.dropHint") }}</p>
+      </div>
+    </div>
 
     <!-- 左:图片网格 | 右:详情窗(宽度可拖拽) -->
     <div ref="splitHost" class="relative flex min-h-0 flex-1">
@@ -1045,6 +1160,44 @@ async function removeFolder(g: { dir: string; label: string; images: TreeNode[] 
   border-radius: 4px;
   background: color-mix(in srgb, var(--color-accent) 8%, transparent);
   pointer-events: none;
+}
+
+/* 拖入遮罩:内缩一圈的圆角虚线框指示落点,整层不接收指针事件(松手仍落在页面上) */
+.drop-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 10px;
+  border: 1.5px dashed color-mix(in srgb, var(--color-accent) 60%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--color-accent) 7%, transparent);
+  pointer-events: none;
+}
+.drop-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 22px 36px;
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-popover);
+  color: var(--color-accent);
+}
+.drop-card .drop-title {
+  margin: 0;
+  font-size: calc(14px * var(--ui-font-scale));
+  font-weight: 600;
+  color: var(--color-ink);
+}
+.drop-card .drop-hint {
+  margin: 0;
+  font-size: calc(11.5px * var(--ui-font-scale));
+  color: var(--color-ink-3);
 }
 
 .asset-card {
