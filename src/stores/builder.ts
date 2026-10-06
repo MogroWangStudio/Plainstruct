@@ -116,6 +116,7 @@ export const useBuilderStore = defineStore("builder", {
         if (existing) {
           this.previewWindowOpen = true;
           await this.notifyPreviewRebuilt();
+          await existing.unminimize().catch(() => undefined);
           await existing.setFocus();
           return;
         }
@@ -146,22 +147,21 @@ export const useBuilderStore = defineStore("builder", {
       }
     },
 
-    /** 关闭独立预览窗口(已打开才有动作);状态同步供界面开关按钮呈现 */
-    async closePreviewWindow() {
+    /** 切到独立预览窗口(不改变开合;最小化/隐藏时先还原再聚焦) */
+    async focusPreviewWindow() {
       if (useAppStore().platform === "browser") {
-        browserPreviewTab?.close();
-        browserPreviewTab = null;
-        this.previewWindowOpen = false;
+        browserPreviewTab?.focus();
         return;
       }
       try {
         const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
         const existing = await WebviewWindow.getByLabel("site-preview");
-        if (existing) await existing.close();
+        if (!existing) return;
+        await existing.unminimize().catch(() => undefined);
+        await existing.show().catch(() => undefined);
+        await existing.setFocus();
       } catch {
         /* 非 Tauri 环境忽略 */
-      } finally {
-        this.previewWindowOpen = false;
       }
     },
 

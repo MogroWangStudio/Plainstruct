@@ -300,6 +300,24 @@ async function requestBuild() {
   buildPendingTimer = window.setTimeout(() => (buildPending.value = false), 8000);
 }
 
+/** 返回软件界面:切到主窗口(最小化先还原),不关闭独立预览窗口 —— 关窗只能由用户主动进行 */
+async function backToApp() {
+  if (!inTauri) {
+    window.opener?.focus();
+    return;
+  }
+  try {
+    const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
+    const main = await WebviewWindow.getByLabel("main");
+    if (!main) return;
+    await main.unminimize().catch(() => undefined);
+    await main.show().catch(() => undefined);
+    await main.setFocus();
+  } catch {
+    /* 聚焦失败不影响预览 */
+  }
+}
+
 /* ---------- 安卓侧滑返回:壳层动画层 ---------- */
 
 const gestureP = ref(0); // 0 静止;>0 右滑滑出;<0 后退目标页从左侧入场
@@ -535,6 +553,10 @@ onBeforeUnmount(() => {
         @click="requestBuild"
       >
         <AppIcon :name="buildPending ? 'refresh' : 'box'" :size="15" />
+      </button>
+      <!-- 返回软件界面:切到主窗口(最小化先还原),不关闭独立预览窗口 —— 关窗只能由用户主动进行 -->
+      <button class="btn-icon" :title="t('previewShell.backToApp')" @click="backToApp">
+        <AppIcon name="columns" :size="15" />
       </button>
       <div v-if="onWindows" class="win-controls">
         <button class="btn-icon" :title="t('titlebar.minimize')" @click="winAction('minimize')">

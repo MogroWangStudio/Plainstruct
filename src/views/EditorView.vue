@@ -19,10 +19,10 @@ const editor = useEditorStore();
 const app = useAppStore();
 const builder = useBuilderStore();
 
-/** 独立预览窗口开关:未开则先构建再弹出;已开则关闭(状态由 store 跟踪) */
+/** 独立预览窗口:未开则先构建再打开;已开则切到独立窗口(不关闭 —— 关窗只能由用户主动进行) */
 async function togglePreviewWindow() {
   if (builder.previewWindowOpen) {
-    await builder.closePreviewWindow();
+    await builder.focusPreviewWindow();
     return;
   }
   await builder.build();
@@ -209,7 +209,7 @@ onBeforeUnmount(() => {
             </button>
           </div>
 
-          <!-- 独立预览窗口开关:未开时点击自动构建并弹出,已开时点击关闭(浏览器 mock 为标签页) -->
+          <!-- 独立预览窗口:未开时点击构建并打开,已开时点击切到独立窗口(不关闭;关闭只能由用户主动关窗) -->
           <button
             class="mode-btn preview-toggle"
             :class="{ active: builder.previewWindowOpen }"
