@@ -220,10 +220,10 @@ function parseLinks(raw: string): LinkRow[] {
     });
 }
 
-/** 行对象 → 行文本(所见即所得:空行保留,构建端本就忽略不完整行;图标留空不写尾管道) */
+/** 行对象 → 行文本(每行恒三段:空行 = "||" 可解析回空行;尾空段无害,构建端 split 三段兼容) */
 function linksToText(rows: LinkRow[]): string {
   return rows
-    .map((r) => [r.name, r.url, r.icon].filter(Boolean).join("|"))
+    .map((r) => [r.name, r.url, r.icon].join("|"))
     .join("\n");
 }
 
