@@ -10,11 +10,27 @@
     :root {
       --ps-accent: {{config.accentColor}};
       --ps-doc-w: {{config.contentWidth}}px;
+      --ps-sidebar-w: {{config.sidebarWidth}}px;
+      --ps-drawer-w: {{config.sidebarWidthM}}vw;
     }
   </style>
+
   <link rel="stylesheet" href="{{asset "assets/style.css"}}">
+  <!-- 4.0.0 正文字号双端独立:置于主题样式之后,桌面/移动(≤900px)分别生效 -->
+  <style>
+    body {
+      font-size: {{config.fontSizePc}}px;
+    }
+
+    @media (max-width: 900px) {
+      body {
+        font-size: {{config.fontSizeM}}px;
+      }
+    }
+  </style>
 </head>
-  <body class="ink font-{{config.bodyFont}}{{#if (eq config.pageTransition "淡入")}} ps-anim-fade{{/if}}{{#if (eq config.pageTransition "淡入上浮")}} ps-anim-rise{{/if}}{{#if (eq config.pageTransition "缩放浮现")}} ps-anim-zoom{{/if}}{{#if (eq config.pageTransition "滑入")}} ps-anim-slide{{/if}}{{#if (eq config.pageTransition "弹性浮现")}} ps-anim-spring{{/if}}{{#if (eq config.pageTransition "模糊聚焦")}} ps-anim-blur{{/if}}{{#if (eq config.pageTransition "翻页")}} ps-anim-flip{{/if}}{{#if (eq config.pageTransition "揭开")}} ps-anim-wipe{{/if}}{{#if config.dropCap}} ink-dropcap{{/if}}"{{#if (eq config.bodyFont "custom")}} style="--ps-font-body: {{config.customFont}}"{{/if}}>
+  <body class="ink font-{{config.bodyFont}}{{#if (eq config.pageTransition "淡入")}} ps-anim-fade{{/if}}{{#if (eq config.pageTransition "淡入上浮")}} ps-anim-rise{{/if}}{{#if (eq config.pageTransition "缩放浮现")}} ps-anim-zoom{{/if}}{{#if (eq config.pageTransition "滑入")}} ps-anim-slide{{/if}}{{#if (eq config.pageTransition "弹性浮现")}} ps-anim-spring{{/if}}{{#if (eq config.pageTransition "模糊聚焦")}} ps-anim-blur{{/if}}{{#if (eq config.pageTransition "翻页")}} ps-anim-flip{{/if}}{{#if (eq config.pageTransition "揭开")}} ps-anim-wipe{{/if}}{{#if config.dropCap}} ink-dropcap{{/if}}"{{#if (eq config.bodyFont "custom")}} style="--ps-font-body: {{config.customFont}}"{{/if}} data-hv-nav="{{config.navHover}}" data-hv-logo="{{config.logoHover}}" data-hv-title="{{config.titleHover}}" data-hv-link="{{config.linkHover}}" data-hv-pager="{{config.pagerHover}}" data-loading="{{config.loadingAnim}}">
+  {{#unless (eq config.loadingAnim "关闭")}}<div class="ps-loader" aria-hidden="true"><span class="ps-loader-spin"></span></div>{{/unless}}
   <header class="ps-topbar">
     <button class="ps-menu-btn" type="button" aria-label="文档列表" aria-expanded="false" aria-controls="ps-sidebar">
       <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">

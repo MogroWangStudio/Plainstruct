@@ -122,7 +122,7 @@ body.font-custom {
 }
 
 .ps-sidebar {
-  width: 248px;
+  width: var(--ps-sidebar-w, 248px);
   flex-shrink: 0;
   position: sticky;
   top: 0;
@@ -768,7 +768,7 @@ a.ps-home-link:hover {
     left: 0;
     bottom: 0;
     z-index: 60;
-    width: min(84vw, 320px);
+    width: min(var(--ps-drawer-w, 84vw), 320px);
     max-height: none;
     padding-top: 28px;
     transform: translateX(-104%);
@@ -872,4 +872,243 @@ a.ps-home-link:hover {
 }
 .ps-aigc[data-aigc="present"] {
   color: var(--ps-ink-2);
+}
+
+/* ---------- 页面加载动画(主题配置 data-loading 驱动;渲染管线在 html 根注入 ps-js,JS 可用时才显示) ---------- */
+
+.ps-loader {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 99;
+  align-items: center;
+  justify-content: center;
+  background: var(--ps-bg);
+  transition: opacity 360ms ease;
+}
+
+.ps-js .ps-loader {
+  display: flex;
+}
+
+.ps-loader.is-done {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ps-loader-spin {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2.5px solid var(--ps-line);
+  border-top-color: var(--ps-accent);
+}
+
+body[data-loading="转圈"] .ps-loader-spin {
+  animation: ps-loader-spin 900ms cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+
+@keyframes ps-loader-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+body[data-loading="点点"] .ps-loader-spin {
+  position: relative;
+  width: 9px;
+  height: 9px;
+  border: none;
+  border-radius: 50%;
+  background: var(--ps-accent);
+  color: var(--ps-accent);
+  animation: ps-loader-dot 1100ms ease-in-out infinite;
+}
+
+body[data-loading="点点"] .ps-loader-spin::before,
+body[data-loading="点点"] .ps-loader-spin::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+body[data-loading="点点"] .ps-loader-spin::before {
+  left: -15px;
+  animation: ps-loader-dot 1100ms ease-in-out infinite;
+  animation-delay: -180ms;
+}
+
+body[data-loading="点点"] .ps-loader-spin::after {
+  left: 15px;
+  animation: ps-loader-dot 1100ms ease-in-out infinite;
+  animation-delay: 180ms;
+}
+
+@keyframes ps-loader-dot {
+  0%,
+  70%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.8);
+  }
+  35% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+body[data-loading="进度条"] .ps-loader {
+  background: transparent;
+  align-items: stretch;
+  pointer-events: none;
+}
+
+body[data-loading="进度条"] .ps-loader-spin {
+  width: 100%;
+  height: 3px;
+  border: none;
+  border-radius: 0;
+  /* deslop-ignore-next-line 06: 进度条填充是功能图形,非氛围渐变 */
+  background: linear-gradient(90deg, transparent, var(--ps-accent));
+  transform-origin: left;
+  animation: ps-loader-bar 1100ms cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+
+@keyframes ps-loader-bar {
+  0% {
+    transform: scaleX(0);
+    transform-origin: left;
+  }
+  49% {
+    transform: scaleX(1);
+    transform-origin: left;
+  }
+  51% {
+    transform: scaleX(1);
+    transform-origin: right;
+  }
+  100% {
+    transform: scaleX(0);
+    transform-origin: right;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ps-loader-spin {
+    animation: none;
+  }
+}
+
+/* ---------- 悬停反馈配置(body data-hv-* 驱动;默认档与主题原样式一致,不写规则) ---------- */
+
+/* 导航悬停反馈(侧栏文档导航) */
+body[data-hv-nav="无"] .ps-nav-link:hover {
+  color: var(--ps-ink-2);
+  border-bottom-color: transparent;
+}
+
+body[data-hv-nav="无"] a.ps-nav-dir:hover {
+  color: var(--ps-ink-3);
+}
+
+body[data-hv-nav="强调色"] .ps-nav-link:hover {
+  color: var(--ps-accent);
+  border-bottom-color: var(--ps-accent);
+}
+
+body[data-hv-nav="强调色"] a.ps-nav-dir:hover {
+  color: var(--ps-accent);
+}
+
+body[data-hv-nav="下划线"] .ps-nav-link:hover {
+  color: var(--ps-ink);
+  border-bottom-color: transparent;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+}
+
+body[data-hv-nav="下划线"] a.ps-nav-dir:hover {
+  color: var(--ps-accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+}
+
+body[data-hv-nav="底色"] .ps-nav-link:hover,
+body[data-hv-nav="底色"] a.ps-nav-dir:hover {
+  color: var(--ps-ink);
+}
+
+body[data-hv-nav="底色"] .ps-nav-link:hover {
+  border-bottom-color: transparent;
+  background: var(--ps-chip);
+}
+
+/* Logo 悬停反馈(侧栏站点头) */
+body[data-hv-logo="淡化"] .ps-site:hover .ps-logo {
+  opacity: 0.6;
+}
+
+body[data-hv-logo="放大"] .ps-logo {
+  transition: transform 200ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+body[data-hv-logo="放大"] .ps-site:hover .ps-logo {
+  transform: scale(1.08);
+}
+
+body[data-hv-logo="强调色"] .ps-site:hover .ps-logo {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ps-accent) 32%, transparent);
+}
+
+/* 站点名悬停反馈 */
+body[data-hv-title="无"] .ps-site:hover .ps-site-name {
+  color: var(--ps-ink);
+  border-bottom-color: var(--ps-ink);
+}
+
+body[data-hv-title="淡化"] .ps-site:hover .ps-site-name {
+  color: var(--ps-ink);
+  border-bottom-color: var(--ps-ink);
+  opacity: 0.6;
+}
+
+/* 正文链接悬停反馈 */
+body[data-hv-link="无"] .ps-doc-body a:hover {
+  color: var(--ps-accent);
+}
+
+body[data-hv-link="下划线"] .ps-doc-body a:hover {
+  color: var(--ps-ink);
+  text-decoration-color: var(--ps-accent);
+}
+
+body[data-hv-link="底色"] .ps-doc-body a:hover {
+  background: color-mix(in srgb, currentColor 10%, transparent);
+}
+
+/* 上下页卡片悬停反馈 */
+body[data-hv-pager="无"] .ps-pager-item:hover {
+  color: var(--ps-ink-2);
+}
+
+body[data-hv-pager="上浮"] .ps-pager-item {
+  transition:
+    color 160ms cubic-bezier(0.23, 1, 0.32, 1),
+    transform 220ms cubic-bezier(0.23, 1, 0.32, 1),
+    box-shadow 220ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+body[data-hv-pager="上浮"] .ps-pager-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(33, 29, 22, 0.1);
+}
+
+body[data-hv-pager="底色"] .ps-pager-item:hover {
+  background: var(--ps-chip);
 }

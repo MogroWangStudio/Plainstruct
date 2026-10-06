@@ -1624,3 +1624,80 @@ body[data-toc-style="极简"] .blog-toc-item a:hover::after,
 body[data-toc-style="极简"] .blog-toc-item a:focus-visible::after {
   transform: scaleX(1);
 }
+
+/* ---------- 正文链接悬停反馈(body data-hv-link 驱动;默认「加深」即主题原样式,不写规则) ---------- */
+
+body[data-hv-link="无"] .blog-post-body a:hover,
+body[data-hv-link="无"] .blog-home-body a:hover {
+  border-bottom-color: color-mix(in srgb, var(--ps-accent) 55%, transparent);
+}
+
+body[data-hv-link="底色"] .blog-post-body a:hover,
+body[data-hv-link="底色"] .blog-home-body a:hover {
+  background: color-mix(in srgb, currentColor 10%, transparent);
+}
+
+/* ---------- 封面图悬停反馈(body data-hv-cover 驱动;悬停整张卡片时生效) ---------- */
+
+.blog-entry-cover img {
+  transition:
+    transform 480ms cubic-bezier(0.23, 1, 0.32, 1),
+    opacity 480ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+body[data-hv-cover="微放大"] .blog-entry:hover .blog-entry-cover img {
+  transform: scale(1.04);
+}
+
+body[data-hv-cover="放大"] .blog-entry:hover .blog-entry-cover img {
+  transform: scale(1.09);
+}
+
+body[data-hv-cover="淡化"] .blog-entry:hover .blog-entry-cover img {
+  opacity: 0.72;
+}
+
+/* ---------- 卡片入场动画(body data-entry 驱动;关闭 = 主题原样式) ---------- */
+
+@keyframes ps-entry-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes ps-entry-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+body[data-entry="淡入"] .blog-entry {
+  animation: ps-entry-fade 480ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+body[data-entry="上浮"] .blog-entry,
+body[data-entry="交错上浮"] .blog-entry {
+  animation: ps-entry-rise 520ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+/* 交错上浮:按卡片顺序依次浮现,8 张以后同拍到达 */
+body[data-entry="交错上浮"] .blog-entry:nth-child(2) { animation-delay: 60ms; }
+body[data-entry="交错上浮"] .blog-entry:nth-child(3) { animation-delay: 120ms; }
+body[data-entry="交错上浮"] .blog-entry:nth-child(4) { animation-delay: 180ms; }
+body[data-entry="交错上浮"] .blog-entry:nth-child(5) { animation-delay: 240ms; }
+body[data-entry="交错上浮"] .blog-entry:nth-child(6) { animation-delay: 300ms; }
+body[data-entry="交错上浮"] .blog-entry:nth-child(7) { animation-delay: 360ms; }
+body[data-entry="交错上浮"] .blog-entry:nth-child(n + 8) { animation-delay: 420ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .blog-entry-cover img {
+    transition: none;
+  }
+
+  body[data-hv-cover="微放大"] .blog-entry:hover .blog-entry-cover img,
+  body[data-hv-cover="放大"] .blog-entry:hover .blog-entry-cover img {
+    transform: none;
+  }
+
+  body[data-entry] .blog-entry {
+    animation: none;
+  }
+}

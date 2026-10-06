@@ -1,7 +1,7 @@
 {
   "id": "plain-dark",
   "name": "素构 · 暗色",
-  "version": "3.8.0",
+  "version": "4.0.0",
   "type": "docs",
   "author": "MogroWang Studio",
   "description": "默认暗色主题:暖黑纸感,浅墨强调,系统字体。",
@@ -38,6 +38,27 @@
       "category": "颜色与字体"
     },
     {
+      "key": "fontSizePc",
+      "label": "正文字号(桌面端)",
+      "type": "number",
+      "default": 15.5,
+      "min": 12,
+      "max": 22,
+      "step": 0.5,
+      "category": "颜色与字体"
+    },
+    {
+      "key": "fontSizeM",
+      "label": "正文字号(移动端)",
+      "type": "number",
+      "default": 15.5,
+      "min": 12,
+      "max": 20,
+      "step": 0.5,
+      "category": "颜色与字体",
+      "hint": "窗口宽度 ≤900px 时生效"
+    },
+    {
       "key": "sidebarWidth",
       "label": "侧栏宽度",
       "type": "number",
@@ -45,6 +66,27 @@
       "min": 200,
       "max": 360,
       "step": 10,
+      "category": "布局"
+    },
+    {
+      "key": "sidebarWidthM",
+      "label": "移动端抽屉宽度(%)",
+      "type": "number",
+      "default": 84,
+      "min": 60,
+      "max": 100,
+      "step": 2,
+      "category": "布局",
+      "hint": "窗口宽度 ≤900px 时侧栏抽屉按视口百分比显示"
+    },
+    {
+      "key": "contentWidth",
+      "label": "正文宽度(px)",
+      "type": "number",
+      "default": 760,
+      "min": 560,
+      "max": 960,
+      "step": 20,
       "category": "布局"
     },
     {
@@ -64,6 +106,84 @@
         "揭开"
       ],
       "category": "动效"
+    },
+    {
+      "key": "loadingAnim",
+      "label": "页面加载动画",
+      "type": "select",
+      "default": "关闭",
+      "options": [
+        "关闭",
+        "转圈",
+        "点点",
+        "进度条"
+      ],
+      "category": "动效"
+    },
+    {
+      "key": "navHover",
+      "label": "导航悬停反馈",
+      "type": "select",
+      "default": "底色",
+      "options": [
+        "无",
+        "加深",
+        "强调色",
+        "下划线",
+        "底色"
+      ],
+      "category": "悬停反馈"
+    },
+    {
+      "key": "logoHover",
+      "label": "Logo 悬停反馈",
+      "type": "select",
+      "default": "放大",
+      "options": [
+        "无",
+        "淡化",
+        "放大",
+        "强调色"
+      ],
+      "category": "悬停反馈"
+    },
+    {
+      "key": "titleHover",
+      "label": "站点名悬停反馈",
+      "type": "select",
+      "default": "强调色",
+      "options": [
+        "无",
+        "淡化",
+        "强调色",
+        "下划线"
+      ],
+      "category": "悬停反馈"
+    },
+    {
+      "key": "linkHover",
+      "label": "正文链接悬停反馈",
+      "type": "select",
+      "default": "下划线",
+      "options": [
+        "无",
+        "下划线",
+        "底色"
+      ],
+      "category": "悬停反馈"
+    },
+    {
+      "key": "pagerHover",
+      "label": "上下页卡片悬停反馈",
+      "type": "select",
+      "default": "上浮",
+      "options": [
+        "无",
+        "上浮",
+        "强调色",
+        "底色"
+      ],
+      "category": "悬停反馈"
     },
     {
       "key": "showDate",
