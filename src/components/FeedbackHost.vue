@@ -13,7 +13,6 @@ const ui = useUiStore();
     v-if="ui.confirm"
     :title="ui.confirm.title"
     :width="380"
-    :backdrop-close="false"
     @cancel="ui.resolveConfirm(false)"
   >
     <p class="text-[calc(13.5px*var(--ui-font-scale))] leading-relaxed text-ink-2">{{ ui.confirm.body }}</p>

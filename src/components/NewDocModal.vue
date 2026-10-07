@@ -8,6 +8,7 @@ import { useThemeStore } from "@/stores/theme";
 import { useUiStore } from "@/stores/ui";
 import { assetRefPrefix } from "@/lib/paths";
 import { parseFrontMatter, type AigcDeclaration } from "@/lib/frontmatter";
+import { useBackdropClose } from "@/lib/backdrop-close";
 import AppIcon from "@/components/AppIcon.vue";
 import DateTimePicker from "@/components/DateTimePicker.vue";
 import SelectMenu from "@/components/SelectMenu.vue";
@@ -22,6 +23,12 @@ const { t } = useI18n();
 const site = useSiteStore();
 const theme = useThemeStore();
 const ui = useUiStore();
+const { onBackdropClick, resetBackdropClicks } = useBackdropClose();
+
+/** 空白区域点击关窗(新建为草稿式表单,放弃即关,不弹保存询问) */
+function closeOnBackdrop() {
+  if (onBackdropClick()) emit("cancel");
+}
 
 const form = reactive({ name: "", title: "", description: "", date: "", cover: "", author: "", aigc: "" as "" | AigcDeclaration });
 const importing = ref(false);
@@ -31,6 +38,7 @@ watch(
   () => props.open,
   (open) => {
     if (open) {
+      resetBackdropClicks(); // 空白点击计数随开窗清零
       form.name = "";
       form.title = "";
       form.description = "";
@@ -105,8 +113,8 @@ function submit() {
   <Teleport to="body">
     <Transition name="modal">
       <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center p-6">
-      <div class="modal-scrim absolute inset-0" />
-      <div class="modal-card panel relative flex max-h-[86vh] w-full max-w-[400px] flex-col shadow-window" style="max-width: 400px">
+      <div class="modal-scrim absolute inset-0" @click="closeOnBackdrop" />
+      <div class="modal-card panel relative flex max-h-[86vh] w-full max-w-[400px] flex-col shadow-window" style="max-width: 400px" @click="resetBackdropClicks">
         <header class="flex items-center justify-between px-5 pb-3 pt-4">
           <h2 class="text-[calc(15px*var(--ui-font-scale))] font-semibold">{{ t("tree.newDocTitle") }}</h2>
           <button class="btn-icon" @click="emit('cancel')">

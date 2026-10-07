@@ -148,9 +148,11 @@ export const useBuilderStore = defineStore("builder", {
           minHeight: 440,
           // macOS 保留原生圆角与阴影,红绿灯以 Overlay 悬浮在自绘标题栏上;
           // 其余平台无边框,窗口控制由壳层自绘(与主窗口同一策略)。
+          // y 的实测换算:tao 把标题栏容器高设为「按钮高(14)+y」且按钮贴容器底 9px,
+          // 按钮中心距窗口顶 = y-2,顶栏 44px 居中即中心 22 → y = 24(与主窗口同法实测标定)
           decorations: onMac,
           ...(onMac
-            ? { titleBarStyle: "overlay" as const, hiddenTitle: true, trafficLightPosition: new LogicalPosition(10, 16) }
+            ? { titleBarStyle: "overlay" as const, hiddenTitle: true, trafficLightPosition: new LogicalPosition(10, 24) }
             : {}),
           // 壳层就绪后自显,避免无装饰窗口内容就绪前的白屏闪烁
           visible: false,

@@ -9,6 +9,7 @@ import { moveImageRefs, countImageRefs, findImageRefs, replaceImageRefs, type Im
 import { basename, dirname, ASSET_MIME, isImageFile, isImportableAsset } from "@/lib/paths";
 import { siteUrl } from "@/lib/preview";
 import { toCssPx } from "@/lib/scale";
+import { useBackdropClose } from "@/lib/backdrop-close";
 import { ipc } from "@/ipc/ipc";
 import type { TreeNode } from "@/ipc/types";
 import { useAppStore } from "@/stores/app";
@@ -24,6 +25,7 @@ const app = useAppStore();
 const site = useSiteStore();
 const editor = useEditorStore();
 const ui = useUiStore();
+const { onBackdropClick, resetBackdropClicks } = useBackdropClose();
 
 /** 站点资产(asset,兼容旧 images)下的全部图片文件(含子文件夹,与分组同源) */
 const images = computed<TreeNode[]>(() => site.assetGroups.flatMap((g) => g.images));
@@ -332,6 +334,7 @@ function openMove(paths: string[]) {
   moveTargetOptions.value = options;
   moveTarget.value = options[0].value;
   moveOpen.value = true;
+  resetBackdropClicks(); // 空白点击计数随开窗清零
 }
 
 async function confirmMove() {
@@ -961,8 +964,8 @@ async function removeFolder(g: { dir: string; label: string; images: TreeNode[] 
     <Teleport to="body">
       <Transition name="modal">
         <div v-if="moveOpen" class="fixed inset-0 z-50 flex items-center justify-center p-6">
-          <div class="modal-scrim absolute inset-0" />
-          <div class="modal-card panel relative w-full max-w-[400px] shadow-window">
+          <div class="modal-scrim absolute inset-0" @click="onBackdropClick() && (moveOpen = false)" />
+          <div class="modal-card panel relative w-full max-w-[400px] shadow-window" @click="resetBackdropClicks">
             <header class="px-6 pb-2 pt-5">
               <h2 class="text-[calc(16px*var(--ui-font-scale))] font-semibold">
                 {{ movePathsOpen.length > 1

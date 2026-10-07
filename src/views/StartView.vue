@@ -7,12 +7,20 @@ import { useUiStore } from "@/stores/ui";
 import { ipc } from "@/ipc/ipc";
 import type { SiteType } from "@/ipc/types";
 import { formatSize, formatTime } from "@/lib/format";
+import { useBackdropClose } from "@/lib/backdrop-close";
 import AppIcon from "@/components/AppIcon.vue";
 
 const { t } = useI18n();
 const app = useAppStore();
 const site = useSiteStore();
 const ui = useUiStore();
+const { onBackdropClick, resetBackdropClicks } = useBackdropClose();
+
+/** 打开新建向导:空白点击计数随开窗清零 */
+function openWizard() {
+  showWizard.value = true;
+  resetBackdropClicks();
+}
 
 /** 最近打开条目的站点摘要(类型与大小,异步获取;null = 获取失败) */
 const siteInfos = ref<Record<string, { siteType: string; sizeBytes: number } | null>>({});
@@ -104,7 +112,7 @@ async function openRecent(path: string) {
       <p class="float-in mt-6 text-center text-[calc(14px*var(--ui-font-scale))] leading-relaxed text-ink-2" style="--d: 30ms">{{ t("app.tagline") }}</p>
 
       <div class="float-in mt-10 flex w-full gap-3" style="--d: 60ms">
-        <button class="btn btn-primary h-10 flex-1" @click="showWizard = true">
+        <button class="btn btn-primary h-10 flex-1" @click="openWizard">
           <AppIcon name="plus" :size="16" />
           {{ t("start.createSite") }}
         </button>
@@ -160,8 +168,8 @@ async function openRecent(path: string) {
     <Teleport to="body">
       <Transition name="modal">
         <div v-if="showWizard" class="fixed inset-0 z-50 flex items-center justify-center p-6">
-          <div class="modal-scrim absolute inset-0" />
-          <div class="modal-card panel relative max-h-[calc(100vh-80px)] w-full max-w-[440px] overflow-y-auto shadow-window">
+          <div class="modal-scrim absolute inset-0" @click="onBackdropClick() && (showWizard = false)" />
+          <div class="modal-card panel relative max-h-[calc(100vh-80px)] w-full max-w-[440px] overflow-y-auto shadow-window" @click="resetBackdropClicks">
             <header class="px-6 pb-2 pt-5">
               <h2 class="text-[calc(16px*var(--ui-font-scale))] font-semibold">{{ t("wizard.title") }}</h2>
             </header>

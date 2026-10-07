@@ -7,6 +7,7 @@ import { useThemeStore } from "@/stores/theme";
 import { useUiStore } from "@/stores/ui";
 import { ipc } from "@/ipc/ipc";
 import type { ThemeMeta } from "@/ipc/types";
+import { useBackdropClose } from "@/lib/backdrop-close";
 import AppIcon from "@/components/AppIcon.vue";
 import ThemeConfigPanel from "@/components/ThemeConfigPanel.vue";
 import ThemePreview from "@/components/ThemePreview.vue";
@@ -17,6 +18,7 @@ const { t } = useI18n();
 const site = useSiteStore();
 const theme = useThemeStore();
 const ui = useUiStore();
+const { onBackdropClick, resetBackdropClicks } = useBackdropClose();
 
 const tab = ref<"config" | "maker">("config");
 
@@ -210,7 +212,10 @@ const activeBuiltinName = computed(() => {
 watch(
   () => theme.suggestCopyForBuiltin,
   (v) => {
-    if (v) copyAskOpen.value = true;
+    if (v) {
+      copyAskOpen.value = true;
+      resetBackdropClicks(); // 空白点击计数随开窗清零
+    }
   },
 );
 
@@ -446,8 +451,8 @@ async function resetConfig() {
     <Teleport to="body">
       <Transition name="modal">
         <div v-if="copyAskOpen" class="fixed inset-0 z-50 flex items-center justify-center p-6">
-          <div class="modal-scrim absolute inset-0" />
-          <div class="modal-card panel relative w-full max-w-[380px] shadow-window">
+          <div class="modal-scrim absolute inset-0" @click="onBackdropClick() && dismissCopyAsk()" />
+          <div class="modal-card panel relative w-full max-w-[380px] shadow-window" @click="resetBackdropClicks">
             <header class="px-6 pb-2 pt-5">
               <h2 class="text-[calc(16px*var(--ui-font-scale))] font-semibold">{{ t("theme.modifiedTitle") }}</h2>
             </header>

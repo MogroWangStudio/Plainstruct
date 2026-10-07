@@ -15,6 +15,7 @@ import FrontMatterModal, { type FrontMatterForm } from "@/components/FrontMatter
 import { ASSET_MIME, basename, dirname, isImageFile, safeName, stripExt } from "@/lib/paths";
 import { siteUrl } from "@/lib/preview";
 import { toCssPx } from "@/lib/scale";
+import { useBackdropClose } from "@/lib/backdrop-close";
 import AppIcon from "./AppIcon.vue";
 import Modal from "./Modal.vue";
 import SelectMenu from "./SelectMenu.vue";
@@ -27,6 +28,18 @@ const editor = useEditorStore();
 const app = useAppStore();
 const ui = useUiStore();
 const ctxMenu = useContextMenuStore();
+const { onBackdropClick: moveDialogBackdrop, resetBackdropClicks: resetMoveDialogClicks } = useBackdropClose();
+
+/** 移动对话框空白点击关窗 */
+function closeMoveDialogOnBackdrop() {
+  if (moveDialogBackdrop()) showMoveDialog.value = false;
+}
+
+/** 打开移动对话框:空白点击计数随开窗清零 */
+function openMoveDialog() {
+  showMoveDialog.value = true;
+  resetMoveDialogClicks();
+}
 
 const collapsed = ref(new Set<string>());
 provide("treeCollapsed", collapsed);
@@ -948,7 +961,7 @@ async function onTreeDrop(e: DragEvent) {
     >
       <span class="shrink-0 whitespace-nowrap text-[calc(12px*var(--ui-font-scale))] font-medium text-ink-2">{{ t("tree.selected", { n: selectedCount }) }}</span>
       <div class="ml-auto flex items-center gap-1">
-        <button class="btn btn-sm btn-secondary text-[calc(11.5px*var(--ui-font-scale))]" @click="showMoveDialog = true">
+        <button class="btn btn-sm btn-secondary text-[calc(11.5px*var(--ui-font-scale))]" @click="openMoveDialog">
           <AppIcon name="folder" :size="13" />
           {{ t("tree.moveTo") }}
         </button>
@@ -1006,8 +1019,8 @@ async function onTreeDrop(e: DragEvent) {
     <Teleport to="body">
       <Transition name="modal">
         <div v-if="showMoveDialog" class="fixed inset-0 z-50 flex items-center justify-center p-6">
-          <div class="modal-scrim absolute inset-0" />
-          <div class="modal-card panel relative w-full max-w-[360px] shadow-window">
+          <div class="modal-scrim absolute inset-0" @click="closeMoveDialogOnBackdrop" />
+          <div class="modal-card panel relative w-full max-w-[360px] shadow-window" @click="resetMoveDialogClicks">
             <header class="px-6 pb-2 pt-5">
               <h2 class="text-[calc(16px*var(--ui-font-scale))] font-semibold">{{ t("tree.moveToFolder") }}</h2>
             </header>
