@@ -3,7 +3,7 @@
  *  HTML 嵌入可再设置对齐、宽高(如 80%、640px,裸数字按百分比)与 class
  *  (如 mws_ps_imgpreview 可配合站点图片预览插件)。本地文件在确认后按
  *  用户选择的目标路径复制进站点。 */
-import { computed, reactive, watch } from "vue";
+import { computed, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import Modal from "./Modal.vue";
 import SelectMenu from "./SelectMenu.vue";
@@ -45,6 +45,9 @@ const state = reactive({
   klass: "",
 });
 
+/** 打开时的表单快照:供空白区域关窗前判断是否有未保存改动 */
+const openSnapshot = ref("");
+
 watch(
   () => props.open,
   (open) => {
@@ -57,6 +60,7 @@ watch(
     state.width = "";
     state.height = "";
     state.klass = "";
+    openSnapshot.value = JSON.stringify({ ...state });
   },
 );
 
@@ -104,10 +108,18 @@ function confirm() {
     localSrc: isAsset.value ? undefined : props.source.path,
   });
 }
+
+const hasChanges = () => JSON.stringify({ ...state }) !== openSnapshot.value;
+
+/** 空白关窗询问中的「保存」= 插入;目标路径无效时保持窗口打开 */
+function saveChanges() {
+  if (!destValid.value) return false;
+  confirm();
+}
 </script>
 
 <template>
-  <Modal v-if="open && source" :title="t('imageInsert.title')" :width="420" @cancel="emit('cancel')">
+  <Modal v-if="open && source" :title="t('imageInsert.title')" :width="420" :has-changes="hasChanges" :save-changes="saveChanges" :save-text="t('imageInsert.insertAndClose')" @cancel="emit('cancel')">
     <div class="flex flex-col gap-3">
       <div>
         <span class="field-label">{{ t("imageInsert.source") }}</span>

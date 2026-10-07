@@ -13,12 +13,17 @@ const ui = useUiStore();
     v-if="ui.confirm"
     :title="ui.confirm.title"
     :width="380"
+    :backdrop-close="false"
     @cancel="ui.resolveConfirm(false)"
   >
     <p class="text-[calc(13.5px*var(--ui-font-scale))] leading-relaxed text-ink-2">{{ ui.confirm.body }}</p>
     <template #footer>
       <button class="btn btn-secondary" @click="ui.resolveConfirm(false)">
-        {{ t("common.cancel") }}
+        {{ ui.confirm.cancelText ?? t("common.cancel") }}
+      </button>
+      <!-- 第三个中性动作(如「不保存」):仅在传入文案时出现 -->
+      <button v-if="ui.confirm.neutralText" class="btn btn-secondary" @click="ui.resolveConfirm('neutral')">
+        {{ ui.confirm.neutralText }}
       </button>
       <button
         class="btn"

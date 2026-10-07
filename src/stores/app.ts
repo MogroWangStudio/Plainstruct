@@ -10,6 +10,7 @@ import type {
   EditorFontMode,
   EditorIndentKey,
   Locale,
+  ModalBackdropClose,
   Platform,
   RecentSite,
   UiFontMode,
@@ -41,6 +42,8 @@ export interface AppearanceSettings {
   editorFontCustom?: string;
   /** 弹窗遮罩的背景模糊(默认开) */
   modalBlur?: boolean;
+  /** 点击弹窗空白区域的关窗方式(默认两次点击) */
+  modalBackdropClose?: ModalBackdropClose;
 }
 
 /** 编辑器写作偏好(空白标记、键位、自动保存行为与预览刷新动画) */
@@ -156,6 +159,7 @@ export const useAppStore = defineStore("app", {
           editorIndentKey: "tab",
           editorIndentWidth: 2,
           modalBlur: true,
+          modalBackdropClose: "double",
         }
       );
     },
@@ -301,22 +305,22 @@ export const useAppStore = defineStore("app", {
     async confirmUpdate(version: string): Promise<boolean> {
       const ui = useUiStore();
       const t = i18n.global.t;
-      return ui.confirmDialog({
+      return (await ui.confirmDialog({
         title: t("settings.updateAskTitle"),
         body: t("settings.updateAskBody", { v: version }),
         confirmText: t("settings.updateAskConfirm"),
-      });
+      })) === true;
     },
 
     /** 重启并更新:拉起更新向导,由向导关闭应用并完成安装后启动新版本 */
     async confirmRestart(version: string): Promise<boolean> {
       const ui = useUiStore();
       const t = i18n.global.t;
-      return ui.confirmDialog({
+      return (await ui.confirmDialog({
         title: t("settings.updateRestartAskTitle"),
         body: t("settings.updateRestartAskBody", { v: version }),
         confirmText: t("settings.updateRestartAskConfirm"),
-      });
+      })) === true;
     },
 
     async restartToUpdate() {

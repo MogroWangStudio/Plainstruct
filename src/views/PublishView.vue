@@ -250,7 +250,8 @@ function openPages() {
       <!-- 发布 -->
       <section class="panel p-6">
         <div class="flex flex-col items-center gap-2">
-          <!-- 发布按钮:圆形大号;发布中圆环循环扩散,成功转绿色打勾并浮现「重新发布」 -->
+          <!-- 发布按钮:圆形大号;发布中圆环循环扩散,成功转绿色打勾并浮现「重新发布」;
+               绿色态点击不再重新发布,而是检测 Pages 构建后询问是否前往查看站点 -->
           <div class="publish-orb-wrap">
             <span v-if="publish.syncing" class="orb-ripple" aria-hidden="true" />
             <span v-if="publish.syncing" class="orb-ripple orb-ripple-late" aria-hidden="true" />
@@ -258,8 +259,9 @@ function openPages() {
               class="publish-orb"
               :class="{ done: publishDone }"
               :disabled="!canPublish || publish.syncing"
-              :aria-label="publishDone ? t('publish.done') : t('publish.publish')"
-              @click="publish.sync()"
+              :aria-label="publishDone ? t('publish.viewSite') : t('publish.publish')"
+              :title="publishDone ? t('publish.viewSite') : undefined"
+              @click="publishDone ? publish.viewPublishedSite() : publish.sync()"
             >
               <AppIcon :name="publishDone ? 'check' : 'upload'" :size="30" />
             </button>

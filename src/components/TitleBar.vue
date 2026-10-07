@@ -84,19 +84,20 @@ function goPreview() {
         <span v-if="site.open && site.config" class="text-[calc(13px*var(--ui-font-scale))] text-ink-3">/</span>
         <span v-if="site.open && site.config" class="text-[calc(13px*var(--ui-font-scale))] text-ink-2">{{ site.config.name }}</span>
       </span>
-      <!-- 悬停提示:发布有上下文时多出「查看发布状态」,与「返回主菜单」以竖线分隔并留出空隙 -->
+      <!-- 悬停入口:「返回主菜单」固定在 logo 所在角落(Windows 左上/macOS 右上,macOS 以反向排列落到右端),
+          「查看发布状态」「预览站点」依次排在其后,以竖线分隔并留出空隙 -->
       <span v-if="canGoBack" class="brand-back">
-        <template v-if="showPublishEntry">
-          <button type="button" class="brand-link" @click.stop="goPublish">
-            {{ t("titlebar.viewPublish") }}
-          </button>
-          <span class="brand-back-sep" aria-hidden="true">|</span>
-        </template>
         <button type="button" class="brand-link" @click.stop="goToStart">
           <AppIcon name="arrowLeft" :size="14" class="brand-back-arrow" />
           <span>{{ t("titlebar.backToMenu") }}</span>
         </button>
-        <!-- 站点构建完毕后,预览入口以竖线隔开显示在返回主菜单之后 -->
+        <template v-if="showPublishEntry">
+          <span class="brand-back-sep" aria-hidden="true">|</span>
+          <button type="button" class="brand-link" @click.stop="goPublish">
+            {{ t("titlebar.viewPublish") }}
+          </button>
+        </template>
+        <!-- 站点构建完毕后,预览入口以竖线隔开显示在最后 -->
         <template v-if="showPreviewEntry">
           <span class="brand-back-sep" aria-hidden="true">|</span>
           <button type="button" class="brand-link" @click.stop="goPreview">
@@ -175,6 +176,8 @@ function goPreview() {
   left: auto;
   right: 0;
   transform: translateY(-50%) translateX(-10px);
+  /* macOS logo 在右上角:反向排列让 DOM 首项「返回主菜单」落到右端角落,其余选项向左延展 */
+  flex-direction: row-reverse;
 }
 .brand.can-back:hover .brand-back {
   opacity: 1;

@@ -583,6 +583,8 @@ function openTreeMenu(e: MouseEvent) {
 const folderCfgOpen = ref(false);
 const folderCfgDir = ref("");
 const folderCfgView = ref<"list" | "stream">("stream");
+/** 打开时的视图取值:供空白区域关窗前判断是否有未保存改动 */
+const folderCfgInitial = ref<"list" | "stream">("stream");
 
 const folderViewOptions = computed(() => [
   { value: "stream", label: t("tree.folderViewStream") },
@@ -597,8 +599,11 @@ async function openFolderConfig(node: TreeNode) {
   } catch {
     folderCfgView.value = "stream";
   }
+  folderCfgInitial.value = folderCfgView.value;
   folderCfgOpen.value = true;
 }
+
+const folderCfgChanged = () => folderCfgView.value !== folderCfgInitial.value;
 
 async function saveFolderConfig() {
   folderCfgOpen.value = false;
@@ -978,7 +983,14 @@ async function onTreeDrop(e: DragEvent) {
     />
 
     <!-- 文件夹页面配置:博客站点自动落地页的显示方式(卡片流 / 列表) -->
-    <Modal v-if="folderCfgOpen" :title="t('tree.folderConfigTitle', { dir: folderCfgDir.split('/').pop() || folderCfgDir })" :width="380" @cancel="folderCfgOpen = false">
+    <Modal
+      v-if="folderCfgOpen"
+      :title="t('tree.folderConfigTitle', { dir: folderCfgDir.split('/').pop() || folderCfgDir })"
+      :width="380"
+      :has-changes="folderCfgChanged"
+      :save-changes="saveFolderConfig"
+      @cancel="folderCfgOpen = false"
+    >
       <label class="flex flex-col gap-1">
         <span class="field-label">{{ t("tree.folderConfigView") }}</span>
         <SelectMenu v-model="folderCfgView" :options="folderViewOptions" align="left" />

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /** 插入链接弹窗:链接地址、显示文本与「在新窗口打开」;
  *  新窗口打开以 kramdown 风格属性块写入(渲染为 target="_blank" + noopener) */
-import { reactive, watch } from "vue";
+import { reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import Modal from "./Modal.vue";
 
@@ -17,6 +17,8 @@ const emit = defineEmits<{ confirm: [result: LinkInsertResult]; cancel: [] }>();
 const { t } = useI18n();
 
 const state = reactive({ url: "", text: "", blank: false });
+/** 打开时的表单快照:供空白区域关窗前判断是否有未保存改动 */
+const openSnapshot = ref("");
 
 watch(
   () => props.open,
@@ -25,6 +27,7 @@ watch(
     state.url = "https://";
     state.text = props.initialText;
     state.blank = false;
+    openSnapshot.value = JSON.stringify({ ...state });
   },
 );
 
@@ -35,10 +38,18 @@ function confirm() {
   if (!valid()) return;
   emit("confirm", { url: state.url.trim(), text: state.text.trim(), blank: state.blank });
 }
+
+const hasChanges = () => JSON.stringify({ ...state }) !== openSnapshot.value;
+
+/** 空白关窗询问中的「保存」= 插入;URL 无效时保持窗口打开 */
+function saveChanges() {
+  if (!valid()) return false;
+  confirm();
+}
 </script>
 
 <template>
-  <Modal v-if="open" :title="t('linkInsert.title')" :width="400" @cancel="emit('cancel')">
+  <Modal v-if="open" :title="t('linkInsert.title')" :width="400" :has-changes="hasChanges" :save-changes="saveChanges" :save-text="t('linkInsert.insertAndClose')" @cancel="emit('cancel')">
     <div class="flex flex-col gap-3">
       <label class="flex flex-col gap-1">
         <span class="field-label">{{ t("linkInsert.url") }}</span>

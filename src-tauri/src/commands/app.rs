@@ -125,6 +125,7 @@ pub(crate) fn settings_defaults() -> Value {
         "editorIndentKey": "tab",
         "editorIndentWidth": 2,
         "modalBlur": true,
+        "modalBackdropClose": "double",
         "confetti": "standard",
     })
 }

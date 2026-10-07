@@ -11,7 +11,7 @@ import {
 } from "@/stores/app";
 import { useUiStore } from "@/stores/ui";
 import { ipc } from "@/ipc/ipc";
-import type { ConfettiLevel, EditorBreakKey, EditorFontMode, EditorIndentKey, Locale, UiFontMode } from "@/ipc/types";
+import type { ConfettiLevel, EditorBreakKey, EditorFontMode, EditorIndentKey, Locale, ModalBackdropClose, UiFontMode } from "@/ipc/types";
 import { APP_THEMES, type AppThemeSwatch } from "@/lib/app-themes";
 import { fireConfetti } from "@/lib/confetti";
 import { formatSize } from "@/lib/format";
@@ -134,6 +134,18 @@ const confettiOptions = computed<{ value: ConfettiLevel; label: string }[]>(() =
   { value: "standard", label: t("settings.confettiStandard") },
   { value: "grand", label: t("settings.confettiGrand") },
 ]);
+
+/** 点击弹窗空白区域(模糊遮罩)的关窗方式,默认两次点击 */
+const backdropCloseOptions = computed<{ value: ModalBackdropClose; label: string }[]>(() => [
+  { value: "never", label: t("settings.backdropNever") },
+  { value: "single", label: t("settings.backdropSingle") },
+  { value: "double", label: t("settings.backdropDouble") },
+]);
+
+const backdropCloseModel = computed({
+  get: () => app.settings.modalBackdropClose ?? "double",
+  set: (v: ModalBackdropClose) => void app.setAppearance({ modalBackdropClose: v }),
+});
 
 /* ---------- 界面字号/字重:预设选择框 + 自定义数值(范围输入) ---------- */
 
@@ -690,6 +702,15 @@ function openRelease(url: string) {
                     />
                     <span class="text-[calc(12px*var(--ui-font-scale))] text-ink-2">{{ t("settings.modalBlurOn") }}</span>
                   </label>
+                </div>
+
+                <!-- 空白区域点击关窗:弹窗外模糊区域的点击如何关窗 -->
+                <div class="settings-row" style="--i: 8">
+                  <div class="min-w-0">
+                    <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.backdropClose") }}</p>
+                    <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.backdropCloseHint") }}</p>
+                  </div>
+                  <SelectMenu v-model="backdropCloseModel" :options="backdropCloseOptions" align="right" class="shrink-0" />
                 </div>
               </div>
             </template>

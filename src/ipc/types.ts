@@ -47,7 +47,12 @@ export interface AppSettings {
   confetti?: ConfettiLevel;
   /** 弹窗遮罩的背景模糊,默认开启;个性化设置可关 */
   modalBlur?: boolean;
+  /** 点击弹窗空白区域(模糊遮罩)的关窗方式:never=不关闭 single=一次 double=两次(默认) */
+  modalBackdropClose?: ModalBackdropClose;
 }
+
+/** 弹窗空白区域点击的关窗方式 */
+export type ModalBackdropClose = "never" | "single" | "double";
 
 export interface RecentSite {
   name: string;

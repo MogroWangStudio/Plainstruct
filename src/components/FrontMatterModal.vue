@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /** 配置头可视化编辑弹窗 -- 编辑器工具栏与文件树右键共用;确认后由父级写回文档 */
-import { computed, reactive, watch } from "vue";
+import { computed, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useSiteStore } from "@/stores/site";
 import { ipc } from "@/ipc/ipc";
@@ -63,12 +63,20 @@ function confirmForm() {
   emit("confirm", { ...form });
 }
 
+/** 打开时的表单快照:供空白区域关窗前判断是否有未保存改动 */
+const openSnapshot = ref("");
+
 watch(
   () => props.open,
   (open) => {
-    if (open) Object.assign(form, props.initial);
+    if (open) {
+      Object.assign(form, props.initial);
+      openSnapshot.value = JSON.stringify({ ...form });
+    }
   },
 );
+
+const hasChanges = () => JSON.stringify({ ...form }) !== openSnapshot.value;
 
 /** 当前文档位置引用站点资产的路径前缀(根级 asset/…,子目录 ../asset/…) */
 const coverPrefix = computed(() => {
@@ -96,7 +104,7 @@ async function importCover() {
 </script>
 
 <template>
-  <Modal v-if="open" :title="t('editor.fmEditorTitle')" :width="400" @cancel="emit('cancel')">
+  <Modal v-if="open" :title="t('editor.fmEditorTitle')" :width="400" :has-changes="hasChanges" :save-changes="confirmForm" @cancel="emit('cancel')">
     <div class="flex flex-col gap-3">
       <label class="flex flex-col gap-1">
         <span class="field-label">{{ t("editor.fmTitle") }}</span>

@@ -196,6 +196,52 @@ export const usePublishStore = defineStore("publish", {
       }
     },
 
+    /**
+     * 点击绿色发布球(PublishView):先看 Pages 是否构建完成 ——
+     * 完成 → 弹窗询问是否前往查看;未完成 → 提示稍候,不再误触重新发布。
+     */
+    async viewPublishedSite() {
+      const ui = useUiStore();
+      const t = i18n.global.t;
+      if (!this.result || this.checkingDeploy) return;
+      if (this.deployState === "building") {
+        ui.toast(t("publish.deployWaitHint"), "info");
+        return;
+      }
+      if (this.deployState === "errored") {
+        ui.toast(t("publish.deployErrored"), "error");
+        return;
+      }
+      if (this.deployState !== "ready") {
+        // 状态未知(监听失败/超时):单击检测一次再分流
+        this.checkingDeploy = true;
+        try {
+          const st = await ipc.githubPagesStatus(this.config, this.result.commitSha);
+          if (st.ready) this.deployState = "ready";
+          else if (st.errored) {
+            this.deployState = "errored";
+            ui.toast(t("publish.deployErrored"), "error");
+            return;
+          } else {
+            ui.toast(t("publish.deployWaitHint"), "info");
+            return;
+          }
+        } catch {
+          // 状态查询失败(网络等):与 openSite 的降级一致,交给弹窗由用户决定
+          this.deployState = "ready";
+        } finally {
+          this.checkingDeploy = false;
+        }
+      }
+      const go = await ui.confirmDialog({
+        title: t("publish.viewAskTitle"),
+        body: t("publish.viewAskBody"),
+        confirmText: t("publish.viewGo"),
+        cancelText: t("publish.viewLater"),
+      });
+      if (go === true) await this.openSite();
+    },
+
     /** 前往目标仓库页面 */
     openRepo() {
       if (!this.config.owner || !this.config.repo) return;
