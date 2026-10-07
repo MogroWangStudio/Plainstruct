@@ -557,7 +557,7 @@ export default {
     greeting10: "Take a breath — the next paragraph is on its way.",
     greeting11: "Move the light in your head onto the page.",
     greeting12: "The thought of this moment is tomorrow's treasure.",
-    greeting13: "Small sparks grow; single lines become a book.",
+    greeting13: "Single lines become a book.",
     blessing0: "Published! May visitors pour in.",
     blessing1: "Ding — your site is live!",
     blessing2: "All done. Go grab a drink.",
