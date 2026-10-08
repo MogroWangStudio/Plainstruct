@@ -369,6 +369,11 @@ a.blog-page-step:active {
   margin-top: 30px;
 }
 
+/* 目录未渲染(配置头关闭/正文无标题)时正文占满整行,不留目录列与列间距的空位 */
+.blog-post-cols.blog-post-cols-full {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 @media (max-width: 960px) {
   .blog-post-cols {
     grid-template-columns: minmax(0, 1fr);
