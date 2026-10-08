@@ -157,17 +157,28 @@ function decodeHtmlAttr(s: string): string {
   return s.replace(/&amp;/gi, "&");
 }
 
-/** 解析一个站内资源引用:出根/外链返回 null,其余返回 content/ 相对路径 */
-function resolveAssetPath(raw: string, env: MdEnv): string | null {
-  if (/^(https?:|data:|blob:)/i.test(raw)) return null;
-  const target = splitHash(raw)[0];
+/** 解析一个站内资源引用:外链(含协议相对 //)返回 null;
+ *  返回站内 content/ 相对路径与原样保留的 ?query/#hash 后缀 ——
+ *  此前把查询串并入文件名、把协议相对外链当站内路径拼接,构建产物中
+ *  嵌入代码(如 //player.bilibili.com/...)被改写成无效地址,发布后 404 */
+function resolveAssetRef(raw: string, env: MdEnv): { resolved: string; suffix: string } | null {
+  const s = raw.trim();
+  if (/^(https?:|data:|blob:|mailto:)/i.test(s)) return null;
+  if (s.startsWith("//")) return null; // 协议相对外链
+  const m = s.match(/^([^?#]*)([?#][\s\S]*)?$/);
+  const target = m?.[1] ?? "";
+  const suffix = m?.[2] ?? "";
   if (!target) return null; // 纯锚点,不是资源引用
-  const resolved = joinPosix(dirname(env.currentMdPath), decodeHref(target));
+  const decoded = decodeHref(target);
+  // 以 / 开头按站内根相对解析(与构建产物的其它引用一致);否则相对当前文档
+  const resolved = decoded.startsWith("/")
+    ? joinPosix(decoded)
+    : joinPosix(dirname(env.currentMdPath), decoded);
   if (resolved.startsWith("..")) {
     env.warnings.push({ source: env.currentMdPath, link: raw, message: "out-of-root" });
     return null;
   }
-  return resolved;
+  return { resolved, suffix };
 }
 
 /** 预览通道的 iframe 占位块:样式内联自包含,不依赖主题 CSS */
@@ -193,17 +204,16 @@ function rewriteHtmlMedia(html: string, env: MdEnv): string {
     (m, head: string, attr: string, eq: string, quote: string, raw: string) => {
       const tag = (head.match(/<\s*([a-z]+)/i)?.[1] ?? "").toLowerCase();
       if (attr.toLowerCase() === "poster" && tag !== "video") return m;
-      const resolved = resolveAssetPath(decodeHtmlAttr(raw), env);
-      if (!resolved) return m;
-      const hash = splitHash(raw)[1];
+      const ref = resolveAssetRef(decodeHtmlAttr(raw), env);
+      if (!ref) return m;
       let next: string;
-      if (isMarkdown(resolved)) {
+      if (isMarkdown(ref.resolved)) {
         if (!resolveDoc) return m;
-        next = resolveDoc(resolved);
+        next = resolveDoc(ref.resolved);
       } else {
-        next = resolveAsset(resolved);
+        next = resolveAsset(ref.resolved);
       }
-      if (hash) next = next + hash;
+      if (ref.suffix) next = next + ref.suffix;
       return `${head}${attr}${eq}${quote}${next}${quote}`;
     },
   );
@@ -233,9 +243,9 @@ md.core.ruler.after("plainstruct-tasks", "plainstruct-links", (state) => {
       } else if (t.type === "image") {
         const srcIdx = t.attrIndex("src");
         if (srcIdx < 0) continue;
-        const resolved = resolveAssetPath(String(t.attrs![srcIdx][1]), env);
-        if (resolved && env.resolveAsset) {
-          t.attrs![srcIdx][1] = env.resolveAsset(resolved);
+        const ref = resolveAssetRef(String(t.attrs![srcIdx][1]), env);
+        if (ref && env.resolveAsset) {
+          t.attrs![srcIdx][1] = env.resolveAsset(ref.resolved) + ref.suffix;
         }
       } else if (t.type === "html_inline") {
         t.content = rewriteHtmlMedia(env.embedPlaceholder ? replaceHtmlIframes(t.content) : t.content, env);

@@ -138,9 +138,15 @@ body.ps-home .blog-main {
   body[data-topbar-mnav="true"] .blog-mnav-btn:hover {
     background: color-mix(in srgb, currentColor 8%, var(--ps-mnav-fill, transparent));
   }
-  /* 下拉列表文字对齐(左/中/右,主题配置) */
+  /* 下拉列表文字对齐(左/中/右,主题配置;中文枚举经 data 属性映射为合法 CSS 值) */
   .blog-mnav a {
-    text-align: var(--ps-mnav-align, left);
+    text-align: left;
+  }
+  body[data-mnav-align="居中"] .blog-mnav a {
+    text-align: center;
+  }
+  body[data-mnav-align="右对齐"] .blog-mnav a {
+    text-align: right;
   }
   /* 移动端专属:站点标识在顶栏水平居中(data-logo-center-m)。
      品牌区绝对定位居中,不参与 flex 排版 —— 目录按钮/导航仍在原位;

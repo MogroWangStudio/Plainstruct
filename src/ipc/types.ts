@@ -198,6 +198,9 @@ export interface ThemeField {
   category?: string;
   /** 可选:字段下方的说明小字(如「首页不显示」之类的行为边界) */
   hint?: string;
+  /** 可选:不在配置面板渲染(配置仍随默认值/存量值参与构建与程序化写入,
+   *  如博客主题的 showArchive —— 由顶栏导航归档行的眼睛开关承担) */
+  hidden?: boolean;
   /** 可选:仅当另一字段等于 equals,或落在 oneOf 之一时显示
    *  (如自定义字体依赖 bodyFont=custom;顶栏变形宽度对「药丸 / 圆角矩形」两种形态都可见) */
   visibleIf?: {

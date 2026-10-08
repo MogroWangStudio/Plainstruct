@@ -122,6 +122,18 @@
     }
   }
 
+  var applyRaf = 0; // 拖拽/捏合的变换写入合帧句柄
+
+  /** 手势路径:把变换写入合并到每一帧一次 —— 抗锯齿与像素两模式共用同一手势管线,
+   *  移动端 pointermove 一帧多次不再重复写样式;进出场/复位等需同步布局的路径仍走 apply() */
+  function applyFrame() {
+    if (applyRaf) return;
+    applyRaf = requestAnimationFrame(() => {
+      applyRaf = 0;
+      apply();
+    });
+  }
+
   var pixelRaf = 0; // 待执行的重绘合帧句柄
   var pixelDirty = false;
   var pixelAnimId = 0; // 像素模式补间动画句柄(缩放/复位/双击/旋转)
@@ -406,6 +418,10 @@
     if (!opened) return;
     opened = false;
     pixel = false;
+    if (applyRaf) {
+      cancelAnimationFrame(applyRaf);
+      applyRaf = 0;
+    }
     unmountPixelCanvas();
     img.style.opacity = "";
     pointers.clear();
@@ -627,34 +643,37 @@
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     var pts = [...pointers.values()];
     if (pts.length >= 2 && drag.pinchDist0) {
-      // 双指:中点为缩放中心,距离比驱动倍率
+      // 双指:中点为缩放中心,距离比驱动倍率(目标值入 st,写入统一走帧合批)
       var mid = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 };
       var dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
       var prev = st.scale;
-      zoomAt(mid.x, mid.y, drag.pinch0 * (dist / drag.pinchDist0));
+      var t = zoomTarget(mid.x, mid.y, drag.pinch0 * (dist / drag.pinchDist0));
+      st.scale = t.scale;
+      st.tx = t.tx;
+      st.ty = t.ty;
       drag.st0 = { scale: st.scale, tx: st.tx, ty: st.ty };
       drag.baseX = mid.x;
       drag.baseY = mid.y;
       if (prev !== st.scale) drag.moved = true;
-      return;
-    }
-    var dx = e.clientX - drag.baseX;
-    var dy = e.clientY - drag.baseY;
-    if (!drag.locked) {
-      // 越过位移阈值才锁定手势并捕获指针:点击/双击不被劫持,按钮与图片各归其位
-      if (Math.abs(dx) + Math.abs(dy) <= 8) return;
-      drag.locked = true;
-      drag.moved = true;
-      try {
-        overlay.setPointerCapture(e.pointerId);
-      } catch (err) {
-        /* 捕获失败按未捕获继续 */
+    } else {
+      var dx = e.clientX - drag.baseX;
+      var dy = e.clientY - drag.baseY;
+      if (!drag.locked) {
+        // 越过位移阈值才锁定手势并捕获指针:点击/双击不被劫持,按钮与图片各归其位
+        if (Math.abs(dx) + Math.abs(dy) <= 8) return;
+        drag.locked = true;
+        drag.moved = true;
+        try {
+          overlay.setPointerCapture(e.pointerId);
+        } catch (err) {
+          /* 捕获失败按未捕获继续 */
+        }
+        setMode("ps-lb-dragging");
       }
-      setMode("ps-lb-dragging");
+      st.tx = drag.st0.tx + dx;
+      st.ty = drag.st0.ty + dy;
     }
-    st.tx = drag.st0.tx + dx;
-    st.ty = drag.st0.ty + dy;
-    apply();
+    applyFrame();
     drag.samples.push({ t: e.timeStamp, x: e.clientX, y: e.clientY });
     if (drag.samples.length > 6) drag.samples.shift();
   }

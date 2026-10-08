@@ -198,6 +198,7 @@
       "key": "showArchive",
       "label": "顶栏显示归档入口",
       "type": "boolean",
+      "hidden": true,
       "default": true,
       "hint": "顶栏导航末尾出现「归档」链接，进入全站归档页",
       "category": "顶栏与导航"

@@ -43,7 +43,7 @@ const PLUGINS_ID = "theme-cat-plugins";
 
 /** 全部分组(按 theme.json 中的出现顺序);字段没有分类时归入「其他」;插件分组始终尾随 */
 const sections = computed<Section[]>(() => {
-  const fields = theme.activeMeta?.config ?? [];
+  const fields = (theme.activeMeta?.config ?? []).filter((f) => !f.hidden);
   const pluginSection: Section = { id: PLUGINS_ID, label: t("theme.pluginsCategory"), fields: [] };
   if (!fields.some((f) => f.category)) return [pluginSection];
   const order: string[] = [];
@@ -93,7 +93,7 @@ function byDevice(f: ThemeField): boolean {
 }
 
 const groupedRows = computed<{ id?: string; label?: string; fields: ThemeField[] }[]>(() => {
-  const fields = theme.activeMeta?.config ?? [];
+  const fields = (theme.activeMeta?.config ?? []).filter((f) => !f.hidden);
   if (!fields.some((f) => f.category)) {
     return [
       { fields: fields.filter((f) => isVisible(f) && byDevice(f)) },
