@@ -345,12 +345,22 @@ const pickerRows = computed(() => {
   return rows;
 });
 
-/** 选择行的原始内容(htmlPath 或 htmlPath|顶栏显示名) */
+/** 选择行的原始内容(htmlPath 或 htmlPath|顶栏显示名);按 key 去重 —— 同一项
+ *  无论文章、文件夹还是归档都只计 1 项,重复行(旧版残留/手改配置)不再让
+ *  「已选 n 项」与顶栏实际数量对不上 */
 function pickedOf(field: ThemeField): string[] {
-  return String(fieldValue(field) ?? "")
-    .split("\n")
-    .map((s) => s.trim())
-    .filter(Boolean);
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of String(fieldValue(field) ?? "").split("\n")) {
+    const s = raw.trim();
+    if (!s) continue;
+    const i = s.indexOf("|");
+    const key = (i > 0 ? s.slice(0, i) : s).trim();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(s);
+  }
+  return out;
 }
 
 /** 选择行的纯 key(剥掉 | 后的自定义名),供勾选集合比对 */
@@ -416,17 +426,32 @@ function pickedRows(field: ThemeField): PickedRow[] {
     .map((r) => ({ ...r, label: labels.get(r.key)!, origin: origins.get(r.key) ?? "" }));
 }
 
-/** 上移/下移某选中项:调整 navPicked 行序,构建端按此顺序渲染顶栏导航 */
-function movePicked(field: ThemeField, key: string, dir: -1 | 1) {
+/* 已选导航的拖动排序:把手拖起,悬停过程实时重排(与构建同源,归档项同样可拖) */
+const dragNav = ref<{ field: ThemeField; from: number } | null>(null);
+
+function onNavDragStart(field: ThemeField, from: number, e: DragEvent) {
+  dragNav.value = { field, from };
+  e.dataTransfer!.effectAllowed = "move";
+  try {
+    e.dataTransfer!.setData("text/plain", String(from));
+  } catch {
+ /* 数据不可用不影响排序 */
+  }
+}
+
+function onNavDragOver(field: ThemeField, index: number) {
+  const d = dragNav.value;
+  if (!d || d.field !== field || d.from === index) return;
   const lines = pickedOf(field);
-  const i = lines.findIndex((line) => {
-    const k = (line.indexOf("|") > 0 ? line.slice(0, line.indexOf("|")) : line).trim();
-    return k === key;
-  });
-  const j = i + dir;
-  if (i < 0 || j < 0 || j >= lines.length) return;
-  [lines[i], lines[j]] = [lines[j], lines[i]];
+  if (index < 0 || index >= lines.length) return;
+  const [moved] = lines.splice(d.from, 1);
+  lines.splice(index, 0, moved);
+  d.from = index;
   onField(field, lines.join("\n"));
+}
+
+function onNavDrop() {
+  dragNav.value = null;
 }
 
 /* 弹窗选择器:草稿集,点击确认才写入配置 */
@@ -474,6 +499,7 @@ const plugins = computed(() =>
         searchStyleM: undefined,
         searchPositionM: undefined,
         searchBarWidth: undefined,
+        searchBarWidthM: undefined,
         custom: [],
       },
 );
@@ -617,8 +643,8 @@ async function removePlugin(id: string, name: string) {
           />
         </label>
 
-        <!-- 文本框搜索栏宽度:仅搜索栏形式下可调,双端共用一个值;移动端窄屏自动收窄不溢出 -->
-        <div v-if="(deviceMode === 'pc' && plugins.searchStyle === 'bar') || (deviceMode === 'm' && (plugins.searchStyleM ?? plugins.searchStyle) === 'bar')" class="flex flex-col gap-1">
+        <!-- 文本框搜索栏宽度:仅搜索栏形式下可调,双端独立 —— 桌面端标签改 PC 值,移动端标签改移动端值(缺省沿用 PC) -->
+        <div v-if="deviceMode === 'pc' && plugins.searchStyle === 'bar'" class="flex flex-col gap-1">
           <span class="field-label">{{ t("theme.pluginSearchBarWidth") }}</span>
           <div class="flex items-center gap-3">
             <input
@@ -634,7 +660,7 @@ async function removePlugin(id: string, name: string) {
               {{ plugins.searchBarWidth ?? 240 }}px
             </span>
             <button
-              v-if="deviceMode === 'pc' && plugins.searchBarWidth !== undefined"
+              v-if="plugins.searchBarWidth !== undefined"
               type="button"
               class="btn-icon h-6 w-6 shrink-0"
               :title="t('theme.resetValue')"
@@ -644,6 +670,33 @@ async function removePlugin(id: string, name: string) {
             </button>
           </div>
           <p class="opt-hint">{{ t("theme.pluginSearchBarWidthHint") }}</p>
+        </div>
+        <div v-if="deviceMode === 'm' && (plugins.searchStyleM ?? plugins.searchStyle) === 'bar'" class="flex flex-col gap-1">
+          <span class="field-label">{{ t("theme.pluginSearchBarWidth") }}</span>
+          <div class="flex items-center gap-3">
+            <input
+              type="range"
+              class="range-input min-w-0 flex-1"
+              min="160"
+              max="420"
+              step="10"
+              :value="plugins.searchBarWidthM ?? plugins.searchBarWidth ?? 240"
+              @change="site.savePlugins({ searchBarWidthM: Number(($event.target as HTMLInputElement).value) })"
+            />
+            <span class="mono w-12 shrink-0 text-right text-[calc(12px*var(--ui-font-scale))] text-ink-2">
+              {{ plugins.searchBarWidthM ?? plugins.searchBarWidth ?? 240 }}px
+            </span>
+            <button
+              v-if="plugins.searchBarWidthM !== undefined"
+              type="button"
+              class="btn-icon h-6 w-6 shrink-0"
+              :title="t('theme.pluginSearchFollowPc')"
+              @click="site.savePlugins({ searchBarWidthM: undefined })"
+            >
+              <AppIcon name="refresh" :size="12" />
+            </button>
+          </div>
+          <p class="opt-hint">{{ t("theme.pluginSearchBarWidthMHint") }}</p>
         </div>
 
         <label class="flex cursor-pointer items-center gap-2">
@@ -776,35 +829,32 @@ async function removePlugin(id: string, name: string) {
             <template v-if="pickedRows(field).length">
               <p class="text-[calc(12px*var(--ui-font-scale))] text-ink-3">{{ t("theme.navPickedHeading") }}</p>
               <ul class="flex flex-col">
-                <li v-for="(row, ri) in pickedRows(field)" :key="row.key" class="nav-picked-row">
+                <li
+                  v-for="(row, ri) in pickedRows(field)"
+                  :key="row.key"
+                  class="nav-picked-row"
+                  :class="{ 'is-dragging': dragNav?.field === field && dragNav?.from === ri }"
+                  @dragover.prevent="onNavDragOver(field, ri)"
+                  @drop.prevent="onNavDrop"
+                >
+                  <!-- 拖动把手:按住上下拖动调整顶栏顺序,与构建同源(归档项同样可拖) -->
+                  <button
+                    type="button"
+                    class="nav-drag-handle"
+                    :title="t('theme.navDragHint')"
+                    :aria-label="t('theme.navDragHint')"
+                    draggable="true"
+                    @dragstart="onNavDragStart(field, ri, $event)"
+                    @dragend="dragNav = null"
+                  >
+                    <AppIcon name="grip" :size="13" />
+                  </button>
                   <span class="min-w-0 flex-1 truncate text-[calc(13px*var(--ui-font-scale))] text-ink-2" :title="row.label">
                     {{ row.label }}
                   </span>
-                  <!-- 上移/下移:调整顶栏导航顺序,与构建同源(归档项同样可调) -->
-                  <button
-                    type="button"
-                    class="btn-icon nav-move-btn"
-                    :class="{ 'is-hidden': ri === 0 }"
-                    :disabled="ri === 0"
-                    :title="t('theme.navMoveUp')"
-                    :aria-label="t('theme.navMoveUp')"
-                    @click="movePicked(field, row.key, -1)"
-                  >
-                    <AppIcon name="chevronUp" :size="12" />
-                  </button>
-                  <button
-                    type="button"
-                    class="btn-icon nav-move-btn"
-                    :class="{ 'is-hidden': ri === pickedRows(field).length - 1 }"
-                    :disabled="ri === pickedRows(field).length - 1"
-                    :title="t('theme.navMoveDown')"
-                    :aria-label="t('theme.navMoveDown')"
-                    @click="movePicked(field, row.key, 1)"
-                  >
-                    <AppIcon name="chevronDown" :size="12" />
-                  </button>
+                  <!-- 重命名:输入框随行宽收缩,占位提示原名称,绝不溢出配置框 -->
                   <input
-                    class="input h-7 w-28 shrink-0 text-[calc(12px*var(--ui-font-scale))]"
+                    class="input nav-rename-input text-[calc(12px*var(--ui-font-scale))]"
                     type="text"
                     :value="row.custom"
                     :placeholder="row.origin"
@@ -1151,40 +1201,45 @@ async function removePlugin(id: string, name: string) {
   flex-shrink: 0;
 }
 
-/* 已选导航行:名称 + 上/下移箭头 + 重命名输入框;箭头在行首尾时隐藏占位,避免可点死角 */
+/* 已选导航行:拖动把手 + 名称 + 重命名输入框;输入框随行宽收缩,不溢出配置框 */
 .nav-picked-row {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   padding: 2px 0;
 }
-.nav-move-btn {
+.nav-picked-row.is-dragging {
+  opacity: 0.4;
+}
+.nav-drag-handle {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 20px;
-  height: 20px;
+  height: 24px;
   flex-shrink: 0;
   border: none;
   border-radius: 5px;
   background: transparent;
   color: var(--color-ink-3);
-  cursor: pointer;
+  cursor: grab;
   transition:
     background-color var(--duration-fast) var(--ease-plain),
-    color var(--duration-fast) var(--ease-plain),
-    opacity var(--duration-fast) var(--ease-plain);
+    color var(--duration-fast) var(--ease-plain);
 }
-.nav-move-btn:hover:not(:disabled) {
+.nav-drag-handle:hover {
   background: var(--color-surface-2);
   color: var(--color-ink);
 }
-.nav-move-btn:active:not(:disabled) {
+.nav-drag-handle:active {
+  cursor: grabbing;
   transform: scale(0.92);
 }
-.nav-move-btn.is-hidden {
-  opacity: 0.25;
-  cursor: default;
+.nav-rename-input {
+  height: 28px;
+  /* 随行宽收缩:占位即原名称,窄面板下不再溢出配置框 */
+  flex: 0 1 7rem;
+  min-width: 0;
 }
 
 /* 友链条目:分行容器(名称/链接/图标各一行),细边框把每条围出一次呼吸空间 */

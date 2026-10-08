@@ -73,7 +73,7 @@
       {{#if (or config.footerNote config.footerBuild config.showFooterCredit page.footerLinks.length)}}
         <footer class="ps-footer">
           {{#if config.footerNote}}<p class="ps-footer-note">{{config.footerNote}}</p>{{/if}}
-          {{#if page.footerLinks.length}}<nav class="ps-footer-links" aria-label="友情链接">{{#each page.footerLinks}}<a class="ps-footer-link" href="{{this.url}}" target="_blank" rel="noopener">{{#if this.icon}}<img class="ps-footer-link-icon" src="{{this.icon}}" alt="" loading="lazy">{{/if}}<span>{{this.name}}</span></a>{{/each}}</nav>{{/if}}
+          {{#if page.footerLinks.length}}<nav class="ps-footer-links" aria-label="友情链接">{{#each page.footerLinks}}<a class="ps-footer-link" href="{{this.url}}" target="_blank" rel="noopener">{{#if this.icon}}<img class="ps-footer-link-icon" src="{{this.icon}}" alt="" loading="lazy">{{/if}}{{#if this.name}}<span>{{this.name}}</span>{{/if}}</a>{{/each}}</nav>{{/if}}
           {{#if config.footerBuild}}{{#if page.build}}<p class="ps-footer-build">{{page.build.text}}</p>{{/if}}{{/if}}
           {{#if config.showFooterCredit}}<a class="ps-footer-credit" href="https://github.com/MogroWang/Plainstruct" target="_blank" rel="noopener">由 Plainstruct 创建</a>{{/if}}
         </footer>

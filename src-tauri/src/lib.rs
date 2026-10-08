@@ -43,9 +43,11 @@ fn mime_for(path: &str) -> &'static str {
     }
 }
 
-/// site:// 页面的内容安全策略:允许同站与 https 外链资源(含文章内嵌的 https iframe 与外链图片),
-/// 禁止向外部发起 fetch/WebSocket(connect-src),防止构建产物中的不可信脚本外带数据。
-const SITE_CSP: &str = "default-src 'self' site:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; style-src 'self' 'unsafe-inline' https:; img-src * data: site:; font-src * data: https:; connect-src 'self' site:; frame-src 'self' site: https:; object-src 'none'; base-uri 'none'";
+/// site:// 页面的内容安全策略:资源加载全面放开(http/https 外链图片、样式、字体、
+/// 媒体与 iframe 内嵌均可展示,含 data:/blob:),仅保留两条底线 ——
+/// 禁止向外部发起 fetch/WebSocket(connect-src 限同站),禁止 object/embed 插件与
+/// base 劫持;构建产物中的不可信脚本无法借预览窗口外带数据。
+const SITE_CSP: &str = "default-src * site: data: blob:; script-src 'self' site: 'unsafe-inline' 'unsafe-eval' http: https:; style-src * site: 'unsafe-inline' data: blob:; img-src * site: data: blob:; media-src * site: data: blob:; font-src * site: data:; connect-src 'self' site:; frame-src * site: data: blob:; worker-src * site: blob:; object-src 'none'; base-uri 'none'; form-action 'self' site:";
 
 /// 预览注入脚本:独立预览窗口的壳层经 postMessage 激活后提供触摸镜像与
 /// 安卓侧滑返回,对编辑器内嵌预览保持沉默。脚本说明见 preview_shim.js。

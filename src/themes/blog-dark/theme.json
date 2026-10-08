@@ -294,6 +294,14 @@
       "hint": "窗口宽度 ≤640px 时生效"
     },
     {
+      "key": "logoCenterM",
+      "label": "站点标识顶栏居中",
+      "type": "boolean",
+      "default": false,
+      "category": "品牌与标识",
+      "hint": "仅移动端（≤640px）生效：Logo 与站点名在顶栏水平居中，建议配合「移动端顶栏显示目录按钮」使用"
+    },
+    {
       "key": "logoHover",
       "label": "Logo 悬停反馈",
       "type": "select",

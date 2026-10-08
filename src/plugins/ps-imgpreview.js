@@ -125,7 +125,6 @@
   var pixelRaf = 0; // 待执行的重绘合帧句柄
   var pixelDirty = false;
   var pixelAnimId = 0; // 像素模式补间动画句柄(缩放/复位/双击/旋转)
-  var lastRect = null; // 上次绘制的图像包围盒(画布物理像素),供局部清除
 
   function flushPixel() {
     pixelRaf = 0;
@@ -211,30 +210,7 @@
       pixelRaf = 0;
     }
     pixelDirty = false;
-    lastRect = null;
     cancelPixelAnim();
-  }
-
-  /** 当前变换下图像在画布上的包围盒(物理像素):供局部清除,避免每帧整屏 clearRect */
-  function pixelRect(dpr) {
-    var w = window.innerWidth;
-    var h = window.innerHeight;
-    var src = sourceImg && sourceImg.naturalWidth ? sourceImg : img;
-    var halfW = (src.naturalWidth * fitFactor(w, h, src.naturalWidth, src.naturalHeight)) / 2;
-    var halfH = (src.naturalHeight * fitFactor(w, h, src.naturalWidth, src.naturalHeight)) / 2;
-    var rad = (st.rot * Math.PI) / 180;
-    var c = Math.cos(rad), s = Math.sin(rad);
-    var cx = w / 2 + st.tx, cy = h / 2 + st.ty;
-    var xs = [0, 0, 0, 0], ys = [0, 0, 0, 0];
-    var px = [halfW, halfW, -halfW, -halfW], py = [halfH, -halfH, -halfH, halfH];
-    for (var i = 0; i < 4; i++) {
-      xs[i] = ((px[i] * c - py[i] * s) * st.scale + cx) * dpr;
-      ys[i] = ((px[i] * s + py[i] * c) * st.scale + cy) * dpr;
-    }
-    return {
-      l: Math.min.apply(null, xs), t: Math.min.apply(null, ys),
-      r: Math.max.apply(null, xs), b: Math.max.apply(null, ys),
-    };
   }
 
   /** <img> 的布局适配因子:与 CSS 的 max-width/max-height 一致(移动端断点下取 96vw/78vh) */
@@ -253,20 +229,11 @@
     if (pixelCanvas.width !== bw || pixelCanvas.height !== bh) {
       pixelCanvas.width = bw;
       pixelCanvas.height = bh;
-      lastRect = null; // 画布尺寸变化后旧包围盒失效
     }
     var ctx = pixelCanvas.getContext("2d");
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    // 局部清除:只清上次∪本次的图像包围盒,高倍放大拖拽时远小于整屏清除
-    var rect = pixelRect(dpr);
-    if (lastRect) {
-      ctx.clearRect(lastRect.l, lastRect.t, lastRect.r - lastRect.l, lastRect.b - lastRect.t);
-      if (rect.l !== lastRect.l || rect.t !== lastRect.t || rect.r !== lastRect.r || rect.b !== lastRect.b) {
-        ctx.clearRect(rect.l, rect.t, rect.r - rect.l, rect.b - rect.t);
-      }
-    } else {
-      ctx.clearRect(0, 0, bw, bh);
-    }
+    // 每帧全屏重绘:不做局部清除(残像/拖影的根源),合成器友好的整幅替换
+    ctx.clearRect(0, 0, bw, bh);
     var src = sourceImg && sourceImg.naturalWidth ? sourceImg : img;
     // 复刻 <img> 的 CSS 布局尺寸(92vw×86vh 内等比适配,移动端 96vw×78vh)再乘当前倍率
     var fit = fitFactor(w, h, src.naturalWidth, src.naturalHeight);
@@ -278,14 +245,12 @@
     ctx.scale(st.scale, st.scale);
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(src, -dw / 2, -dh / 2, dw, dh);
-    lastRect = rect;
   }
 
-  /** 以视口点 p 为缩放中心的目标变换(保持该点下的内容不动;不直接应用) */
+  /** 以视口点 p 为缩放中心的目标变换(保持该点下的内容不动;不直接应用)。
+   *  像素模式与抗锯齿同参数:不做整数倍吸附,缩放范围同为 MIN–MAX。 */
   function zoomTarget(px, py, next) {
     var s = Math.min(MAX, Math.max(MIN, next));
-    // 像素渲染:≥100% 时吸附整数倍 —— 一个图像像素对应整数个屏幕像素,点对点清晰可见
-    if (pixel && s >= 1) s = Math.max(1, Math.round(s));
     var k = s / st.scale;
     var cx = window.innerWidth / 2 + st.tx;
     var cy = window.innerHeight / 2 + st.ty;
@@ -546,12 +511,7 @@
         // 抗锯齿模式完全同路(visibility 会把事件落到遮罩上,按下即触发关闭)
         img.style.opacity = "0";
         mountPixelCanvas();
-        // 切入时当前倍率 ≥100% 就吸附到最近整数倍,补间过去立即呈现点对点效果
-        if (st.scale >= 1) {
-          zoomAnimated(window.innerWidth / 2, window.innerHeight / 2, st.scale);
-        } else {
-          apply();
-        }
+        apply();
       } else {
         img.style.opacity = "";
         unmountPixelCanvas();
@@ -695,10 +655,10 @@
         var now2 = e.timeStamp;
         if (now2 - lastTap < 320) {
           if (pixel && !reduced) {
-            // 像素渲染:双击动画与抗锯齿一致,目标 200%(整数倍点对点)或复位
+            // 像素渲染:双击动画与抗锯齿一致(250%),由画布补间承担过渡
             setMode(null);
             if (st.scale > 1.3) animatePixel({ scale: 1, tx: 0, ty: 0 }, 550, EASE_LONG);
-            else animatePixel(zoomTarget(e.clientX, e.clientY, 2), 380, EASE_SPRING);
+            else animatePixel(zoomTarget(e.clientX, e.clientY, 2.5), 380, EASE_SPRING);
             lastTap = 0;
             return;
           }
@@ -708,8 +668,7 @@
             st.tx = 0;
             st.ty = 0;
           } else {
-            // 抗锯齿双击到 250%,像素渲染下双击到 200%(整数倍点对点)
-            var target = pixel ? 2 : 2.5;
+            var target = 2.5;
             var k = target / st.scale;
             var cx = window.innerWidth / 2 + st.tx;
             var cy = window.innerHeight / 2 + st.ty;

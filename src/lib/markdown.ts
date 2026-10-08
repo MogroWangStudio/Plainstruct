@@ -14,6 +14,8 @@ export interface MdEnv {
   warnings: BuildWarning[];
   /** 编辑器预览模式:图片等资源改写为协议地址 */
   resolveAsset?: (resolvedPath: string) => string;
+  /** 内嵌 iframe/video 指向站内文档(.md)时:换算为构建后页面的 URL(缺省不识别) */
+  resolveDoc?: (resolvedPath: string) => string;
 }
 
 export function decodeHref(href: string): string {
@@ -154,8 +156,10 @@ function decodeHtmlAttr(s: string): string {
 
 /** 解析一个站内资源引用:出根/外链返回 null,其余返回 content/ 相对路径 */
 function resolveAssetPath(raw: string, env: MdEnv): string | null {
-  if (/^(https?:|data:)/i.test(raw)) return null;
-  const resolved = joinPosix(dirname(env.currentMdPath), decodeHref(splitHash(raw)[0]));
+  if (/^(https?:|data:|blob:)/i.test(raw)) return null;
+  const target = splitHash(raw)[0];
+  if (!target) return null; // 纯锚点,不是资源引用
+  const resolved = joinPosix(dirname(env.currentMdPath), decodeHref(target));
   if (resolved.startsWith("..")) {
     env.warnings.push({ source: env.currentMdPath, link: raw, message: "out-of-root" });
     return null;
@@ -163,15 +167,34 @@ function resolveAssetPath(raw: string, env: MdEnv): string | null {
   return resolved;
 }
 
-/** 裸 HTML <img>(html_block/html_inline)的 src 改写:与 Markdown 图片语法同流,
- *  经 resolveAsset 换算(预览绝对化为协议地址,构建换算为页面相对地址);
- *  对齐按钮插入的 <div align><img>、用户粘贴的 HTML 由此获得正确的预览路径 */
-function rewriteHtmlImages(html: string, env: MdEnv): string {
-  return html.replace(/<img\b[^>]*?\bsrc\s*=\s*(["'])(.*?)\1/gi, (m, quote: string, raw: string) => {
-    const resolved = resolveAssetPath(decodeHtmlAttr(raw), env);
-    if (!resolved || !env.resolveAsset) return m;
-    return m.slice(0, m.length - raw.length - 1) + env.resolveAsset(resolved) + quote;
-  });
+/** 裸 HTML 内嵌资源(img/iframe/video/audio/source/track/embed)的 src/poster 改写:
+ *  与 Markdown 图片语法同流,经 resolveAsset 换算(预览绝对化为协议地址,
+ *  构建换算为页面相对地址) —— 此前仅改写 <img>,正文里手写的 <iframe>、
+ *  <video> 等内嵌在预览中相对地址落到应用自身 origin、在构建产物中落到当前
+ *  页面目录,均 404;指向站内文档(.md)时经 resolveDoc 指向构建后的页面。 */
+function rewriteHtmlMedia(html: string, env: MdEnv): string {
+  const resolveAsset = env.resolveAsset;
+  if (!resolveAsset) return html;
+  const resolveDoc = env.resolveDoc;
+  return html.replace(
+    /(<(?:img|iframe|video|audio|source|track|embed)\b[^>]*?\s)(src|poster)(\s*=\s*)(["'])(.*?)\4/gi,
+    (m, head: string, attr: string, eq: string, quote: string, raw: string) => {
+      const tag = (head.match(/<\s*([a-z]+)/i)?.[1] ?? "").toLowerCase();
+      if (attr.toLowerCase() === "poster" && tag !== "video") return m;
+      const resolved = resolveAssetPath(decodeHtmlAttr(raw), env);
+      if (!resolved) return m;
+      const hash = splitHash(raw)[1];
+      let next: string;
+      if (isMarkdown(resolved)) {
+        if (!resolveDoc) return m;
+        next = resolveDoc(resolved);
+      } else {
+        next = resolveAsset(resolved);
+      }
+      if (hash) next = next + hash;
+      return `${head}${attr}${eq}${quote}${next}${quote}`;
+    },
+  );
 }
 
 md.core.ruler.after("plainstruct-tasks", "plainstruct-links", (state) => {
@@ -179,7 +202,7 @@ md.core.ruler.after("plainstruct-tasks", "plainstruct-links", (state) => {
   if (!env?.docMap || !env?.warnings) return null;
   for (const block of state.tokens) {
     if (block.type === "html_block") {
-      block.content = rewriteHtmlImages(block.content, env);
+      block.content = rewriteHtmlMedia(block.content, env);
       continue;
     }
     if (block.type !== "inline" || !block.children) continue;
@@ -202,7 +225,7 @@ md.core.ruler.after("plainstruct-tasks", "plainstruct-links", (state) => {
           t.attrs![srcIdx][1] = env.resolveAsset(resolved);
         }
       } else if (t.type === "html_inline") {
-        t.content = rewriteHtmlImages(t.content, env);
+        t.content = rewriteHtmlMedia(t.content, env);
       }
     }
     /* 链接属性块(kramdown 风格):紧跟链接的 `{: target="_blank"}` 应用到该链接,

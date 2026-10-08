@@ -143,6 +143,8 @@ export interface SitePluginsConfig {
   searchPositionM?: "bottom-right" | "bottom-left" | "topbar";
   /** 文本框搜索栏宽度(px,160–420);缺省用样式默认值 */
   searchBarWidth?: number;
+  /** 移动端搜索栏宽度(px),缺省沿用 PC 配置 */
+  searchBarWidthM?: number;
   custom?: SitePluginEntry[];
 }
 

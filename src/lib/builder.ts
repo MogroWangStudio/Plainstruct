@@ -325,14 +325,17 @@ export function navMaxOf(config: Record<string, string | number | boolean>): num
  * (上限只收敛文档项;归档入口始终随 showArchive 保留,与模板时代的行为一致)。
  */
 export function blogTopNav(config: Record<string, string | number | boolean>, raw: RawNav[]): RawNav[] {
-  const picked = String(config.navPicked ?? "")
-    .split("\n")
-    .map((s) => s.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const i = line.indexOf("|");
-      return i > 0 ? [line.slice(0, i).trim(), line.slice(i + 1).trim()] : [line, ""];
-    });
+  const picked: [string, string][] = [];
+  const pickedSeen = new Set<string>();
+  for (const raw of String(config.navPicked ?? "").split("\n")) {
+    const line = raw.trim();
+    if (!line) continue;
+    const i = line.indexOf("|");
+    const key = (i > 0 ? line.slice(0, i) : line).trim();
+    if (!key || pickedSeen.has(key)) continue; // 按 key 去重:一项只计一次(文件夹同理)
+    pickedSeen.add(key);
+    picked.push([key, i > 0 ? line.slice(i + 1).trim() : ""]);
+  }
   const archiveOn = Boolean(config.showArchive);
   const archiveItem = (name: string): RawNav => ({ title: name || BLOG_ARCHIVE_TITLE, htmlPath: BLOG_ARCHIVE_KEY, children: [] });
   const custom = String(config.navMode ?? "") === "自定义" && picked.length > 0;
@@ -492,14 +495,15 @@ function mtimeMapOf(tree: TreeNode[]): Map<string, number> {
   return map;
 }
 
-/** 页脚友情链接解析:每行「名称|链接|图标地址(可选)」,忽略坏行与缺链接的行 */
+/** 页脚友情链接解析:每行「名称|链接|图标地址(可选)」,忽略坏行与缺链接的行;
+ *  名称可留空(有图标时渲染为纯图标链接,无图标也无名称的坏行仍忽略) */
 function parseFooterLinks(raw: string | number | boolean | undefined): { name: string; url: string; icon?: string }[] {
   return String(raw ?? "")
     .split("\n")
     .map((line) => line.trim())
     .filter(Boolean)
     .map((line) => line.split("|").map((s) => s.trim()))
-    .filter((p) => p.length >= 2 && p[0] && /^(https?:|\/|\.\/|\.\.\/|#|mailto:)/i.test(p[1]))
+    .filter((p) => p.length >= 2 && (p[0] || p[2]) && /^(https?:|\/|\.\/|\.\.\/|#|mailto:)/i.test(p[1]))
     .map((p) => ({ name: p[0], url: p[1], icon: p[2] || undefined }));
 }
 
@@ -580,6 +584,8 @@ function renderOnePage(
   coverUrl?: (cover: string) => string,
   /** 站点类型与博客文章流(extras.posts 为当前页应展示的切片,extras.pagination 仅首页系列传入) */
   extras?: BlogHomeExtras,
+  /** 预览/构建共用:内嵌 iframe/video 指向站内文档(.md)时,换算为构建后页面的 URL */
+  resolveDoc?: MdEnv["resolveDoc"],
 ): PageContext & { html: string } {
   const htmlPath = mdToHtml(doc.path);
   const outDir = dirname(htmlPath);
@@ -601,6 +607,8 @@ function renderOnePage(
     dirSet,
     warnings,
     resolveAsset: resolveAsset ?? ((resolved) => encodePath(relPosix(outDir, resolved))),
+    resolveDoc:
+      resolveDoc ?? ((resolved) => encodePath(relPosix(outDir, mdToHtml(resolved)))),
   };
   const content = renderMarkdown(doc.body, env);
 
@@ -791,6 +799,8 @@ export function renderPreview(
     { logo: logoUrl, favicon: faviconUrl },
     (cover) => siteUrl(platform, "content/" + cover),
     extras,
+    // 内嵌 iframe/video 指向站内文档:预览指向构建产物页(未构建时由壳层/构建流程补齐)
+    (resolved) => siteUrl(platform, "build/" + mdToHtml(resolved)),
   );
   // 先内联主题资产,再追加插件:搜索数据内联在前,脚本在主题脚本之后执行
   let out = inlineThemeAssets(html, theme.files);
@@ -907,6 +917,7 @@ export async function renderSpecialPreview(
     { logo: logoUrl, favicon: faviconUrl },
     (cover) => siteUrl(platform, "content/" + cover),
     extras,
+    (resolved) => siteUrl(platform, "build/" + mdToHtml(resolved)),
   );
   let out = inlineThemeAssets(html, theme.files);
   const tags = inlinePreviewPlugins(site, pluginContents);

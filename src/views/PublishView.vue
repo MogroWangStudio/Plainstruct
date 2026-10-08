@@ -262,7 +262,7 @@ async function republish() {
       <!-- 发布 -->
       <section class="panel p-6">
         <div class="flex flex-col items-center gap-2">
-          <!-- 发布按钮:圆形大号;发布中圆环弧光边扩散边自转(加载与扩散同一动画),
+          <!-- 发布按钮:圆形大号;发布中外圈纯扩散、中心加载环(非线性连贯),
                成功转绿色打勾并浮现「重新发布」;绿色态点击检测 Pages 构建状态 -->
           <div class="publish-orb-wrap">
             <span v-if="publish.syncing" class="orb-ripple" aria-hidden="true" />
@@ -475,8 +475,9 @@ async function republish() {
   background: var(--color-ok);
   box-shadow: 0 12px 30px color-mix(in srgb, var(--color-ok) 32%, transparent);
 }
-/* 发布中:弧光环边自转边向外扩散 —— 扩散与加载是同一道动画(弧光旋进),
-   两道错相 1/2 周期,任意时刻都有一道在途,循环无缝;缓动非线性(快进缓出) */
+/* 发布中:外圈纯扩散 —— 圆环自按钮边缘匀速长大的同时透明度长尾渐隐,
+   起止都归零,循环点无跳变;两道错相 1/2 周期,任意时刻都有一道在途;
+   中心保留同色两段式加减速加载环,「扩散 + 加载」各司其职 */
 .publish-orb.syncing {
   cursor: progress;
 }
@@ -484,27 +485,28 @@ async function republish() {
   position: absolute;
   width: 92px;
   height: 92px;
-  border: 2px solid transparent;
-  border-top-color: var(--color-accent);
-  border-right-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
+  border: 1.5px solid var(--color-accent);
   border-radius: 50%;
   pointer-events: none;
   opacity: 0;
-  animation: orb-ripple 1800ms cubic-bezier(0.33, 0, 0.2, 1) infinite;
+  animation: orb-ripple 1900ms cubic-bezier(0.25, 0.46, 0.45, 0.94) infinite;
 }
 .orb-ripple-late {
-  animation-delay: 900ms;
+  animation-delay: 950ms;
 }
 @keyframes orb-ripple {
   0% {
-    transform: scale(1) rotate(0deg);
+    transform: scale(1);
     opacity: 0;
   }
-  8% {
-    opacity: 0.7;
+  12% {
+    opacity: 0.55;
+  }
+  85% {
+    opacity: 0.12;
   }
   100% {
-    transform: scale(2.1) rotate(320deg);
+    transform: scale(2.2);
     opacity: 0;
   }
 }

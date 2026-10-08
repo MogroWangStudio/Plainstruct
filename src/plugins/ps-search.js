@@ -67,8 +67,10 @@
       // 长条搜索框:入口直接输入文本,点右侧搜索按钮(或回车)后才弹出结果面板
       entry.className = "ps-search-entry ps-search-bar";
       // 用户配置的宽度经 CSS 变量下发:悬浮/顶栏各上下文同一变量取宽度,
-      // 侧栏内仍是整行展示(width:auto 规则优先级更高,不受影响)
-      if (searchBarWidth) entry.style.setProperty("--ps-search-bar-w", searchBarWidth + "px");
+      // 侧栏内仍是整行展示(width:auto 规则优先级更高,不受影响);
+      // 移动端未单独设置时沿用 PC 宽度
+      var barW = mobile ? (searchBarWidthM != null ? searchBarWidthM : searchBarWidth) : searchBarWidth;
+      if (barW) entry.style.setProperty("--ps-search-bar-w", barW + "px");
       entry.setAttribute("role", "search");
       entryInput = el("input", "ps-search-field", entry);
       entryInput.type = "text";
@@ -336,6 +338,7 @@
   var entryStyleM = null;      // 移动端形式,缺省沿用 PC
   var entryPositionM = null;   // 移动端位置,缺省沿用 PC
   var searchBarWidth = null;   // 文本框搜索栏宽度(px),null = 用样式默认值
+  var searchBarWidthM = null;  // 移动端宽度,缺省沿用 PC
   function readPos(raw) {
     return raw === "bottom-left" ? "bl" : raw === "topbar" ? "top" : "br";
   }
@@ -352,6 +355,8 @@
       entryPosition = readPos(me.getAttribute("data-position"));
       var barW = parseInt(me.getAttribute("data-bar-width") || "", 10);
       if (Number.isFinite(barW) && barW > 0) searchBarWidth = Math.min(420, Math.max(160, barW));
+      var barWM = parseInt(me.getAttribute("data-bar-width-m") || "", 10);
+      if (Number.isFinite(barWM) && barWM > 0) searchBarWidthM = Math.min(420, Math.max(160, barWM));
       var styleM = me.getAttribute("data-style-m");
       if (styleM) entryStyleM = styleM === "bar" ? "bar" : "button";
       var posM = me.getAttribute("data-position-m");
@@ -365,6 +370,8 @@
       if (window.__psSearchCfg.positionM) entryPositionM = readPos(window.__psSearchCfg.positionM);
       var cfgBarW = Number(window.__psSearchCfg.barWidth);
       if (Number.isFinite(cfgBarW) && cfgBarW > 0) searchBarWidth = Math.min(420, Math.max(160, cfgBarW));
+      var cfgBarWM = Number(window.__psSearchCfg.barWidthM);
+      if (Number.isFinite(cfgBarWM) && cfgBarWM > 0) searchBarWidthM = Math.min(420, Math.max(160, cfgBarWM));
     }
     // 供置顶按钮等同位元素协调避让
     window.__psSearchCorner = entryPosition === "top" ? null : entryPosition;
