@@ -211,6 +211,60 @@
       "hint": "窗口宽度 ≤640px 时导航收进目录按钮，点击展开"
     },
     {
+      "key": "mnavHeightM",
+      "label": "列表按钮大小",
+      "type": "number",
+      "default": 36,
+      "min": 30,
+      "max": 48,
+      "step": 2,
+      "category": "顶栏与导航",
+      "hint": "仅移动端（≤640px）生效：按钮高度（px），宽度随比例伸缩"
+    },
+    {
+      "key": "mnavRadiusM",
+      "label": "列表按钮圆角",
+      "type": "number",
+      "default": 11,
+      "min": 0,
+      "max": 20,
+      "step": 1,
+      "category": "顶栏与导航",
+      "hint": "仅移动端（≤640px）生效：按钮圆角（px），20 接近胶囊"
+    },
+    {
+      "key": "mnavFillColorM",
+      "label": "按钮填充色",
+      "type": "color",
+      "default": "#FFFFFF",
+      "category": "顶栏与导航",
+      "hint": "仅移动端（≤640px）生效"
+    },
+    {
+      "key": "mnavFillOpacityM",
+      "label": "按钮填充不透明度",
+      "type": "number",
+      "default": 72,
+      "min": 0,
+      "max": 100,
+      "step": 4,
+      "category": "顶栏与导航",
+      "hint": "仅移动端（≤640px）生效：单位 %，0 为全透明"
+    },
+    {
+      "key": "mnavAlignM",
+      "label": "下拉列表文字对齐",
+      "type": "select",
+      "default": "左对齐",
+      "options": [
+        "左对齐",
+        "居中",
+        "右对齐"
+      ],
+      "category": "顶栏与导航",
+      "hint": "仅移动端（≤640px）生效：移动端导航下拉面板中文字的对齐"
+    },
+    {
       "key": "navHover",
       "label": "导航悬停反馈",
       "type": "select",

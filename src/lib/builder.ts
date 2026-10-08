@@ -586,6 +586,8 @@ function renderOnePage(
   extras?: BlogHomeExtras,
   /** 预览/构建共用:内嵌 iframe/video 指向站内文档(.md)时,换算为构建后页面的 URL */
   resolveDoc?: MdEnv["resolveDoc"],
+  /** 预览模式:页脚友链图标的绝对地址(构建时留空,使用页面相对地址) */
+  iconUrl?: (icon: string) => string,
 ): PageContext & { html: string } {
   const htmlPath = mdToHtml(doc.path);
   const outDir = dirname(htmlPath);
@@ -609,6 +611,8 @@ function renderOnePage(
     resolveAsset: resolveAsset ?? ((resolved) => encodePath(relPosix(outDir, resolved))),
     resolveDoc:
       resolveDoc ?? ((resolved) => encodePath(relPosix(outDir, mdToHtml(resolved)))),
+    // 预览通道(resolveAsset 由调用方传入):iframe 内嵌替换为占位提示
+    embedPlaceholder: Boolean(resolveAsset),
   };
   const content = renderMarkdown(doc.body, env);
 
@@ -686,13 +690,16 @@ function renderOnePage(
       folderPosts: isBlog ? extras?.folderPosts?.map(mapPost) : undefined,
       folderListHtml: isBlog ? extras?.folderListHtml : undefined,
       folderView: isBlog ? extras?.folderView : undefined,
-      // 页脚友情链接(主题配置按行解析;站内图标路径按页面深度换算相对地址)
+      // 页脚友情链接(主题配置按行解析;站内图标路径按页面深度换算相对地址,
+      // 预览通道换算为协议地址 —— 否则落到应用自身 origin 404)
       footerLinks: parseFooterLinks(config.footerLinks).map((l) => ({
         ...l,
         icon: l.icon
           ? /^(https?:|data:)/i.test(l.icon)
             ? l.icon
-            : encodePath(relPosix(outDir, l.icon))
+            : iconUrl
+              ? iconUrl(l.icon)
+              : encodePath(relPosix(outDir, l.icon))
           : undefined,
       })),
       // 构建信息(版本/日期/时间 + 按格式替换令牌后的文案),页脚按主题配置展示
@@ -801,6 +808,8 @@ export function renderPreview(
     extras,
     // 内嵌 iframe/video 指向站内文档:预览指向构建产物页(未构建时由壳层/构建流程补齐)
     (resolved) => siteUrl(platform, "build/" + mdToHtml(resolved)),
+    // 页脚友链图标:预览指向协议地址
+    (icon) => siteUrl(platform, "content/" + icon),
   );
   // 先内联主题资产,再追加插件:搜索数据内联在前,脚本在主题脚本之后执行
   let out = inlineThemeAssets(html, theme.files);
@@ -918,6 +927,7 @@ export async function renderSpecialPreview(
     (cover) => siteUrl(platform, "content/" + cover),
     extras,
     (resolved) => siteUrl(platform, "build/" + mdToHtml(resolved)),
+    (icon) => siteUrl(platform, "content/" + icon),
   );
   let out = inlineThemeAssets(html, theme.files);
   const tags = inlinePreviewPlugins(site, pluginContents);

@@ -1634,3 +1634,8 @@ body[data-entry="交错上浮"] .blog-entry:nth-child(n + 8) { animation-delay: 
     animation: none;
   }
 }
+
+/* 移动端点按不出现系统蓝色高亮框(WebKit tap highlight) */
+html {
+  -webkit-tap-highlight-color: transparent;
+}

@@ -380,6 +380,8 @@ export default {
     navPickedHeading: "当前在导航中显示（箭头可调顺序，右侧输入框可自定义顶栏显示名，留空用页面标题）",
     navRenameTitle: "自定义该项在顶栏导航中的显示名称（原名：{name}），留空显示页面标题",
     navDragHint: "按住拖动调整顶栏导航顺序",
+    navArchiveShow: "显示归档入口",
+    navArchiveHide: "隐藏归档入口",
     navExpand: "展开",
     navCollapse: "收起",
     catNav: "按分类跳转",

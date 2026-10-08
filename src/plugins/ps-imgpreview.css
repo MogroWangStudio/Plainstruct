@@ -223,3 +223,8 @@ article a img {
   height: 100%;
   pointer-events: none;
 }
+
+/* 移动端点按不出现系统蓝色高亮框(WebKit tap highlight) */
+html {
+  -webkit-tap-highlight-color: transparent;
+}

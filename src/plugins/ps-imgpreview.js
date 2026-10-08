@@ -243,8 +243,38 @@
     ctx.translate(w / 2 + st.tx, h / 2 + st.ty);
     if (st.rot) ctx.rotate((st.rot * Math.PI) / 180);
     ctx.scale(st.scale, st.scale);
+    // 阴影与圆角:与 <img> 的 box-shadow(0 22px 70px rgba(0,0,0,.5))和
+    // border-radius(6px)同参数,先铺一次带阴影的底再裁剪绘制图像
+    ctx.save();
+    ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
+    ctx.shadowBlur = 70;
+    ctx.shadowOffsetY = 22;
+    ctx.fillStyle = "#000";
+    roundRectPath(ctx, -dw / 2, -dh / 2, dw, dh, 6);
+    ctx.fill();
+    ctx.restore();
+    ctx.save();
+    roundRectPath(ctx, -dw / 2, -dh / 2, dw, dh, 6);
+    ctx.clip();
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(src, -dw / 2, -dh / 2, dw, dh);
+    ctx.restore();
+  }
+
+  /** 圆角矩形路径:优先用原生 roundRect,旧引擎退化为四段圆弧 */
+  function roundRectPath(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    if (ctx.roundRect) {
+      ctx.roundRect(x, y, w, h, r);
+      return;
+    }
+    var rr = Math.min(r, w / 2, h / 2);
+    ctx.moveTo(x + rr, y);
+    ctx.arcTo(x + w, y, x + w, y + h, rr);
+    ctx.arcTo(x + w, y + h, x, y + h, rr);
+    ctx.arcTo(x, y + h, x, y, rr);
+    ctx.arcTo(x, y, x + w, y, rr);
+    ctx.closePath();
   }
 
   /** 以视口点 p 为缩放中心的目标变换(保持该点下的内容不动;不直接应用)。

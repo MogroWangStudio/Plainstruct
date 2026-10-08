@@ -380,6 +380,8 @@ export default {
     navPickedHeading: "Shown in the nav (arrows reorder; type in the box to customize its top-bar label)",
     navRenameTitle: "Customize this item's label in the top-bar nav (original: {name}); leave empty to use the page title",
     navDragHint: "Drag to reorder the top-bar nav",
+    navArchiveShow: "Show the archive entry",
+    navArchiveHide: "Hide the archive entry",
     navExpand: "Expand",
     navCollapse: "Collapse",
     catNav: "Jump to a section",

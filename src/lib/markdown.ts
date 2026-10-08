@@ -16,6 +16,9 @@ export interface MdEnv {
   resolveAsset?: (resolvedPath: string) => string;
   /** 内嵌 iframe/video 指向站内文档(.md)时:换算为构建后页面的 URL(缺省不识别) */
   resolveDoc?: (resolvedPath: string) => string;
+  /** 预览通道:iframe 内嵌替换为占位提示(内嵌页面的自身相对资源在预览中无法保证可用,
+   *  提示用户发布站点后生效;构建产物不受影响) */
+  embedPlaceholder?: boolean;
 }
 
 export function decodeHref(href: string): string {
@@ -167,6 +170,15 @@ function resolveAssetPath(raw: string, env: MdEnv): string | null {
   return resolved;
 }
 
+/** 预览通道的 iframe 占位块:样式内联自包含,不依赖主题 CSS */
+const IFRAME_PLACEHOLDER =
+  '<div style="display:flex;align-items:center;justify-content:center;min-height:120px;margin:1.2em 0;padding:16px;border:1px dashed color-mix(in srgb, currentColor 30%, transparent);border-radius:8px;color:inherit;opacity:.65;font:400 13px/1.6 system-ui,-apple-system,&quot;Segoe UI&quot;,sans-serif;text-align:center;">内嵌内容将在发布站点后显示<br>(Embeds render in the published site)</div>';
+
+/** 预览通道:把 iframe 元素整体替换为占位提示(成对与自闭合两种写法都覆盖) */
+function replaceHtmlIframes(html: string): string {
+  return html.replace(/<iframe\b[^>]*>[\s\S]*?<\/iframe\s*>|<iframe\b[^>]*\/?>/gi, IFRAME_PLACEHOLDER);
+}
+
 /** 裸 HTML 内嵌资源(img/iframe/video/audio/source/track/embed)的 src/poster 改写:
  *  与 Markdown 图片语法同流,经 resolveAsset 换算(预览绝对化为协议地址,
  *  构建换算为页面相对地址) —— 此前仅改写 <img>,正文里手写的 <iframe>、
@@ -202,7 +214,8 @@ md.core.ruler.after("plainstruct-tasks", "plainstruct-links", (state) => {
   if (!env?.docMap || !env?.warnings) return null;
   for (const block of state.tokens) {
     if (block.type === "html_block") {
-      block.content = rewriteHtmlMedia(block.content, env);
+      // 预览通道:先替换 iframe 为占位符,再改写其余内嵌资源地址
+      block.content = rewriteHtmlMedia(env.embedPlaceholder ? replaceHtmlIframes(block.content) : block.content, env);
       continue;
     }
     if (block.type !== "inline" || !block.children) continue;
@@ -225,7 +238,7 @@ md.core.ruler.after("plainstruct-tasks", "plainstruct-links", (state) => {
           t.attrs![srcIdx][1] = env.resolveAsset(resolved);
         }
       } else if (t.type === "html_inline") {
-        t.content = rewriteHtmlMedia(t.content, env);
+        t.content = rewriteHtmlMedia(env.embedPlaceholder ? replaceHtmlIframes(t.content) : t.content, env);
       }
     }
     /* 链接属性块(kramdown 风格):紧跟链接的 `{: target="_blank"}` 应用到该链接,

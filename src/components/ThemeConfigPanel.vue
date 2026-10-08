@@ -318,7 +318,8 @@ function clearLinkIcon(field: ThemeField, i: number) {
    归档开启时追加重拟项「归档」,与文档项一同勾选/重命名/排序(键 = archive/index.html) */
 const navOptions = computed<NavPickerItem[]>(() => {
   const items = topNavItems(site.tree, site.docsCache);
-  if (theme.configValues.showArchive) items.push({ key: BLOG_ARCHIVE_KEY, title: BLOG_ARCHIVE_TITLE, dir: false, children: [] });
+  // 归档始终参与选择与排序(可见性由归档行的眼睛开关控制,即 showArchive 配置)
+  items.push({ key: BLOG_ARCHIVE_KEY, title: BLOG_ARCHIVE_TITLE, dir: false, children: [] });
   return items;
 });
 
@@ -381,27 +382,35 @@ function pickedCustoms(field: ThemeField): Map<string, string> {
   );
 }
 
-/** 修改某选中项的顶栏显示名(留空 = 恢复显示页面原标题) */
+/** 修改某选中项的顶栏显示名(留空 = 恢复显示页面原标题;虚拟归档行重命名即落盘) */
 function renamePicked(field: ThemeField, key: string, name: string) {
-  const lines = pickedOf(field).map((line) => {
-    const i = line.indexOf("|");
-    const k = (i > 0 ? line.slice(0, i) : line).trim();
-    if (k !== key) return line;
-    return name.trim() ? `${key}|${name.trim()}` : key;
+  const lines = pickedOf(field);
+  const i = lines.findIndex((line) => {
+    const k = (line.indexOf("|") > 0 ? line.slice(0, line.indexOf("|")) : line).trim();
+    return k === key;
   });
+  if (i === -1) {
+    // 虚拟归档行(未在选择列表中)设置名称:落盘为选择行
+    if (key === BLOG_ARCHIVE_KEY && name.trim()) lines.push(`${key}|${name.trim()}`);
+  } else {
+    lines[i] = name.trim() ? `${key}|${name.trim()}` : key;
+  }
   onField(field, lines.join("\n"));
 }
 
 /** 数量上限与构建同源(navMaxItems 配置,缺省 6) */
 const maxNav = computed(() => navMaxOf(theme.configValues));
 
-/** 已选行(含所在文件夹链与自定义顶栏名;文档已删除的项不再展示) */
+/** 已选行(含所在文件夹链与自定义顶栏名;文档已删除的项不再展示;
+ *  归档为常驻虚拟行 —— 未写入 navPicked 时固定排在末尾,眼睛开关控制可见性) */
 interface PickedRow {
   key: string;
   label: string;
   /** 原始顶栏名(不含文件夹前缀):重命名输入框的占位提示,改了名也能对回原文 */
   origin: string;
   custom: string;
+  /** 归档虚拟项 */
+  archive?: boolean;
 }
 
 function pickedRows(field: ThemeField): PickedRow[] {
@@ -416,42 +425,81 @@ function pickedRows(field: ThemeField): PickedRow[] {
     }
   };
   walk(navOptions.value, "");
-  return pickedOf(field)
+  const rows: PickedRow[] = pickedOf(field)
     .map((line) => {
       const i = line.indexOf("|");
       const key = (i > 0 ? line.slice(0, i) : line).trim();
       return { key, custom: i > 0 ? line.slice(i + 1).trim() : "" };
     })
     .filter((r) => labels.has(r.key))
-    .map((r) => ({ ...r, label: labels.get(r.key)!, origin: origins.get(r.key) ?? "" }));
-}
-
-/* 已选导航的拖动排序:把手拖起,悬停过程实时重排(与构建同源,归档项同样可拖) */
-const dragNav = ref<{ field: ThemeField; from: number } | null>(null);
-
-function onNavDragStart(field: ThemeField, from: number, e: DragEvent) {
-  dragNav.value = { field, from };
-  e.dataTransfer!.effectAllowed = "move";
-  try {
-    e.dataTransfer!.setData("text/plain", String(from));
-  } catch {
- /* 数据不可用不影响排序 */
+    .map((r) => ({
+      ...r,
+      label: labels.get(r.key)!,
+      origin: origins.get(r.key) ?? "",
+      archive: r.key === BLOG_ARCHIVE_KEY || undefined,
+    }));
+  // 归档未写入选择列表时作为虚拟行追加在末尾(排序/重命名会把它落盘)
+  if (!rows.some((r) => r.archive)) {
+    rows.push({ key: BLOG_ARCHIVE_KEY, label: BLOG_ARCHIVE_TITLE, origin: BLOG_ARCHIVE_TITLE, custom: "", archive: true });
   }
+  return rows;
 }
 
-function onNavDragOver(field: ThemeField, index: number) {
-  const d = dragNav.value;
-  if (!d || d.field !== field || d.from === index) return;
-  const lines = pickedOf(field);
-  if (index < 0 || index >= lines.length) return;
-  const [moved] = lines.splice(d.from, 1);
-  lines.splice(index, 0, moved);
+/** 「已选 n 项」:与顶栏实际渲染数一致 —— 剔除已失效项与隐藏中的归档 */
+function pickedCount(field: ThemeField): number {
+  const archiveVisible = Boolean(theme.configValues.showArchive);
+  return pickedRows(field).filter((r) => !r.archive || archiveVisible).length;
+}
+
+/** 归档可见性开关(showArchive 配置;顶栏导航末尾的「顶栏显示归档入口」开关同源) */
+function setArchiveVisible(visible: boolean) {
+  void theme.setConfigValue("showArchive", visible);
+}
+
+/* 已选导航的拖动排序:指针拖拽(HTML5 DnD 在 WKWebView 中不可靠),
+   把手按下捕获指针,移到目标行上方时实时重排,与构建同源;归档虚拟行同样可拖,
+   被拖离末尾时落盘为选择行 */
+const dragNav = ref<{ field: ThemeField; from: number } | null>(null);
+let dragCtx: { field: ThemeField; from: number; pointerId: number } | null = null;
+
+function onNavDragStart(field: ThemeField, from: number, e: PointerEvent) {
+  if (e.pointerType === "mouse" && e.button !== 0) return;
+  (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  dragCtx = { field, from, pointerId: e.pointerId };
+  dragNav.value = { field, from };
+}
+
+function onNavDragMove(e: PointerEvent) {
+  const d = dragCtx;
+  if (!d) return;
+  const el = document.elementFromPoint(e.clientX, e.clientY)?.closest?.(".nav-picked-row") as HTMLElement | null;
+  if (!el) return;
+  const index = Number(el.dataset.navIndex);
+  if (!Number.isInteger(index) || index === d.from) return;
+  reorderNav(d.field, d.from, index);
   d.from = index;
-  onField(field, lines.join("\n"));
+  dragNav.value = { field: d.field, from: index };
 }
 
-function onNavDrop() {
+function onNavDragEnd() {
+  dragCtx = null;
   dragNav.value = null;
+}
+
+/** 重排(含虚拟归档行):重排后序列化回 navPicked;虚拟归档仅在不再居末尾时落盘,
+ *  已有归档行则始终保留(自定义名不丢) */
+function reorderNav(field: ThemeField, from: number, to: number) {
+  const rows = pickedRows(field);
+  if (from < 0 || to < 0 || from >= rows.length || to >= rows.length || from === to) return;
+  const arr = [...rows];
+  const [moved] = arr.splice(from, 1);
+  arr.splice(to, 0, moved);
+  const hadArchiveLine = pickedKeys(field).includes(BLOG_ARCHIVE_KEY);
+  const lines = arr.map((r, i) => {
+    if (r.archive && !hadArchiveLine && i === arr.length - 1) return null; // 虚拟归档仍在末尾,不落盘
+    return r.custom ? `${r.key}|${r.custom}` : r.key;
+  });
+  onField(field, lines.filter(Boolean).join("\n"));
 }
 
 /* 弹窗选择器:草稿集,点击确认才写入配置 */
@@ -824,7 +872,7 @@ async function removePlugin(id: string, name: string) {
           <p v-if="!navOptions.length" class="text-[calc(13px*var(--ui-font-scale))] text-ink-3">{{ t("theme.navlistEmpty") }}</p>
           <template v-else>
             <button type="button" class="select !w-64 cursor-pointer text-left" @click="openPicker(field)">
-              {{ pickedOf(field).length ? t("theme.navPickedCount", { n: pickedOf(field).length }) : t("theme.navPickEmpty") }}
+              {{ pickedKeys(field).length ? t("theme.navPickedCount", { n: pickedCount(field) }) : t("theme.navPickEmpty") }}
             </button>
             <template v-if="pickedRows(field).length">
               <p class="text-[calc(12px*var(--ui-font-scale))] text-ink-3">{{ t("theme.navPickedHeading") }}</p>
@@ -833,9 +881,8 @@ async function removePlugin(id: string, name: string) {
                   v-for="(row, ri) in pickedRows(field)"
                   :key="row.key"
                   class="nav-picked-row"
-                  :class="{ 'is-dragging': dragNav?.field === field && dragNav?.from === ri }"
-                  @dragover.prevent="onNavDragOver(field, ri)"
-                  @drop.prevent="onNavDrop"
+                  :class="{ 'is-dragging': dragNav?.field === field && dragNav?.from === ri, 'is-off': row.archive && !theme.configValues.showArchive }"
+                  :data-nav-index="ri"
                 >
                   <!-- 拖动把手:按住上下拖动调整顶栏顺序,与构建同源(归档项同样可拖) -->
                   <button
@@ -843,15 +890,27 @@ async function removePlugin(id: string, name: string) {
                     class="nav-drag-handle"
                     :title="t('theme.navDragHint')"
                     :aria-label="t('theme.navDragHint')"
-                    draggable="true"
-                    @dragstart="onNavDragStart(field, ri, $event)"
-                    @dragend="dragNav = null"
+                    @pointerdown="onNavDragStart(field, ri, $event)"
+                    @pointermove="onNavDragMove"
+                    @pointerup="onNavDragEnd"
+                    @pointercancel="onNavDragEnd"
                   >
                     <AppIcon name="grip" :size="13" />
                   </button>
                   <span class="min-w-0 flex-1 truncate text-[calc(13px*var(--ui-font-scale))] text-ink-2" :title="row.label">
                     {{ row.label }}
                   </span>
+                  <!-- 归档专属:可见/不可见开关(即「顶栏显示归档入口」配置) -->
+                  <button
+                    v-if="row.archive"
+                    type="button"
+                    class="btn-icon nav-archive-eye"
+                    :title="theme.configValues.showArchive ? t('theme.navArchiveHide') : t('theme.navArchiveShow')"
+                    :aria-pressed="Boolean(theme.configValues.showArchive)"
+                    @click="setArchiveVisible(!theme.configValues.showArchive)"
+                  >
+                    <AppIcon :name="theme.configValues.showArchive ? 'eye' : 'eyeOff'" :size="13" />
+                  </button>
                   <!-- 重命名:输入框随行宽收缩,占位提示原名称,绝不溢出配置框 -->
                   <input
                     class="input nav-rename-input text-[calc(12px*var(--ui-font-scale))]"
@@ -1234,6 +1293,34 @@ async function removePlugin(id: string, name: string) {
 .nav-drag-handle:active {
   cursor: grabbing;
   transform: scale(0.92);
+}
+/* 触屏可拖:把手上禁用浏览器默认触摸行为,否则 pointermove 被滚动接管 */
+.nav-drag-handle {
+  touch-action: none;
+}
+.nav-archive-eye {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--color-ink-3);
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-plain),
+    color var(--duration-fast) var(--ease-plain);
+}
+.nav-archive-eye:hover {
+  background: var(--color-surface-2);
+  color: var(--color-ink);
+}
+.nav-picked-row.is-off .nav-rename-input,
+.nav-picked-row.is-off > span {
+  opacity: 0.45;
 }
 .nav-rename-input {
   height: 28px;

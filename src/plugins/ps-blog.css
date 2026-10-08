@@ -124,18 +124,23 @@ body.ps-home .blog-main {
   }
   body[data-topbar-mnav="true"] .blog-mnav-btn {
     display: inline-flex;
-    /* 与搜索按钮同款扁圆角矩形条(60×36):同材质同描边同阴影,列表/搜索视觉统一 */
-    width: 60px;
-    height: 36px;
+    /* 与搜索按钮同款扁圆角矩形条:大小/圆角/填充色/不透明度均可配
+       (--ps-mnav-* 由主题 layout 注入),材质与搜索入口一致 */
+    width: calc(var(--ps-mnav-h, 36px) * 1.6667);
+    height: var(--ps-mnav-h, 36px);
     border: 1px solid color-mix(in srgb, currentColor 14%, transparent);
-    border-radius: 11px;
-    background: color-mix(in srgb, var(--ps-bg, #fff) 72%, transparent);
+    border-radius: var(--ps-mnav-r, 11px);
+    background: var(--ps-mnav-fill, color-mix(in srgb, var(--ps-bg, #fff) 72%, transparent));
     -webkit-backdrop-filter: blur(16px) saturate(1.6);
     backdrop-filter: blur(16px) saturate(1.6);
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
   }
   body[data-topbar-mnav="true"] .blog-mnav-btn:hover {
-    background: color-mix(in srgb, var(--ps-bg, #fff) 90%, transparent);
+    background: color-mix(in srgb, currentColor 8%, var(--ps-mnav-fill, transparent));
+  }
+  /* 下拉列表文字对齐(左/中/右,主题配置) */
+  .blog-mnav a {
+    text-align: var(--ps-mnav-align, left);
   }
   /* 移动端专属:站点标识在顶栏水平居中(data-logo-center-m)。
      品牌区绝对定位居中,不参与 flex 排版 —— 目录按钮/导航仍在原位;
@@ -440,4 +445,9 @@ body.ps-home .blog-main {
 }
 .blog-archive .blog-stream {
   margin-top: 14px;
+}
+
+/* 移动端点按不出现系统蓝色高亮框(WebKit tap highlight) */
+html {
+  -webkit-tap-highlight-color: transparent;
 }
