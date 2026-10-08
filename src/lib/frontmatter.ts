@@ -1,6 +1,6 @@
 /** 素构识别的配置头字段(写回时以表单值为准重建这些行;表单未管理的字段
  *  不在此列 —— 用户手写的行原样保留,如 order) */
-export const FM_KEYS = ["title", "description", "date", "cover", "author", "aigc", "hidden", "homegroups", "homeuncategorized", "homeuncategorizedlabel"];
+export const FM_KEYS = ["title", "description", "date", "cover", "author", "aigc", "hidden", "toc", "homegroups", "homeuncategorized", "homeuncategorizedlabel"];
 
 /** AIGC 声明:present = 存在 AIGC,none = 无任何 AIGC;缺省(不写字段)即不显示声明 */
 export type AigcDeclaration = "none" | "present";
@@ -17,8 +17,11 @@ export function applyFrontMatter(
     date?: string;
     cover?: string;
     author?: string;
+    /** AIGC 声明 */
     aigc?: AigcDeclaration | "";
     hidden?: boolean;
+    /** 页面目录(博客文章页):on = 强制显示,false = 强制隐藏,"" = 不落字段,跟随主题设置 */
+    toc?: "" | "on" | "off";
     /** 博客主页(根 index.md)专属:卡片流按分类分组 */
     homeGroups?: boolean;
     /** 博客主页专属:分组时是否显示「未分类」组(根级文章);缺省显示,隐藏时写 false */
@@ -35,6 +38,7 @@ export function applyFrontMatter(
     ...(values.author?.trim() ? [`author: ${values.author.trim()}`] : []),
     ...(values.aigc === "none" || values.aigc === "present" ? [`aigc: ${values.aigc}`] : []),
     ...(values.hidden ? ["hidden: true"] : []),
+    ...(values.toc === "on" ? ["toc: true"] : values.toc === "off" ? ["toc: false"] : []),
     ...(values.homeGroups ? ["homeGroups: true"] : []),
     // 显示未分类是缺省行为(不写字段);仅在用户隐藏时落 false
     ...(values.homeGroups && values.homeUncategorized === false ? ["homeUncategorized: false"] : []),
@@ -68,6 +72,8 @@ export interface FrontMatter {
   aigc?: AigcDeclaration;
   /** 隐藏文档:不进文章流与导航、不入搜索索引,仅可通过链接访问 */
   hidden?: boolean;
+  /** 页面目录开关(博客文章页):true = 强制显示,false = 强制隐藏;缺省跟随主题设置 */
+  toc?: boolean;
   /** 博客主页(根 index.md)专属:卡片流按分类分组(分类 = 顶层文件夹) */
   homeGroups?: boolean;
   /** 博客主页专属:分组时显示「未分类」组(根级文章);缺省显示 */
@@ -112,6 +118,10 @@ export function parseFrontMatter(src: string): ParsedDoc {
       if (value === "none" || value === "present") data.aigc = value;
     } else if (key === "hidden") {
       if (value === "true" || value === "1") data.hidden = true;
+    } else if (key === "toc") {
+      // 页面目录三态:缺省(不写字段)跟随主题设置,显式 true/false 强制覆盖
+      if (value === "true" || value === "1") data.toc = true;
+      else if (value === "false" || value === "0") data.toc = false;
     } else if (key === "homegroups") {
       if (value === "true" || value === "1") data.homeGroups = true;
     } else if (key === "homeuncategorized") {

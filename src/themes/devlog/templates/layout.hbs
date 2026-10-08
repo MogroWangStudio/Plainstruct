@@ -61,16 +61,14 @@
     {{#if config.topbarPageTitle}}{{#unless page.isHome}}<span class="blog-topbar-page">{{page.title}}</span>{{/unless}}{{/if}}
     {{#if nav}}
       <nav class="blog-nav" aria-label="站点导航">
-        {{#each nav}}<a href="{{this.url}}"{{#if this.current}} class="current"{{/if}}>{{this.title}}</a>{{/each}}{{#if config.showArchive}}<a href="{{asset "archive/index.html"}}">归档</a>{{/if}}
+        {{#each nav}}<a href="{{this.url}}"{{#if this.current}} class="current"{{/if}}>{{this.title}}</a>{{/each}}
       </nav>
-    {{else if config.showArchive}}
-      <nav class="blog-nav" aria-label="站点导航"><a href="{{asset "archive/index.html"}}">归档</a></nav>
     {{/if}}
     {{#if config.topbarMobileMenu}}<button type="button" class="blog-mnav-btn" aria-label="目录" aria-expanded="false"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/></svg></button>{{/if}}
   </header>
   {{#if config.topbarMobileMenu}}
   <nav class="blog-mnav" aria-label="站点导航">
-    {{#each nav}}<a href="{{this.url}}"{{#if this.current}} class="current"{{/if}}>{{this.title}}</a>{{/each}}{{#if config.showArchive}}<a href="{{asset "archive/index.html"}}">归档</a>{{/if}}
+    {{#each nav}}<a href="{{this.url}}"{{#if this.current}} class="current"{{/if}}>{{this.title}}</a>{{/each}}
   </nav>
   {{/if}}
   <main class="blog-main">

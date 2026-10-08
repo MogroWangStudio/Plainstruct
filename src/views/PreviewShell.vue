@@ -556,7 +556,7 @@ onBeforeUnmount(() => {
       </button>
       <!-- 返回软件界面:切到主窗口(最小化先还原),不关闭独立预览窗口 —— 关窗只能由用户主动进行 -->
       <button class="btn-icon" :title="t('previewShell.backToApp')" @click="backToApp">
-        <AppIcon name="columns" :size="15" />
+        <AppIcon name="cornerUpLeft" :size="15" />
       </button>
       <div v-if="onWindows" class="win-controls">
         <button class="btn-icon" :title="t('titlebar.minimize')" @click="winAction('minimize')">

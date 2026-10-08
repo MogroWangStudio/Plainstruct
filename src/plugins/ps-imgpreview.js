@@ -115,8 +115,78 @@
     img.style.transform =
       "translate(-50%,-50%) translate(" + st.tx + "px," + st.ty + "px) scale(" + st.scale + ") rotate(" + st.rot + "deg)";
     if (scaleBtn) scaleBtn.textContent = Math.round(st.scale * 100) + "%";
-    if (pixel && pixelCanvas) drawPixel();
+    if (pixel && pixelCanvas) {
+      // 像素渲染重绘合帧:指针事件流一帧多次触发只绘一次 —— 移动端拖拽/捏合帧率的主要保障
+      pixelDirty = true;
+      if (!pixelRaf) pixelRaf = requestAnimationFrame(flushPixel);
+    }
   }
+
+  var pixelRaf = 0; // 待执行的重绘合帧句柄
+  var pixelDirty = false;
+  var pixelAnimId = 0; // 像素模式补间动画句柄(缩放/复位/双击/旋转)
+  var lastRect = null; // 上次绘制的图像包围盒(画布物理像素),供局部清除
+
+  function flushPixel() {
+    pixelRaf = 0;
+    if (!pixelDirty || !pixelCanvas || !opened) return;
+    pixelDirty = false;
+    drawPixel();
+  }
+
+  function cancelPixelAnim() {
+    if (pixelAnimId) {
+      cancelAnimationFrame(pixelAnimId);
+      pixelAnimId = 0;
+    }
+  }
+
+  /* 像素模式补间:与抗锯齿模式同一套非线性曲线(短曲线带轻微过冲,
+     长曲线缓出),逐帧重绘画布,缩放/复位/双击/旋转的手感与抗锯齿一致 */
+  function animatePixel(target, dur, ease) {
+    cancelPixelAnim();
+    var from = { scale: st.scale, tx: st.tx, ty: st.ty, rot: st.rot };
+    var dS = target.scale - from.scale;
+    var dX = target.tx - from.tx;
+    var dY = target.ty - from.ty;
+    var dR = target.rot !== undefined ? target.rot - from.rot : 0;
+    var hasRot = target.rot !== undefined;
+    var start = 0;
+    var step = function (now) {
+      if (!start) start = now;
+      var t = Math.min(1, (now - start) / dur);
+      var e = ease(t);
+      st.scale = from.scale + dS * e;
+      st.tx = from.tx + dX * e;
+      st.ty = from.ty + dY * e;
+      if (hasRot) st.rot = from.rot + dR * e;
+      apply();
+      if (t < 1 && opened && pixel) pixelAnimId = requestAnimationFrame(step);
+      else pixelAnimId = 0;
+    };
+    pixelAnimId = requestAnimationFrame(step);
+  }
+
+  /* 与 CSS 同族的贝塞尔求值:短曲线 cubic-bezier(0.3,1.15,0.5,1),长曲线 (0.32,0.72,0,1) */
+  function bezierEase(x1, y1, x2, y2) {
+    var cx = 3 * x1, bx = 3 * (x2 - x1) - cx, ax = 1 - cx - bx;
+    var cy = 3 * y1, by = 3 * (y2 - y1) - cy, ay = 1 - cy - by;
+    var px = function (t) { return ((ax * t + bx) * t + cx) * t; };
+    var py = function (t) { return ((ay * t + by) * t + cy) * t; };
+    var dx = function (t) { return (3 * ax * t + 2 * bx) * t + cx; };
+    return function (x) {
+      var t = x;
+      for (var i = 0; i < 6; i++) {
+        var d = dx(t);
+        if (!d) break;
+        t -= (px(t) - x) / d;
+      }
+      t = Math.min(1, Math.max(0, t));
+      return py(t);
+    };
+  }
+  var EASE_SPRING = bezierEase(0.3, 1.15, 0.5, 1);
+  var EASE_LONG = bezierEase(0.32, 0.72, 0, 1);
 
   /* ---------- 像素渲染:canvas 最近邻采样 ---------- */
   /* CSS transform 缩放由合成器以线性滤波插值,image-rendering: pixelated 在
@@ -136,6 +206,41 @@
     pixelCanvas.remove();
     pixelCanvas = null;
     window.removeEventListener("resize", drawPixel);
+    if (pixelRaf) {
+      cancelAnimationFrame(pixelRaf);
+      pixelRaf = 0;
+    }
+    pixelDirty = false;
+    lastRect = null;
+    cancelPixelAnim();
+  }
+
+  /** 当前变换下图像在画布上的包围盒(物理像素):供局部清除,避免每帧整屏 clearRect */
+  function pixelRect(dpr) {
+    var w = window.innerWidth;
+    var h = window.innerHeight;
+    var src = sourceImg && sourceImg.naturalWidth ? sourceImg : img;
+    var halfW = (src.naturalWidth * fitFactor(w, h, src.naturalWidth, src.naturalHeight)) / 2;
+    var halfH = (src.naturalHeight * fitFactor(w, h, src.naturalWidth, src.naturalHeight)) / 2;
+    var rad = (st.rot * Math.PI) / 180;
+    var c = Math.cos(rad), s = Math.sin(rad);
+    var cx = w / 2 + st.tx, cy = h / 2 + st.ty;
+    var xs = [0, 0, 0, 0], ys = [0, 0, 0, 0];
+    var px = [halfW, halfW, -halfW, -halfW], py = [halfH, -halfH, -halfH, halfH];
+    for (var i = 0; i < 4; i++) {
+      xs[i] = ((px[i] * c - py[i] * s) * st.scale + cx) * dpr;
+      ys[i] = ((px[i] * s + py[i] * c) * st.scale + cy) * dpr;
+    }
+    return {
+      l: Math.min.apply(null, xs), t: Math.min.apply(null, ys),
+      r: Math.max.apply(null, xs), b: Math.max.apply(null, ys),
+    };
+  }
+
+  /** <img> 的布局适配因子:与 CSS 的 max-width/max-height 一致(移动端断点下取 96vw/78vh) */
+  function fitFactor(w, h, nw, nh) {
+    var small = window.matchMedia("(max-width: 640px)").matches;
+    return Math.min(1, (w * (small ? 0.96 : 0.92)) / nw, (h * (small ? 0.78 : 0.86)) / nh);
   }
 
   function drawPixel() {
@@ -148,13 +253,23 @@
     if (pixelCanvas.width !== bw || pixelCanvas.height !== bh) {
       pixelCanvas.width = bw;
       pixelCanvas.height = bh;
+      lastRect = null; // 画布尺寸变化后旧包围盒失效
     }
     var ctx = pixelCanvas.getContext("2d");
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, bw, bh);
+    // 局部清除:只清上次∪本次的图像包围盒,高倍放大拖拽时远小于整屏清除
+    var rect = pixelRect(dpr);
+    if (lastRect) {
+      ctx.clearRect(lastRect.l, lastRect.t, lastRect.r - lastRect.l, lastRect.b - lastRect.t);
+      if (rect.l !== lastRect.l || rect.t !== lastRect.t || rect.r !== lastRect.r || rect.b !== lastRect.b) {
+        ctx.clearRect(rect.l, rect.t, rect.r - rect.l, rect.b - rect.t);
+      }
+    } else {
+      ctx.clearRect(0, 0, bw, bh);
+    }
     var src = sourceImg && sourceImg.naturalWidth ? sourceImg : img;
-    // 复刻 <img> 的 CSS 布局尺寸(92vw × 86vh 内等比适配)再乘当前倍率
-    var fit = Math.min(1, (w * 0.92) / src.naturalWidth, (h * 0.86) / src.naturalHeight);
+    // 复刻 <img> 的 CSS 布局尺寸(92vw×86vh 内等比适配,移动端 96vw×78vh)再乘当前倍率
+    var fit = fitFactor(w, h, src.naturalWidth, src.naturalHeight);
     var dw = src.naturalWidth * fit;
     var dh = src.naturalHeight * fit;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -163,20 +278,41 @@
     ctx.scale(st.scale, st.scale);
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(src, -dw / 2, -dh / 2, dw, dh);
+    lastRect = rect;
   }
 
-  /** 以视口点 p 为缩放中心改变倍率(保持该点下的内容不动) */
-  function zoomAt(px, py, next) {
+  /** 以视口点 p 为缩放中心的目标变换(保持该点下的内容不动;不直接应用) */
+  function zoomTarget(px, py, next) {
     var s = Math.min(MAX, Math.max(MIN, next));
     // 像素渲染:≥100% 时吸附整数倍 —— 一个图像像素对应整数个屏幕像素,点对点清晰可见
     if (pixel && s >= 1) s = Math.max(1, Math.round(s));
     var k = s / st.scale;
     var cx = window.innerWidth / 2 + st.tx;
     var cy = window.innerHeight / 2 + st.ty;
-    st.tx = px - (px - cx) * k - window.innerWidth / 2;
-    st.ty = py - (py - cy) * k - window.innerHeight / 2;
-    st.scale = s;
+    return {
+      scale: s,
+      tx: px - (px - cx) * k - window.innerWidth / 2,
+      ty: py - (py - cy) * k - window.innerHeight / 2,
+    };
+  }
+
+  function zoomAt(px, py, next) {
+    var t = zoomTarget(px, py, next);
+    st.scale = t.scale;
+    st.tx = t.tx;
+    st.ty = t.ty;
     apply();
+  }
+
+  /** 缩放按钮/双击/键盘缩放:像素模式走补间(手感与抗锯齿一致),其余即时应用 */
+  function zoomAnimated(px, py, next) {
+    if (pixel && !reduced) {
+      setMode(null); // img 已隐,CSS 过渡无对象 —— 动画由画布补间承担
+      animatePixel(zoomTarget(px, py, next), 380, EASE_SPRING);
+    } else {
+      setMode("ps-lb-spring");
+      zoomAt(px, py, next);
+    }
   }
 
   function setMode(cls) {
@@ -276,6 +412,7 @@
     opened = false;
     pixel = false;
     unmountPixelCanvas();
+    img.style.opacity = "";
     pointers.clear();
     drag = null;
     document.removeEventListener("keydown", onKey, true);
@@ -366,27 +503,36 @@
     var bar = document.createElement("div");
     bar.className = "ps-lb-bar";
     var out = btn(ICON.minus, T.zoomOut, function () {
-      setMode("ps-lb-spring");
-      zoomAt(window.innerWidth / 2, window.innerHeight / 2, st.scale / 1.5);
+      zoomAnimated(window.innerWidth / 2, window.innerHeight / 2, st.scale / 1.5);
     });
     scaleBtn = btn("", T.reset, function () {
-      setMode("ps-lb-spring");
-      st.scale = 1;
-      st.tx = 0;
-      st.ty = 0;
-      apply();
+      if (pixel && !reduced) {
+        setMode(null);
+        animatePixel({ scale: 1, tx: 0, ty: 0 }, 550, EASE_LONG);
+      } else {
+        setMode("ps-lb-spring");
+        st.scale = 1;
+        st.tx = 0;
+        st.ty = 0;
+        apply();
+      }
     });
     scaleBtn.classList.add("ps-lb-scale");
     var inn = btn(ICON.plus, T.zoomIn, function () {
-      setMode("ps-lb-spring");
-      zoomAt(window.innerWidth / 2, window.innerHeight / 2, st.scale * 1.5);
+      zoomAnimated(window.innerWidth / 2, window.innerHeight / 2, st.scale * 1.5);
     });
     var sep1 = document.createElement("span");
     sep1.className = "ps-lb-sep";
     var rot = btn(ICON.rotate, T.rotate, function () {
-      setMode("ps-lb-spring");
-      st.rot += 90; // 累积角度:取模会让 270°→0° 沿原路倒转一大圈
-      apply();
+      if (pixel && !reduced) {
+        // 像素模式:旋转也走补间,收正过渡与缩放同一曲线
+        setMode(null);
+        animatePixel({ scale: st.scale, tx: st.tx, ty: st.ty, rot: st.rot + 90 }, 380, EASE_SPRING);
+      } else {
+        setMode("ps-lb-spring");
+        st.rot += 90; // 累积角度:取模会让 270°→0° 沿原路倒转一大圈
+        apply();
+      }
     });
     // 渲染方式:像素放大(点对点,关闭插值,像素网格清晰)与抗锯齿放大(默认)切换
     var pixelBtn = btn(ICON.pixel, T.pixelOff, function () {
@@ -395,19 +541,22 @@
       pixelBtn.title = pixel ? T.pixelOn : T.pixelOff;
       pixelBtn.setAttribute("aria-pressed", String(pixel));
       if (pixel) {
-        // 像素模式:隐藏 <img>,由最近邻 canvas 呈现,彻底关闭抗锯齿
-        img.style.visibility = "hidden";
+        // 像素模式:淡出 <img>,由最近邻 canvas 呈现,彻底关闭抗锯齿。
+        // 用 opacity 而非 visibility —— img 仍接收指针事件,拖拽/捏合/双击与
+        // 抗锯齿模式完全同路(visibility 会把事件落到遮罩上,按下即触发关闭)
+        img.style.opacity = "0";
         mountPixelCanvas();
-        // 切入时当前倍率 ≥100% 就吸附到最近整数倍,立即呈现点对点效果
+        // 切入时当前倍率 ≥100% 就吸附到最近整数倍,补间过去立即呈现点对点效果
         if (st.scale >= 1) {
-          setMode("ps-lb-spring");
-          zoomAt(window.innerWidth / 2, window.innerHeight / 2, st.scale);
+          zoomAnimated(window.innerWidth / 2, window.innerHeight / 2, st.scale);
         } else {
           apply();
         }
       } else {
-        img.style.visibility = "";
+        img.style.opacity = "";
         unmountPixelCanvas();
+        setMode("ps-lb-spring");
+        apply();
       }
     });
     pixelBtn.setAttribute("aria-pressed", "false");
@@ -443,6 +592,7 @@
   /* ---------- 手势:滚轮 / 拖拽 / 双指 / 双击 ---------- */
   function onWheel(e) {
     e.preventDefault();
+    cancelPixelAnim();
     setMode("ps-lb-spring");
     var k = Math.exp(-e.deltaY * (e.deltaMode === 1 ? 0.05 : 0.0016));
     zoomAt(e.clientX, e.clientY, st.scale * k);
@@ -456,6 +606,7 @@
     // 工具条上的按下完全豁免:不登记指针、不捕获 —— 按钮的 pointer 事件
     // 保持原生路径,click 正常派发(此前立即捕获把点击重定向到了遮罩,按钮全部失效)
     if (e.target.closest && e.target.closest(".ps-lb-bar")) return;
+    cancelPixelAnim(); // 拖拽/捏合随时打断补间,从当前值接管(可打断)
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pointers.size === 1) {
       drag = {
@@ -543,13 +694,21 @@
       if (d.downTarget === img) {
         var now2 = e.timeStamp;
         if (now2 - lastTap < 320) {
+          if (pixel && !reduced) {
+            // 像素渲染:双击动画与抗锯齿一致,目标 200%(整数倍点对点)或复位
+            setMode(null);
+            if (st.scale > 1.3) animatePixel({ scale: 1, tx: 0, ty: 0 }, 550, EASE_LONG);
+            else animatePixel(zoomTarget(e.clientX, e.clientY, 2), 380, EASE_SPRING);
+            lastTap = 0;
+            return;
+          }
           setMode("ps-lb-spring");
           if (st.scale > 1.3) {
             st.scale = 1;
             st.tx = 0;
             st.ty = 0;
           } else {
-            // 像素渲染下双击到 200%(整数倍点对点),抗锯齿保持 250%
+            // 抗锯齿双击到 250%,像素渲染下双击到 200%(整数倍点对点)
             var target = pixel ? 2 : 2.5;
             var k = target / st.scale;
             var cx = window.innerWidth / 2 + st.tx;
@@ -604,23 +763,32 @@
       e.preventDefault();
       close();
     } else if (e.key === "+" || e.key === "=") {
-      setMode("ps-lb-spring");
-      zoomAt(window.innerWidth / 2, window.innerHeight / 2, st.scale * 1.4);
+      zoomAnimated(window.innerWidth / 2, window.innerHeight / 2, st.scale * 1.4);
     } else if (e.key === "-" || e.key === "_") {
-      setMode("ps-lb-spring");
-      zoomAt(window.innerWidth / 2, window.innerHeight / 2, st.scale / 1.4);
+      zoomAnimated(window.innerWidth / 2, window.innerHeight / 2, st.scale / 1.4);
     } else if (e.key === "0") {
-      setMode("ps-lb-spring");
-      st.scale = 1;
-      st.tx = 0;
-      st.ty = 0;
-      apply();
+      if (pixel && !reduced) {
+        setMode(null);
+        animatePixel({ scale: 1, tx: 0, ty: 0 }, 550, EASE_LONG);
+      } else {
+        setMode("ps-lb-spring");
+        st.scale = 1;
+        st.tx = 0;
+        st.ty = 0;
+        apply();
+      }
     } else if (e.key === "r" || e.key === "R") {
-      setMode("ps-lb-spring");
-      st.rot += 90; // 累积角度:取模会让 270°→0° 沿原路倒转一大圈
-      apply();
+      if (pixel && !reduced) {
+        setMode(null);
+        animatePixel({ scale: st.scale, tx: st.tx, ty: st.ty, rot: st.rot + 90 }, 380, EASE_SPRING);
+      } else {
+        setMode("ps-lb-spring");
+        st.rot += 90; // 累积角度:取模会让 270°→0° 沿原路倒转一大圈
+        apply();
+      }
     } else if (e.key.startsWith("Arrow")) {
       e.preventDefault();
+      cancelPixelAnim();
       setMode("ps-lb-dragging");
       var step = 40;
       if (e.key === "ArrowLeft") st.tx -= step;

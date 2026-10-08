@@ -66,6 +66,9 @@
     if (style === "bar") {
       // 长条搜索框:入口直接输入文本,点右侧搜索按钮(或回车)后才弹出结果面板
       entry.className = "ps-search-entry ps-search-bar";
+      // 用户配置的宽度经 CSS 变量下发:悬浮/顶栏各上下文同一变量取宽度,
+      // 侧栏内仍是整行展示(width:auto 规则优先级更高,不受影响)
+      if (searchBarWidth) entry.style.setProperty("--ps-search-bar-w", searchBarWidth + "px");
       entry.setAttribute("role", "search");
       entryInput = el("input", "ps-search-field", entry);
       entryInput.type = "text";
@@ -332,6 +335,7 @@
   var entryPosition = "br";    // br | bl | top
   var entryStyleM = null;      // 移动端形式,缺省沿用 PC
   var entryPositionM = null;   // 移动端位置,缺省沿用 PC
+  var searchBarWidth = null;   // 文本框搜索栏宽度(px),null = 用样式默认值
   function readPos(raw) {
     return raw === "bottom-left" ? "bl" : raw === "topbar" ? "top" : "br";
   }
@@ -346,6 +350,8 @@
       rootPrefix = me.getAttribute("data-root-prefix") || "";
       entryStyle = me.getAttribute("data-style") === "bar" ? "bar" : "button";
       entryPosition = readPos(me.getAttribute("data-position"));
+      var barW = parseInt(me.getAttribute("data-bar-width") || "", 10);
+      if (Number.isFinite(barW) && barW > 0) searchBarWidth = Math.min(420, Math.max(160, barW));
       var styleM = me.getAttribute("data-style-m");
       if (styleM) entryStyleM = styleM === "bar" ? "bar" : "button";
       var posM = me.getAttribute("data-position-m");
@@ -357,6 +363,8 @@
       entryPosition = readPos(window.__psSearchCfg.position);
       if (window.__psSearchCfg.styleM === "bar" || window.__psSearchCfg.styleM === "button") entryStyleM = window.__psSearchCfg.styleM;
       if (window.__psSearchCfg.positionM) entryPositionM = readPos(window.__psSearchCfg.positionM);
+      var cfgBarW = Number(window.__psSearchCfg.barWidth);
+      if (Number.isFinite(cfgBarW) && cfgBarW > 0) searchBarWidth = Math.min(420, Math.max(160, cfgBarW));
     }
     // 供置顶按钮等同位元素协调避让
     window.__psSearchCorner = entryPosition === "top" ? null : entryPosition;

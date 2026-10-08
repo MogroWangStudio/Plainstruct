@@ -4,7 +4,7 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import type { ThemeField } from "@/ipc/types";
-import { navMaxOf, topNavItems, type NavPickerItem } from "@/lib/builder";
+import { BLOG_ARCHIVE_KEY, BLOG_ARCHIVE_TITLE, navMaxOf, topNavItems, type NavPickerItem } from "@/lib/builder";
 import { normalizePlugins } from "@/lib/plugins";
 import { siteUrl } from "@/lib/preview";
 import { useAppStore } from "@/stores/app";
@@ -314,8 +314,13 @@ function clearLinkIcon(field: ThemeField, i: number) {
   updateLink(field, i, "icon", "");
 }
 
-/* navlist(博客顶栏导航):可选项与构建同源 -- 完整导航树,文件夹默认折叠,点箭头展开 */
-const navOptions = computed<NavPickerItem[]>(() => topNavItems(site.tree, site.docsCache));
+/* navlist(博客顶栏导航):可选项与构建同源 -- 完整导航树,文件夹默认折叠,点箭头展开;
+   归档开启时追加重拟项「归档」,与文档项一同勾选/重命名/排序(键 = archive/index.html) */
+const navOptions = computed<NavPickerItem[]>(() => {
+  const items = topNavItems(site.tree, site.docsCache);
+  if (theme.configValues.showArchive) items.push({ key: BLOG_ARCHIVE_KEY, title: BLOG_ARCHIVE_TITLE, dir: false, children: [] });
+  return items;
+});
 
 /** 已展开的文件夹(未展开的默认折叠) */
 const expandedDirs = ref(new Set<string>());
@@ -384,15 +389,19 @@ const maxNav = computed(() => navMaxOf(theme.configValues));
 interface PickedRow {
   key: string;
   label: string;
+  /** 原始顶栏名(不含文件夹前缀):重命名输入框的占位提示,改了名也能对回原文 */
+  origin: string;
   custom: string;
 }
 
 function pickedRows(field: ThemeField): PickedRow[] {
   const labels = new Map<string, string>();
+  const origins = new Map<string, string>();
   const walk = (opts: NavPickerItem[], prefix: string) => {
     for (const o of opts) {
       const label = prefix ? `${prefix} / ${o.title}` : o.title;
       labels.set(o.key, label);
+      origins.set(o.key, o.title);
       if (o.children.length) walk(o.children, o.dir ? label : prefix);
     }
   };
@@ -404,7 +413,20 @@ function pickedRows(field: ThemeField): PickedRow[] {
       return { key, custom: i > 0 ? line.slice(i + 1).trim() : "" };
     })
     .filter((r) => labels.has(r.key))
-    .map((r) => ({ ...r, label: labels.get(r.key)! }));
+    .map((r) => ({ ...r, label: labels.get(r.key)!, origin: origins.get(r.key) ?? "" }));
+}
+
+/** 上移/下移某选中项:调整 navPicked 行序,构建端按此顺序渲染顶栏导航 */
+function movePicked(field: ThemeField, key: string, dir: -1 | 1) {
+  const lines = pickedOf(field);
+  const i = lines.findIndex((line) => {
+    const k = (line.indexOf("|") > 0 ? line.slice(0, line.indexOf("|")) : line).trim();
+    return k === key;
+  });
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= lines.length) return;
+  [lines[i], lines[j]] = [lines[j], lines[i]];
+  onField(field, lines.join("\n"));
 }
 
 /* 弹窗选择器:草稿集,点击确认才写入配置 */
@@ -451,6 +473,7 @@ const plugins = computed(() =>
         searchPosition: "bottom-right",
         searchStyleM: undefined,
         searchPositionM: undefined,
+        searchBarWidth: undefined,
         custom: [],
       },
 );
@@ -594,6 +617,35 @@ async function removePlugin(id: string, name: string) {
           />
         </label>
 
+        <!-- 文本框搜索栏宽度:仅搜索栏形式下可调,双端共用一个值;移动端窄屏自动收窄不溢出 -->
+        <div v-if="(deviceMode === 'pc' && plugins.searchStyle === 'bar') || (deviceMode === 'm' && (plugins.searchStyleM ?? plugins.searchStyle) === 'bar')" class="flex flex-col gap-1">
+          <span class="field-label">{{ t("theme.pluginSearchBarWidth") }}</span>
+          <div class="flex items-center gap-3">
+            <input
+              type="range"
+              class="range-input min-w-0 flex-1"
+              min="160"
+              max="420"
+              step="10"
+              :value="plugins.searchBarWidth ?? 240"
+              @change="site.savePlugins({ searchBarWidth: Number(($event.target as HTMLInputElement).value) })"
+            />
+            <span class="mono w-12 shrink-0 text-right text-[calc(12px*var(--ui-font-scale))] text-ink-2">
+              {{ plugins.searchBarWidth ?? 240 }}px
+            </span>
+            <button
+              v-if="deviceMode === 'pc' && plugins.searchBarWidth !== undefined"
+              type="button"
+              class="btn-icon h-6 w-6 shrink-0"
+              :title="t('theme.resetValue')"
+              @click="site.savePlugins({ searchBarWidth: undefined })"
+            >
+              <AppIcon name="refresh" :size="12" />
+            </button>
+          </div>
+          <p class="opt-hint">{{ t("theme.pluginSearchBarWidthHint") }}</p>
+        </div>
+
         <label class="flex cursor-pointer items-center gap-2">
           <input
             type="checkbox"
@@ -724,16 +776,39 @@ async function removePlugin(id: string, name: string) {
             <template v-if="pickedRows(field).length">
               <p class="text-[calc(12px*var(--ui-font-scale))] text-ink-3">{{ t("theme.navPickedHeading") }}</p>
               <ul class="flex flex-col">
-                <li v-for="row in pickedRows(field)" :key="row.key" class="flex items-center gap-2 py-0.5">
+                <li v-for="(row, ri) in pickedRows(field)" :key="row.key" class="nav-picked-row">
                   <span class="min-w-0 flex-1 truncate text-[calc(13px*var(--ui-font-scale))] text-ink-2" :title="row.label">
                     {{ row.label }}
                   </span>
+                  <!-- 上移/下移:调整顶栏导航顺序,与构建同源(归档项同样可调) -->
+                  <button
+                    type="button"
+                    class="btn-icon nav-move-btn"
+                    :class="{ 'is-hidden': ri === 0 }"
+                    :disabled="ri === 0"
+                    :title="t('theme.navMoveUp')"
+                    :aria-label="t('theme.navMoveUp')"
+                    @click="movePicked(field, row.key, -1)"
+                  >
+                    <AppIcon name="chevronUp" :size="12" />
+                  </button>
+                  <button
+                    type="button"
+                    class="btn-icon nav-move-btn"
+                    :class="{ 'is-hidden': ri === pickedRows(field).length - 1 }"
+                    :disabled="ri === pickedRows(field).length - 1"
+                    :title="t('theme.navMoveDown')"
+                    :aria-label="t('theme.navMoveDown')"
+                    @click="movePicked(field, row.key, 1)"
+                  >
+                    <AppIcon name="chevronDown" :size="12" />
+                  </button>
                   <input
                     class="input h-7 w-28 shrink-0 text-[calc(12px*var(--ui-font-scale))]"
                     type="text"
                     :value="row.custom"
-                    :placeholder="t('theme.navRenamePlaceholder')"
-                    :title="t('theme.navRenameTitle')"
+                    :placeholder="row.origin"
+                    :title="t('theme.navRenameTitle', { name: row.origin })"
                     @change="renamePicked(field, row.key, ($event.target as HTMLInputElement).value)"
                   />
                 </li>
@@ -753,66 +828,71 @@ async function removePlugin(id: string, name: string) {
           <span class="text-[calc(13px*var(--ui-font-scale))] text-ink-2">{{ field.label }}</span>
         </label>
 
-        <!-- links 字段:友情链接可视化逐条编辑(名称/链接/图标各一框,行文本存储兼容) -->
+        <!-- links 字段:友情链接可视化逐条编辑。每条分行列出(名称/链接/图标各占一行),
+             窄面板下不再横向溢出;操作按钮附在对应行尾,行文本存储兼容旧站点 -->
         <div v-else-if="field.type === 'links'" class="flex flex-col gap-2">
           <div
             v-for="(row, i) in parseLinks(String(fieldValue(field) ?? ''))"
             :key="i"
-            class="flex items-center gap-1.5"
+            class="link-entry"
           >
+            <div class="flex items-center gap-1.5">
+              <input
+                class="input h-7 min-w-0 flex-1 text-[calc(12px*var(--ui-font-scale))]"
+                type="text"
+                :value="row.name"
+                :placeholder="t('theme.linkName')"
+                @change="updateLink(field, i, 'name', ($event.target as HTMLInputElement).value)"
+              />
+              <button
+                type="button"
+                class="btn-icon h-7 w-7 shrink-0 hover:!text-danger"
+                :title="t('common.delete')"
+                @click="removeLinkRow(field, i)"
+              >
+                <AppIcon name="trash" :size="12" />
+              </button>
+            </div>
             <input
-              class="input h-7 w-20 shrink-0 text-[calc(12px*var(--ui-font-scale))]"
-              type="text"
-              :value="row.name"
-              :placeholder="t('theme.linkName')"
-              @change="updateLink(field, i, 'name', ($event.target as HTMLInputElement).value)"
-            />
-            <input
-              class="input h-7 min-w-0 flex-1 text-[calc(12px*var(--ui-font-scale))]"
+              class="input h-7 w-full text-[calc(12px*var(--ui-font-scale))]"
               type="text"
               :value="row.url"
               :placeholder="t('theme.linkUrl')"
               @change="updateLink(field, i, 'url', ($event.target as HTMLInputElement).value)"
             />
-            <input
-              class="input h-7 w-24 shrink-0 text-[calc(12px*var(--ui-font-scale))]"
-              type="text"
-              :value="row.icon"
-              :placeholder="t('theme.linkIcon')"
-              @change="updateLink(field, i, 'icon', ($event.target as HTMLInputElement).value)"
-            />
-            <!-- 从站点资产选图:按钮内预览当前站内图标,无图标时显示图片图标 -->
-            <button
-              type="button"
-              class="btn-icon h-7 w-7 shrink-0"
-              :title="t('theme.linkPickAsset')"
-              @click="openAssetPicker(field, i)"
-            >
-              <img
-                v-if="row.icon && iconThumb(row.icon)"
-                :src="iconThumb(row.icon)"
-                class="h-4 w-4 rounded object-cover"
-                alt=""
+            <div class="flex items-center gap-1.5">
+              <input
+                class="input h-7 min-w-0 flex-1 text-[calc(12px*var(--ui-font-scale))]"
+                type="text"
+                :value="row.icon"
+                :placeholder="t('theme.linkIcon')"
+                @change="updateLink(field, i, 'icon', ($event.target as HTMLInputElement).value)"
               />
-              <AppIcon v-else name="image" :size="13" />
-            </button>
-            <button
-              v-if="row.icon"
-              type="button"
-              class="btn-icon h-7 w-7 shrink-0"
-              :title="t('theme.linkIconClear')"
-              @click="clearLinkIcon(field, i)"
-            >
-              <AppIcon name="x" :size="12" />
-            </button>
-            <button
-              type="button"
-              class="btn-icon h-7 w-7 shrink-0 hover:!text-danger"
-              :title="t('common.delete')"
-              @click="removeLinkRow(field, i)"
-            >
-              <AppIcon name="trash" :size="12" />
-            </button>
+              <!-- 从站点资产选图:按钮内预览当前站内图标,无图标时显示图片图标 -->
+              <button
+                type="button"
+                class="btn-icon h-7 w-7 shrink-0"
+                :title="t('theme.linkPickAsset')"
+                @click="openAssetPicker(field, i)"
+              >
+                <img
+                  v-if="row.icon && iconThumb(row.icon)"
+                  :src="iconThumb(row.icon)"
+                  class="h-4 w-4 rounded object-cover"
+                  alt=""
+                />
+                <AppIcon v-else name="image" :size="13" />
+              </button>
+              <button
+                v-if="row.icon"
+                type="button"
+                class="btn-icon h-7 w-7 shrink-0"
+                :title="t('theme.linkIconClear')"
+                @click="clearLinkIcon(field, i)"
+              >
+                <AppIcon name="x" :size="12" />
+              </button>
+            </div>
           </div>
           <button type="button" class="btn btn-secondary w-fit" @click="addLinkRow(field)">
             <AppIcon name="plus" :size="13" />
@@ -1069,6 +1149,53 @@ async function removePlugin(id: string, name: string) {
 .navlist-caret-sp {
   width: 18px;
   flex-shrink: 0;
+}
+
+/* 已选导航行:名称 + 上/下移箭头 + 重命名输入框;箭头在行首尾时隐藏占位,避免可点死角 */
+.nav-picked-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 0;
+}
+.nav-move-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--color-ink-3);
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-plain),
+    color var(--duration-fast) var(--ease-plain),
+    opacity var(--duration-fast) var(--ease-plain);
+}
+.nav-move-btn:hover:not(:disabled) {
+  background: var(--color-surface-2);
+  color: var(--color-ink);
+}
+.nav-move-btn:active:not(:disabled) {
+  transform: scale(0.92);
+}
+.nav-move-btn.is-hidden {
+  opacity: 0.25;
+  cursor: default;
+}
+
+/* 友链条目:分行容器(名称/链接/图标各一行),细边框把每条围出一次呼吸空间 */
+.link-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md, 8px);
+  background: var(--color-surface);
 }
 
 /* ---------- 友链图标资产选择网格 ---------- */

@@ -22,6 +22,8 @@ export interface FrontMatterForm {
   aigc: "" | "none" | "present";
   /** 隐藏文档:不进文章流/导航/搜索索引,仅可通过链接访问 */
   hidden: boolean;
+  /** 页面目录(博客文章页):"" = 跟随主题设置,on = 强制显示,off = 强制隐藏 */
+  toc: "" | "on" | "off";
   /** 博客主页专属:卡片流按分类分组(仅主页配置区展示) */
   homeGroups: boolean;
   /** 博客主页专属:分组时显示「未分类」组;缺省(勾选)= 显示 */
@@ -38,6 +40,8 @@ const props = defineProps<{
   initial: FrontMatterForm;
   /** 是否为博客主页(根 index.md):true 时显示主页配置区 */
   blogHome?: boolean;
+  /** 是否博客站点:true 时显示「页面目录」开关(仅博客文章页的目录可按文档覆盖) */
+  blogSite?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -49,13 +53,20 @@ const { t } = useI18n();
 const site = useSiteStore();
 const ui = useUiStore();
 
-const form = reactive<FrontMatterForm>({ title: "", description: "", date: "", cover: "", author: "", aigc: "", hidden: false, homeGroups: false, homeShowUncategorized: true, homeUncategorizedLabel: "" });
+const form = reactive<FrontMatterForm>({ title: "", description: "", date: "", cover: "", author: "", aigc: "", hidden: false, toc: "", homeGroups: false, homeShowUncategorized: true, homeUncategorizedLabel: "" });
 
 /** AIGC 声明三档;选「不显示」时写回不落字段 */
 const aigcOptions = computed(() => [
   { value: "", label: t("editor.aigcHidden") },
   { value: "none", label: t("editor.aigcNone") },
   { value: "present", label: t("editor.aigcPresent") },
+]);
+
+/** 页面目录三档;选「跟随主题设置」时写回不落字段 */
+const tocOptions = computed(() => [
+  { value: "", label: t("editor.fmTocFollow") },
+  { value: "on", label: t("editor.fmTocShow") },
+  { value: "off", label: t("editor.fmTocHide") },
 ]);
 
 /** 确认:主页字段原样交由写回(隐藏未分类才落 false,标题留空 = 缺省「未分类」) */
@@ -136,6 +147,14 @@ async function importCover() {
         <span class="text-[calc(13px*var(--ui-font-scale))] text-ink-2">{{ t("editor.fmHidden") }}</span>
       </label>
       <p class="opt-hint">{{ t("editor.fmHiddenHint") }}</p>
+      <!-- 页面目录(仅博客站点):三态覆盖,缺省跟随主题的「启用文章目录」 -->
+      <template v-if="blogSite">
+        <label class="flex flex-col gap-1">
+          <span class="field-label">{{ t("editor.fmToc") }}</span>
+          <SelectMenu v-model="form.toc" :options="tocOptions" align="left" />
+        </label>
+        <p class="opt-hint">{{ t("editor.fmTocHint") }}</p>
+      </template>
       <label class="flex flex-col gap-1">
         <span class="field-label">{{ t("editor.fmCover") }}</span>
         <div class="flex gap-2">

@@ -338,7 +338,7 @@ function frontMatterEnd(doc: Text): number | null {
 /* ---------- 配置头可视化编辑:表单弹窗(FrontMatterModal),确认后就地写回 ---------- */
 
 const fmOpen = ref(false);
-const fmInitial: FrontMatterForm = reactive({ title: "", description: "", date: "", cover: "", author: "", aigc: "", hidden: false, homeGroups: false, homeShowUncategorized: true, homeUncategorizedLabel: "" });
+const fmInitial: FrontMatterForm = reactive({ title: "", description: "", date: "", cover: "", author: "", aigc: "", hidden: false, toc: "", homeGroups: false, homeShowUncategorized: true, homeUncategorizedLabel: "" });
 
 /** 是否显示主页配置区:博客站点 + 当前文档是根 index.md */
 const isBlogHomeDoc = computed(
@@ -372,6 +372,7 @@ function openFmEditor() {
   fmInitial.author = parsed.data.author ?? "";
   fmInitial.aigc = parsed.data.aigc ?? "";
   fmInitial.hidden = parsed.data.hidden === true;
+  fmInitial.toc = parsed.data.toc === true ? "on" : parsed.data.toc === false ? "off" : "";
   // 主页配置区预填:未分类缺省显示,标题空 = 缺省「未分类」
   fmInitial.homeGroups = parsed.data.homeGroups === true;
   fmInitial.homeShowUncategorized = parsed.data.homeUncategorized !== false;
@@ -1031,6 +1032,7 @@ defineExpose({
       :doc-path="editor.activePath ?? ''"
       :initial="fmInitial"
       :blog-home="isBlogHomeDoc"
+      :blog-site="site.config?.siteType === 'blog'"
       @confirm="writeFrontMatter"
       @cancel="fmOpen = false"
     />

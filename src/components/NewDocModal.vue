@@ -15,7 +15,19 @@ import SelectMenu from "@/components/SelectMenu.vue";
 
 const props = defineProps<{ open: boolean; dir: string }>();
 const emit = defineEmits<{
-  confirm: [payload: { name: string; title: string; description: string; date: string; cover: string; author: string; aigc: "" | AigcDeclaration }];
+  confirm: [payload: {
+    name: string;
+    title: string;
+    description: string;
+    date: string;
+    cover: string;
+    author: string;
+    aigc: "" | AigcDeclaration;
+    /** 隐藏文档:勾选后不进文章流/导航/搜索索引 */
+    hidden: boolean;
+    /** 页面目录(博客):on = 强制显示,"" = 不落字段跟随主题设置 */
+    toc: "" | "on";
+  }];
   cancel: [];
 }>();
 
@@ -30,9 +42,12 @@ function closeOnBackdrop() {
   if (onBackdropClick()) emit("cancel");
 }
 
-const form = reactive({ name: "", title: "", description: "", date: "", cover: "", author: "", aigc: "" as "" | AigcDeclaration });
+const form = reactive({ name: "", title: "", description: "", date: "", cover: "", author: "", aigc: "" as "" | AigcDeclaration, hidden: false, toc: false as boolean });
 const importing = ref(false);
 const inputRef = ref<HTMLInputElement>();
+
+/** 是否博客站点:决定是否显示「页面目录」开关 */
+const isBlogSite = computed(() => theme.siteType === "blog");
 
 watch(
   () => props.open,
@@ -47,6 +62,8 @@ watch(
       form.cover = "";
       form.author = "";
       form.aigc = "";
+      form.hidden = false;
+      form.toc = false;
       void nextTick(() => inputRef.value?.focus());
     }
   },
@@ -105,6 +122,8 @@ function submit() {
     cover: form.cover.trim(),
     author: form.author.trim(),
     aigc: form.aigc,
+    hidden: form.hidden,
+    toc: form.toc && isBlogSite.value ? "on" : "",
   });
 }
 </script>
@@ -152,6 +171,30 @@ function submit() {
               <span class="field-label">{{ t("editor.fmAigc") }}</span>
               <SelectMenu v-model="form.aigc" :options="aigcOptions" align="left" />
             </label>
+            <div class="flex flex-col gap-1">
+              <label class="flex cursor-pointer items-center gap-2">
+                <input
+                  type="checkbox"
+                  class="checkbox-input"
+                  :checked="form.hidden"
+                  @change="form.hidden = ($event.target as HTMLInputElement).checked"
+                />
+                <span class="text-[calc(13px*var(--ui-font-scale))] text-ink-2">{{ t("editor.fmHidden") }}</span>
+              </label>
+              <p class="opt-hint">{{ t("editor.fmHiddenHint") }}</p>
+            </div>
+            <div v-if="isBlogSite" class="flex flex-col gap-1">
+              <label class="flex cursor-pointer items-center gap-2">
+                <input
+                  type="checkbox"
+                  class="checkbox-input"
+                  :checked="form.toc"
+                  @change="form.toc = ($event.target as HTMLInputElement).checked"
+                />
+                <span class="text-[calc(13px*var(--ui-font-scale))] text-ink-2">{{ t("editor.fmToc") }}</span>
+              </label>
+              <p class="opt-hint">{{ t("editor.fmTocNewHint") }}</p>
+            </div>
             <label class="flex flex-col gap-1">
               <span class="field-label">{{ t("editor.fmCover") }}</span>
               <div class="flex gap-2">

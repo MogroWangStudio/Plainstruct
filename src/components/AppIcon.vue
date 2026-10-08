@@ -33,6 +33,7 @@ const paths: Record<string, string[]> = {
   chevronRight: ["M9 6l6 6-6 6"],
   chevronLeft: ["M15 6l-6 6 6 6"],
   chevronDown: ["M6 9l6 6 6-6"],
+  chevronUp: ["M6 15l6-6 6 6"],
   x: ["M6 6l12 12", "M18 6L6 18"],
   search: ["M11 5a6 6 0 1 0 0 12 6 6 0 0 0 0-12z", "M20 20l-4.2-4.2"],
   check: ["M5 13l4 4L19 7"],
@@ -84,6 +85,8 @@ const paths: Record<string, string[]> = {
   window: ["M4 5h16v14H4z", "M4 9h16"],
   arrowLeft: ["M19 12H5", "M11 6l-6 6 6 6"],
   arrowRight: ["M5 12h14", "M13 6l6 6-6 6"],
+  /* 返回:横线自右折回左上的角标箭头,与前进/后退的水平箭头同族但语义为「回到来处」 */
+  cornerUpLeft: ["M20 19v-5a4 4 0 0 0-4-4H4", "M9 15l-5-5 5-5"],
   more: ["M12 6h.01", "M12 12h.01", "M12 18h.01"],
   info: [
     "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z",

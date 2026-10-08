@@ -392,6 +392,8 @@ export const useSiteStore = defineStore("site", {
       searchPosition?: "bottom-right" | "bottom-left" | "topbar";
       searchStyleM?: "button" | "bar";
       searchPositionM?: "bottom-right" | "bottom-left" | "topbar";
+      /** 文本框搜索栏宽度(px);缺省用样式默认值 */
+      searchBarWidth?: number;
       custom?: SitePluginEntry[];
     }) {
       if (!this.config) return;
@@ -406,6 +408,8 @@ export const useSiteStore = defineStore("site", {
           // 移动端独立设置:缺省 undefined(沿用 PC 配置),旧版本在此处丢失导致移动端设置无效
           searchStyleM: patch.searchStyleM ?? current.searchStyleM,
           searchPositionM: patch.searchPositionM ?? current.searchPositionM,
+          // 搜索栏宽度:缺省 undefined(用样式默认值),仅在配置过时落盘
+          searchBarWidth: patch.searchBarWidth ?? current.searchBarWidth,
           custom: patch.custom ?? current.custom,
         },
       });

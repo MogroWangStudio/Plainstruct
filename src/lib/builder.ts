@@ -60,6 +60,8 @@ export interface DocMeta {
   aigc?: string;
   /** 隐藏文档:不进文章流/导航/搜索索引,页面仍生成(仅可通过链接访问) */
   hidden?: boolean;
+  /** 页面目录覆盖(博客文章页):true = 强制显示,false = 强制隐藏;缺省跟随主题设置 */
+  toc?: boolean;
   /** 博客主页(根 index.md)专属:卡片流按分类分组 */
   homeGroups?: boolean;
   /** 博客主页专属:分组时显示「未分类」组(根级文章);缺省显示,false = 隐藏 */
@@ -123,6 +125,7 @@ function buildMetas(paths: string[], cache: DocsCache): Map<string, DocMeta> {
       author: data.author,
       aigc: data.aigc,
       hidden: data.hidden === true,
+      toc: data.toc === true ? true : data.toc === false ? false : undefined,
       homeGroups: data.homeGroups === true,
       homeUncategorized: data.homeUncategorized === false ? false : undefined,
       homeUncategorizedLabel: data.homeUncategorizedLabel,
@@ -301,6 +304,11 @@ export function postsPerPageOf(config: Record<string, string | number | boolean>
 export const BLOG_NAV_MAX_DEFAULT = 6;
 const BLOG_NAV_MAX_CEIL = 12;
 
+/** 归档页在顶栏导航中的虚拟键:与 archive/index.html 产物路径一致,
+ *  配置面板据此在导航选择器中列出「归档」并允许排序/重命名 */
+export const BLOG_ARCHIVE_KEY = "archive/index.html";
+export const BLOG_ARCHIVE_TITLE = "归档";
+
 /** 右上角导航数量上限(主题配置 navMaxItems,越界时收敛) */
 export function navMaxOf(config: Record<string, string | number | boolean>): number {
   const n = Math.floor(Number(config.navMaxItems));
@@ -308,34 +316,55 @@ export function navMaxOf(config: Record<string, string | number | boolean>): num
 }
 
 /**
- * 博客顶栏导航:navMode 为"自定义"时按选择保留,顺序仍随内容树;
- * 可选池为整棵导航树(含文件夹内页面,选择器中展开后可选),不再限于顶层。
+ * 博客顶栏导航:navMode 为“自定义”时按选择保留,顺序与选择列表一致(可在配置中调节);
+ * 可选池为整棵导航树(含文件夹内页面,选择器中展开后可选),不再限于顶层;
+ * 归档开启时作为虚拟项(键 = archive/index.html)参与排序与重命名,
+ * 自定义未勾选归档时仍按旧行为补在末尾,旧站点升级后归档入口不消失。
  * 选择行格式:`htmlPath` 或 `htmlPath|顶栏显示名`(名称留空 = 显示原页面标题);
- * 选择为空或全部失效时回退为全部,避免导航意外消失。任何模式都受数量上限收敛。
+ * 选择为空或全部失效时回退为全部,避免导航意外消失。任何模式都受数量上限收敛
+ * (上限只收敛文档项;归档入口始终随 showArchive 保留,与模板时代的行为一致)。
  */
 export function blogTopNav(config: Record<string, string | number | boolean>, raw: RawNav[]): RawNav[] {
-  const pickedMap = new Map(
-    String(config.navPicked ?? "")
-      .split("\n")
-      .map((s) => s.trim())
-      .filter(Boolean)
-      .map((line) => {
-        const i = line.indexOf("|");
-        return i > 0 ? [line.slice(0, i).trim(), line.slice(i + 1).trim()] : [line, ""];
-      }),
-  );
-  const custom = String(config.navMode ?? "") === "自定义" && pickedMap.size > 0;
-  const chosen = custom
-    ? // 自定义模式:按选择保留并套用顶栏显示名(隐藏文档被明确勾选时仍可展示在顶栏)
-      flattenNav(raw)
-        .filter((item) => item.htmlPath !== undefined && pickedMap.has(item.htmlPath))
-        .map((item) => {
-          const name = pickedMap.get(item.htmlPath!) ?? "";
-          return name ? { ...item, title: name } : item;
-        })
-    : // 默认模式:隐去隐藏文档
-      raw.filter((item) => !item.hidden);
-  return chosen.slice(0, navMaxOf(config));
+  const picked = String(config.navPicked ?? "")
+    .split("\n")
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const i = line.indexOf("|");
+      return i > 0 ? [line.slice(0, i).trim(), line.slice(i + 1).trim()] : [line, ""];
+    });
+  const archiveOn = Boolean(config.showArchive);
+  const archiveItem = (name: string): RawNav => ({ title: name || BLOG_ARCHIVE_TITLE, htmlPath: BLOG_ARCHIVE_KEY, children: [] });
+  const custom = String(config.navMode ?? "") === "自定义" && picked.length > 0;
+  const max = navMaxOf(config);
+  let chosen: RawNav[];
+  if (custom) {
+    const flat = flattenNav(raw).filter((item) => item.htmlPath !== undefined);
+    chosen = [];
+    let docs = 0;
+    let archiveSeen = false;
+    for (const [key, name] of picked) {
+      if (key === BLOG_ARCHIVE_KEY) {
+        if (archiveOn) {
+          chosen.push(archiveItem(name));
+          archiveSeen = true;
+        }
+        continue;
+      }
+      if (docs >= max) continue; // 数量上限只收敛文档项
+      const item = flat.find((i) => i.htmlPath === key);
+      if (item) {
+        chosen.push(name ? { ...item, title: name } : item);
+        docs++;
+      }
+    }
+    // 旧站点兼容:归档开启但未在自定义列表中勾选时,补在末尾(与模板时代的“末尾追加”一致)
+    if (archiveOn && !archiveSeen) chosen.push(archiveItem(""));
+  } else {
+    chosen = raw.filter((item) => !item.hidden).slice(0, max);
+    if (archiveOn) chosen.push(archiveItem(""));
+  }
+  return chosen;
 }
 
 /** 导航选择器条目:与构建同源的导航树(文件夹内页面可在选择器中展开后勾选) */
@@ -627,8 +656,13 @@ function renderOnePage(
       aigc: doc.aigc,
       // 博客首页系列(含 page/N)由模板渲染文章流
       isHome: htmlPath === "index.html" || !!pagination || undefined,
-      // 博客文章页的页内目录;标题 id 与渲染管线同源(extractHeadings 复用 slugify),锚点一致
-      toc: isBlog && !pagination ? extractHeadings(doc.body) : undefined,
+      // 博客文章页的页内目录;标题 id 与渲染管线同源(extractHeadings 复用 slugify),锚点一致。
+      // 显隐由配置头 toc 三态与主题 tocEnabled 共同决定:true/false 强制覆盖,缺省跟随主题;
+      // 模板仅判 page.toc(不再看 config.tocEnabled),旧主题升级后行为一致
+      toc:
+        isBlog && !pagination && (doc.toc === true || (doc.toc === undefined && config.tocEnabled !== false))
+          ? extractHeadings(doc.body)
+          : undefined,
       pagination,
       // 主页分类卡片流(主页配置头 homeGroups;组内条目与文章流同规则换算,
       // total(截断前总数)透传给模板显示「查看更多」)

@@ -307,6 +307,8 @@ async function onNewDocConfirm(payload: {
   cover: string;
   author: string;
   aigc: "" | "none" | "present";
+  hidden: boolean;
+  toc: "" | "on";
 }) {
   newDocOpen.value = false;
   try {
@@ -382,7 +384,9 @@ const fmOpen = ref(false);
 const fmTarget = ref("");
 /** 是否显示主页配置区:目标是博客根 index.md */
 const fmBlogHome = ref(false);
-const fmInitial = reactive<FrontMatterForm>({ title: "", description: "", date: "", cover: "", author: "", aigc: "", hidden: false, homeGroups: false, homeShowUncategorized: true, homeUncategorizedLabel: "" });
+/** 是否显示「页面目录」开关:博客站点的任意文档页 */
+const fmBlogSite = ref(false);
+const fmInitial = reactive<FrontMatterForm>({ title: "", description: "", date: "", cover: "", author: "", aigc: "", hidden: false, toc: "", homeGroups: false, homeShowUncategorized: true, homeUncategorizedLabel: "" });
 
 /** 打开配置头表单:当前打开的文档取编辑器内容(含未保存修改),其余读磁盘版本 */
 async function openFmEditor(node: TreeNode) {
@@ -399,9 +403,11 @@ async function openFmEditor(node: TreeNode) {
   fmInitial.author = parsed.data.author ?? "";
   fmInitial.aigc = parsed.data.aigc ?? "";
   fmInitial.hidden = parsed.data.hidden === true;
+  fmInitial.toc = parsed.data.toc === true ? "on" : parsed.data.toc === false ? "off" : "";
   // 主页配置区:未分类缺省显示,标题空 = 缺省「未分类」
   const isHomeDoc = (site.config?.siteType ?? "docs") === "blog" && node.path.toLowerCase() === "index.md";
   fmBlogHome.value = isHomeDoc;
+  fmBlogSite.value = (site.config?.siteType ?? "docs") === "blog";
   fmInitial.homeGroups = parsed.data.homeGroups === true;
   fmInitial.homeShowUncategorized = parsed.data.homeUncategorized !== false;
   fmInitial.homeUncategorizedLabel = parsed.data.homeUncategorizedLabel ?? "";
@@ -991,6 +997,7 @@ async function onTreeDrop(e: DragEvent) {
       :doc-path="fmTarget"
       :initial="fmInitial"
       :blog-home="fmBlogHome"
+      :blog-site="site.config?.siteType === 'blog'"
       @confirm="onFmConfirm"
       @cancel="fmOpen = false"
     />

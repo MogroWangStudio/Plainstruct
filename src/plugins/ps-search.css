@@ -40,7 +40,8 @@
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
 }
 .ps-search-bar {
-  width: 240px;
+  /* 宽度可由站点插件配置经 --ps-search-bar-w 调节(160–420px);各上下文有各自默认值 */
+  width: var(--ps-search-bar-w, 240px);
   height: 40px;
   padding: 0 14px;
   gap: 8px;
@@ -130,7 +131,7 @@
   box-shadow: none;
 }
 .ps-search-bar.ps-in-topbar {
-  width: 200px;
+  width: var(--ps-search-bar-w, 200px);
 }
 /* 文档主题顶栏(移动端顶栏与桌面端折叠/常显顶栏)内的入口:
    与目录按钮同款扁圆角矩形条(同高 36、同毛玻璃材质与阴影) */
@@ -148,7 +149,7 @@ html[data-ps-dark] .ps-topbar .ps-search-entry.ps-in-topbar {
   background: rgba(44, 44, 46, 0.72);
 }
 .ps-topbar .ps-search-bar.ps-in-topbar {
-  width: 180px;
+  width: var(--ps-search-bar-w, 180px);
 }
 html[data-ps-dark] .ps-search-entry {
   border-color: rgba(255, 255, 255, 0.12);
@@ -350,7 +351,7 @@ html[data-ps-dark] .ps-search-note {
     bottom: 14px;
   }
   .ps-search-bar {
-    width: 200px;
+    width: min(var(--ps-search-bar-w, 200px), 92vw);
   }
 }
 

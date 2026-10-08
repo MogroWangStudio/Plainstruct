@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 import { usePublishStore } from "@/stores/publish";
 import { useBuilderStore } from "@/stores/builder";
 import { useAppStore } from "@/stores/app";
+import { useUiStore } from "@/stores/ui";
 import { fireConfetti } from "@/lib/confetti";
 import AppIcon from "@/components/AppIcon.vue";
 import type { GithubAccountType } from "@/ipc/types";
@@ -12,6 +13,7 @@ const { t } = useI18n();
 const publish = usePublishStore();
 const builder = useBuilderStore();
 const app = useAppStore();
+const ui = useUiStore();
 
 /** 目标仓库等配置变更后,上一次的验证结果不再可信:清空,直到重新点「验证连接」 */
 watch(
@@ -134,6 +136,16 @@ const progressPct = computed(() =>
 function openPages() {
   void publish.openSite();
 }
+
+/** 重新发布前确认:发布已完成后再点即重新提交全站,避免误触把远端覆盖一遍 */
+async function republish() {
+  const ok = await ui.confirmDialog({
+    title: t("publish.republishConfirmTitle"),
+    body: t("publish.republishConfirmBody", { repo: publish.config.repo }),
+    confirmText: t("publish.republishConfirm"),
+  });
+  if (ok === true) void publish.sync();
+}
 </script>
 
 <template>
@@ -250,27 +262,28 @@ function openPages() {
       <!-- 发布 -->
       <section class="panel p-6">
         <div class="flex flex-col items-center gap-2">
-          <!-- 发布按钮:圆形大号;发布中圆环循环扩散,成功转绿色打勾并浮现「重新发布」;
-               绿色态点击不再重新发布,而是检测 Pages 构建后询问是否前往查看站点 -->
+          <!-- 发布按钮:圆形大号;发布中圆环弧光边扩散边自转(加载与扩散同一动画),
+               成功转绿色打勾并浮现「重新发布」;绿色态点击检测 Pages 构建状态 -->
           <div class="publish-orb-wrap">
             <span v-if="publish.syncing" class="orb-ripple" aria-hidden="true" />
             <span v-if="publish.syncing" class="orb-ripple orb-ripple-late" aria-hidden="true" />
             <button
               class="publish-orb"
-              :class="{ done: publishDone }"
+              :class="{ done: publishDone, syncing: publish.syncing }"
               :disabled="!canPublish || publish.syncing"
               :aria-label="publishDone ? t('publish.viewSite') : t('publish.publish')"
               :title="publishDone ? t('publish.viewSite') : undefined"
               @click="publishDone ? publish.viewPublishedSite() : publish.sync()"
             >
-              <AppIcon :name="publishDone ? 'check' : 'upload'" :size="30" />
+              <span v-if="publish.syncing" class="orb-load" aria-hidden="true"></span>
+              <AppIcon v-else :name="publishDone ? 'check' : 'upload'" :size="30" />
             </button>
           </div>
           <p class="orb-label" :class="{ ok: publishDone }">
             {{ publish.syncing ? t("publish.publishing") : publishDone ? t("publish.done") : t("publish.publish") }}
           </p>
           <Transition name="pop">
-            <button v-if="publishDone" class="orb-republish" :title="t('publish.republish')" @click="publish.sync()">
+            <button v-if="publishDone" class="orb-republish" :title="t('publish.republish')" @click="republish">
               <AppIcon name="refresh" :size="16" />
             </button>
           </Transition>
@@ -462,28 +475,48 @@ function openPages() {
   background: var(--color-ok);
   box-shadow: 0 12px 30px color-mix(in srgb, var(--color-ok) 32%, transparent);
 }
-/* 扩散环:两道错相的圆环从按钮向外扩散,提示发布进行中 */
+/* 发布中:弧光环边自转边向外扩散 —— 扩散与加载是同一道动画(弧光旋进),
+   两道错相 1/2 周期,任意时刻都有一道在途,循环无缝;缓动非线性(快进缓出) */
+.publish-orb.syncing {
+  cursor: progress;
+}
 .orb-ripple {
   position: absolute;
   width: 92px;
   height: 92px;
-  border: 2px solid var(--color-accent);
+  border: 2px solid transparent;
+  border-top-color: var(--color-accent);
+  border-right-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
   border-radius: 50%;
   pointer-events: none;
-  animation: orb-ripple 1700ms var(--ease-plain) infinite;
+  opacity: 0;
+  animation: orb-ripple 1800ms cubic-bezier(0.33, 0, 0.2, 1) infinite;
 }
 .orb-ripple-late {
-  animation-delay: 850ms;
+  animation-delay: 900ms;
 }
 @keyframes orb-ripple {
   0% {
-    transform: scale(1);
-    opacity: 0.65;
-  }
-  100% {
-    transform: scale(2.05);
+    transform: scale(1) rotate(0deg);
     opacity: 0;
   }
+  8% {
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(2.1) rotate(320deg);
+    opacity: 0;
+  }
+}
+/* 中心加载环:与扩散同色的两段式加减速旋转(复用 spin-arc 关键帧),
+   边扩散边加载的“加载”即是它 */
+.orb-load {
+  position: absolute;
+  inset: 27px;
+  border-radius: 50%;
+  border: 3px solid color-mix(in srgb, var(--color-on-accent) 32%, transparent);
+  border-top-color: var(--color-on-accent);
+  animation: spin-arc 1100ms cubic-bezier(0.45, 0, 0.55, 1) infinite;
 }
 .orb-label {
   margin: 0;
@@ -524,6 +557,9 @@ function openPages() {
   .orb-ripple {
     animation: none;
     opacity: 0;
+  }
+  .orb-load {
+    animation-duration: 2.4s;
   }
   .publish-orb,
   .orb-republish {

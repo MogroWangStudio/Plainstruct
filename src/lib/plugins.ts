@@ -29,6 +29,8 @@ export function normalizePlugins(site: SiteConfig): {
   /** 移动端独立设置,缺省沿用 PC 配置 */
   searchStyleM?: "button" | "bar";
   searchPositionM?: "bottom-right" | "bottom-left" | "topbar";
+  /** 文本框搜索栏宽度(px):缺省用样式默认值,160–420 越界收敛 */
+  searchBarWidth?: number;
   custom: SitePluginEntry[];
 } {
   const p = site.plugins ?? {};
@@ -40,6 +42,10 @@ export function normalizePlugins(site: SiteConfig): {
     searchStyle: p.searchStyle === "bar" ? "bar" : "button",
     searchPosition: p.searchPosition === "bottom-left" || p.searchPosition === "topbar" ? p.searchPosition : "bottom-right",
     searchStyleM: p.searchStyleM === "bar" || p.searchStyleM === "button" ? p.searchStyleM : undefined,
+    searchBarWidth: (() => {
+      const n = Math.floor(Number(p.searchBarWidth));
+      return Number.isFinite(n) && n > 0 ? Math.min(420, Math.max(160, n)) : undefined;
+    })(),
     searchPositionM:
       p.searchPositionM === "bottom-left" || p.searchPositionM === "topbar" || p.searchPositionM === "bottom-right"
         ? p.searchPositionM
@@ -90,6 +96,7 @@ export function pluginTags(prefix: string, site: SiteConfig): string[] {
         "assets/ps-plugins/ps-search.js",
         ` data-index-url="${prefix}${encodePath("assets/ps-plugins/search-index.json")}" data-root-prefix="${prefix}"` +
           ` data-style="${p.searchStyle}" data-position="${p.searchPosition}"` +
+          (p.searchBarWidth !== undefined ? ` data-bar-width="${p.searchBarWidth}"` : "") +
           (p.searchStyleM ? ` data-style-m="${p.searchStyleM}"` : "") +
           (p.searchPositionM ? ` data-position-m="${p.searchPositionM}"` : ""),
       ),
@@ -202,7 +209,7 @@ export function inlinePreviewPlugins(site: SiteConfig, contents: SitePluginFiles
     }
   }
   if (p.search) {
-    const cfg = JSON.stringify({ style: p.searchStyle, position: p.searchPosition, styleM: p.searchStyleM, positionM: p.searchPositionM }).replace(/</g, "\\u003c");
+    const cfg = JSON.stringify({ style: p.searchStyle, position: p.searchPosition, styleM: p.searchStyleM, positionM: p.searchPositionM, barWidth: p.searchBarWidth }).replace(/</g, "\\u003c");
     tags.push(`<script>window.__psSearchCfg=${cfg};</script>`);
     tags.push(script(searchJs));
   }

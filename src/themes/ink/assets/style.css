@@ -1481,7 +1481,15 @@ body.ps-sidebar-collapsed .ps-sidebar-toggle svg {
     height 300ms cubic-bezier(0.23, 1, 0.32, 1),
     border-radius 300ms cubic-bezier(0.23, 1, 0.32, 1),
     border-color 300ms cubic-bezier(0.23, 1, 0.32, 1),
-    box-shadow 300ms cubic-bezier(0.23, 1, 0.32, 1);
+    box-shadow 300ms cubic-bezier(0.23, 1, 0.32, 1),
+    transform 340ms cubic-bezier(0.23, 1, 0.32, 1),
+    visibility 0s linear 340ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ps-topbar {
+    transition: none;
+  }
 }
 
 @media (max-width: 900px) {
@@ -1531,18 +1539,27 @@ body[data-topbar-shape="圆角矩形"] .ps-topbar.is-scrolled {
     left: 0;
     right: 0;
     z-index: 70;
-    /* display 交给下方折叠/常显条件规则:缺省「折叠时显示」在侧栏展开时保持隐藏 */
+    /* 常驻布局,显隐交给 transform+visibility(过渡沿用下方公共规则):
+       侧栏展开时顶栏藏于视口上方,折叠/常显时自顶部非线性下移出现 */
+    display: flex;
     align-items: center;
     gap: 10px;
     height: var(--ps-topbar-h);
     padding: 0 16px;
     background: var(--ps-surface);
     border-bottom: 1px solid var(--ps-line);
+    transform: translateY(-100%);
+    visibility: hidden;
+    pointer-events: none;
   }
 
   body.ps-sidebar-collapsed .ps-topbar,
   body[data-topbar-show-pc="常显"] .ps-topbar {
-    display: flex;
+    transform: translateY(0);
+    visibility: visible;
+    pointer-events: auto;
+    /* 显示方向过渡立即生效(可随时打断);隐藏方向由公共规则延迟到收起完成 */
+    transition-delay: 0s;
   }
 
   body[data-topbar-show-pc="不显示"] .ps-topbar {
