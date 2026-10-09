@@ -66,11 +66,13 @@ function goPreview() {
 
 <template>
   <header
-    class="titlebar flex h-10 shrink-0 select-none items-center gap-2 border-b border-line bg-surface pl-3 pr-2"
+    class="titlebar flex h-10 shrink-0 select-none items-center gap-2 border-b border-line bg-surface pl-3"
+    :class="onMac ? 'pr-3' : 'pr-2'"
     data-tauri-drag-region
     @dblclick="showWindowControls && winAction('toggleMaximize')"
   >
-    <!-- 品牌与路径:Windows 固定左上角;macOS 原生红绿灯占据左上角,整组移到右上角(logo 在最右,路径显示在 logo 左边) -->
+    <!-- 品牌与路径:Windows 固定左上角;macOS 原生红绿灯占据左上角,整组移到右上角(logo 在最右,路径显示在 logo 左边)。
+         macOS 左右各留 12px 边距(红绿灯 conf x=12,右侧 pr-3):两角元素对角呼应、不贴边,垂直居中不变 -->
     <div
       class="brand flex items-center gap-2"
       :class="[canGoBack && 'can-back cursor-pointer', onMac && 'brand-mac']"

@@ -1,12 +1,12 @@
 <script setup lang="ts">
 /** 自定义下拉选择 -- 面板以带轻微过冲的非线性缓动弹出;选项无系统黑边框选中态 */
-import { nextTick, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import { toCssPx, uiZoom } from "@/lib/scale";
 
 const props = withDefaults(
   defineProps<{
     modelValue: string;
-    options: { value: string; label: string }[];
+    options: { value: string; label: string; group?: string }[];
     /** 面板对齐方向 */
     align?: "left" | "right";
   }>(),
@@ -14,6 +14,20 @@ const props = withDefaults(
 );
 
 const emit = defineEmits<{ (e: "update:modelValue", v: string): void }>();
+
+/** 选项分组:任一选项带 group 时按连续分组渲染弱化小标题,否则单组平铺(无标题);
+ *  标题仅作视觉分隔,不是选项,不参与键盘导航与选择 */
+const grouped = computed(() => {
+  if (!props.options.some((o) => o.group)) return [{ label: "", options: props.options }];
+  const out: { label: string; options: { value: string; label: string; group?: string }[] }[] = [];
+  for (const opt of props.options) {
+    const label = opt.group ?? "";
+    const last = out[out.length - 1];
+    if (last && last.label === label) last.options.push(opt);
+    else out.push({ label, options: [opt] });
+  }
+  return out;
+});
 
 const root = ref<HTMLElement | null>(null);
 const trigger = ref<HTMLButtonElement | null>(null);
@@ -32,7 +46,8 @@ function placePanel() {
   const t = trigger.value;
   if (!t) return;
   const r = t.getBoundingClientRect();
-  const estimatedH = props.options.length * 34 + 10;
+  const headers = grouped.value.filter((g) => g.label).length;
+  const estimatedH = props.options.length * 34 + headers * 22 + 10;
   // 界面缩放(zoom)下:rect/视口比较在视觉像素中进行,面板 CSS 定位值经 toCssPx 还原
   const z = uiZoom();
   flipUp.value = r.bottom + 6 + estimatedH * z > window.innerHeight - 8;
@@ -150,32 +165,35 @@ onBeforeUnmount(() => {
           role="listbox"
           @keydown="onPanelKeydown"
         >
-          <button
-            v-for="opt in options"
-            :key="opt.value"
-            type="button"
-            role="option"
-            class="select-option"
-            :class="{ selected: opt.value === modelValue }"
-            :aria-selected="opt.value === modelValue"
-            @click="choose(opt.value)"
-          >
-            <span>{{ opt.label }}</span>
-            <svg
-              v-if="opt.value === modelValue"
-              width="13"
-              height="13"
-              viewBox="0 0 14 14"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.8"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              aria-hidden="true"
+          <template v-for="(grp, gi) in grouped" :key="gi">
+            <div v-if="grp.label" class="select-group" role="presentation">{{ grp.label }}</div>
+            <button
+              v-for="opt in grp.options"
+              :key="opt.value"
+              type="button"
+              role="option"
+              class="select-option"
+              :class="{ selected: opt.value === modelValue }"
+              :aria-selected="opt.value === modelValue"
+              @click="choose(opt.value)"
             >
-              <path d="M2.5 7.5 5.5 10.5 11.5 3.5" />
-            </svg>
-          </button>
+              <span>{{ opt.label }}</span>
+              <svg
+                v-if="opt.value === modelValue"
+                width="13"
+                height="13"
+                viewBox="0 0 14 14"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M2.5 7.5 5.5 10.5 11.5 3.5" />
+              </svg>
+            </button>
+          </template>
         </div>
       </Transition>
     </Teleport>
@@ -247,6 +265,12 @@ onBeforeUnmount(() => {
   border-radius: 10px;
   background: var(--color-surface);
   box-shadow: var(--shadow-popover);
+}
+.select-group {
+  padding: 6px 10px 2px;
+  font-size: calc(11px * var(--ui-font-scale));
+  color: var(--color-ink-3);
+  user-select: none;
 }
 .select-option {
   display: flex;

@@ -22,7 +22,9 @@ const onMac = platform === "macos";
 const onWindows = platform === "windows";
 const inTauri = platform !== "browser";
 
-/* ---------- 移动设备模拟:机型预设(真机常见视口,竖屏;逻辑尺寸 × DPR ≈ 物理分辨率) ---------- */
+/* ---------- 移动设备模拟:机型预设(按品牌分组,覆盖 2024–2026 常见机型;竖屏,逻辑尺寸 × DPR ≈ 物理分辨率)。
+ *  视口为真机常见逻辑分辨率:Apple / 三星 / Google 联网逐机型核对(yesviz),国产机型按面板分辨率换算,
+ *  同视口的相邻代机型合并为一项(如「iPhone 15 / 16」)。 ---------- */
 const BEZEL = 10;
 
 interface DevicePreset {
@@ -34,20 +36,61 @@ interface DevicePreset {
   dpr: number;
 }
 
-const DEVICES: DevicePreset[] = [
-  { name: "小米 14", w: 400, h: 890, dpr: 3 },
-  { name: "Redmi Note 13", w: 393, h: 873, dpr: 2.75 },
-  { name: "华为 Mate 60 Pro", w: 420, h: 907, dpr: 3 },
-  { name: "荣耀 Magic6", w: 427, h: 933, dpr: 3 },
-  { name: "OPPO Find X7", w: 421, h: 920, dpr: 3 },
-  { name: "vivo X100", w: 420, h: 933, dpr: 3 },
-  { name: "三星 Galaxy S24", w: 360, h: 780, dpr: 3 },
-  { name: "Google Pixel 8", w: 412, h: 915, dpr: 2.625 },
-  { name: "iPhone SE 3", w: 375, h: 667, dpr: 2 },
-  { name: "iPhone 13 / 14", w: 390, h: 844, dpr: 3 },
-  { name: "iPhone 15", w: 393, h: 852, dpr: 3 },
-  { name: "iPhone 15 Pro Max", w: 430, h: 932, dpr: 3 },
+const DEVICE_GROUPS: { brand: string; devices: DevicePreset[] }[] = [
+  {
+    brand: "Apple",
+    devices: [
+      { name: "iPhone SE 3", w: 375, h: 667, dpr: 2 },
+      { name: "iPhone 13 / 14", w: 390, h: 844, dpr: 3 },
+      { name: "iPhone 15 / 16", w: 393, h: 852, dpr: 3 },
+      { name: "iPhone 15 Plus / 16 Plus", w: 430, h: 932, dpr: 3 },
+      { name: "iPhone 16 Pro / 17 / 17 Pro", w: 402, h: 874, dpr: 3 },
+      { name: "iPhone Air", w: 420, h: 912, dpr: 3 },
+      { name: "iPhone 16 Pro Max / 17 Pro Max", w: 440, h: 956, dpr: 3 },
+    ],
+  },
+  {
+    brand: "三星 Galaxy",
+    devices: [
+      { name: "Galaxy S24 / S25 / S26", w: 360, h: 780, dpr: 3 },
+      { name: "Galaxy S25 / S26 Ultra", w: 412, h: 891, dpr: 3.5 },
+    ],
+  },
+  {
+    brand: "小米 · Redmi",
+    devices: [
+      { name: "小米 14 / 15", w: 400, h: 890, dpr: 3 },
+      { name: "Redmi Note 13", w: 393, h: 873, dpr: 2.75 },
+    ],
+  },
+  {
+    brand: "华为 · 荣耀",
+    devices: [
+      { name: "华为 Mate 60 Pro", w: 420, h: 907, dpr: 3 },
+      { name: "荣耀 Magic6", w: 427, h: 933, dpr: 3 },
+      { name: "荣耀 Magic7", w: 421, h: 933, dpr: 3 },
+    ],
+  },
+  {
+    brand: "OPPO · vivo",
+    devices: [
+      { name: "OPPO Find X7", w: 421, h: 920, dpr: 3 },
+      { name: "OPPO Find X8", w: 419, h: 920, dpr: 3 },
+      { name: "vivo X100 / X200", w: 420, h: 933, dpr: 3 },
+    ],
+  },
+  {
+    brand: "Google",
+    devices: [
+      { name: "Pixel 8", w: 412, h: 915, dpr: 2.625 },
+      { name: "Pixel 9", w: 360, h: 808, dpr: 3 },
+      { name: "Pixel 9 Pro", w: 427, h: 952, dpr: 3 },
+      { name: "Pixel 9 Pro XL", w: 448, h: 997, dpr: 3 },
+    ],
+  },
 ];
+
+const DEVICES = DEVICE_GROUPS.flatMap((g) => g.devices);
 
 const DEVICE_KEY = "plainstruct.previewDevice";
 const CUSTOM_KEY = "plainstruct.previewDeviceCustom";
@@ -99,7 +142,9 @@ const physH = computed(() => Math.round(screenH.value * device.value.dpr));
 const deviceOuterW = computed(() => screenW.value + BEZEL * 2);
 const deviceOuterH = computed(() => screenH.value + BEZEL * 2);
 const deviceOptions = [
-  ...DEVICES.map((d) => ({ value: d.name, label: `${d.name} · ${d.w}×${d.h} @${d.dpr}x` })),
+  ...DEVICE_GROUPS.flatMap((g) =>
+    g.devices.map((d) => ({ value: d.name, label: `${d.name} · ${d.w}×${d.h} @${d.dpr}x`, group: g.brand })),
+  ),
   { value: CUSTOM_NAME, label: t("previewShell.customDevice") },
 ];
 

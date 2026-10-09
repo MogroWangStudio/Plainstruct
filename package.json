@@ -1,7 +1,7 @@
 {
   "name": "plainstruct",
   "private": true,
-  "version": "4.0.2",
+  "version": "4.0.3",
   "description": "素构 Plainstruct - 本地静态文档（wiki）网站创建器",
   "type": "module",
   "scripts": {
