@@ -48,9 +48,12 @@ function placePanel() {
   const r = t.getBoundingClientRect();
   const headers = grouped.value.filter((g) => g.label).length;
   const estimatedH = props.options.length * 34 + headers * 22 + 10;
+  // 面板自身限高(max-height: min(320px, 60vh))并内部滚动:翻转判断必须用限高后的实际高度,
+  // 否则长列表(如机型预设 21 项 ≈ 840px)恒被判为「放不下」而永远向上展开
+  const panelH = Math.min(estimatedH, Math.min(320, window.innerHeight * 0.6));
   // 界面缩放(zoom)下:rect/视口比较在视觉像素中进行,面板 CSS 定位值经 toCssPx 还原
   const z = uiZoom();
-  flipUp.value = r.bottom + 6 + estimatedH * z > window.innerHeight - 8;
+  flipUp.value = r.bottom + 6 + panelH * z > window.innerHeight - 8;
   pos.value = {
     left: toCssPx(props.align === "right" ? r.right : r.left) + "px",
     minWidth: toCssPx(Math.max(r.width, 150)) + "px",
