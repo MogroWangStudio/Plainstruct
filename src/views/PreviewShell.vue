@@ -82,7 +82,7 @@ const DEVICE_GROUPS: { brand: string; devices: DevicePreset[] }[] = [
   {
     brand: "Google",
     devices: [
-      { name: "Pixel 8", w: 412, h: 915, dpr: 2.625 },
+      { name: "Google Pixel 8", w: 412, h: 915, dpr: 2.625 },
       { name: "Pixel 9", w: 360, h: 808, dpr: 3 },
       { name: "Pixel 9 Pro", w: 427, h: 952, dpr: 3 },
       { name: "Pixel 9 Pro XL", w: 448, h: 997, dpr: 3 },
@@ -94,7 +94,9 @@ const DEVICES = DEVICE_GROUPS.flatMap((g) => g.devices);
 
 const DEVICE_KEY = "plainstruct.previewDevice";
 const CUSTOM_KEY = "plainstruct.previewDeviceCustom";
-const DEFAULT_DEVICE = DEVICES.find((d) => d.name === "Google Pixel 8")!;
+// 默认机型名称必须与预设表严格一致(4.0.3 曾因改名导致查找落空、setup 崩溃白屏):
+// 这里不加非空断言,查不到时兏底到首项,保底壳层永远能挂载
+const DEFAULT_DEVICE = DEVICES.find((d) => d.name === "Google Pixel 8") ?? DEVICES[0];
 const CUSTOM_NAME = "custom";
 
 function readDeviceName(): string {
