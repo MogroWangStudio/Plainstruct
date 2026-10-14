@@ -281,6 +281,8 @@ pub async fn github_read_config(window: tauri::WebviewWindow, state: State<'_, A
             auto_create: true,
             account_type: default_account_type(),
             custom_domain: String::new(),
+            proxy_mode: default_proxy_mode(),
+            proxy_url: String::new(),
         }),
     }
 }
