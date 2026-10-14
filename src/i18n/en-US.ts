@@ -574,6 +574,8 @@ export default {
     proxyUrl: "Proxy server address",
     proxyUrlPlaceholder: "http://127.0.0.1:7890 or socks5://127.0.0.1:7890",
     proxyUrlHint: "Use the proxy app's HTTP or SOCKS5 listening port, e.g. http://127.0.0.1:7890.",
+    notifyActionOpenApp: "View publish status",
+    notifyActionViewSite: "View site",
     notifyPublishedTitle: "Publish succeeded",
     notifyPublishedBody: "The site was pushed to GitHub; waiting for Pages to build.",
     notifyDeployedTitle: "Pages build finished",

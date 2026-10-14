@@ -45,3 +45,7 @@ block2 = "0.6.2"
 objc2 = "0.6.5"
 objc2-foundation = "0.3.2"
 objc2-user-notifications = "0.3"
+
+[target.x86_64-pc-windows-msvc.dependencies]
+windows = { version = "0.61", features = ["UI_Notifications", "Data_Xml_Dom"] }
+winreg = "0.55"

@@ -138,6 +138,12 @@ export interface SitePluginEntry {
   builtinCopyOf?: string;
 }
 
+/** 通知动作按钮(Windows):arg 为 plainstruct:// 协议(回跳应用)或 https://(直开浏览器) */
+export interface NotifyAction {
+  label: string;
+  arg: string;
+}
+
 /** 导入结果:条目 + 是否识别为 Plainstruct 插件(recognized 不落盘) */
 export interface ImportedPlugin {
   entry: SitePluginEntry;

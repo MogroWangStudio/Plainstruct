@@ -8,6 +8,8 @@ export const Events = {
   PreviewRebuilt: "plainstruct://preview-rebuilt",
   /** 预览窗口请求主窗口立即重新构建(预览壳层无 bootstrap,只能托主窗口构建) */
   PreviewBuildRequested: "plainstruct://preview-build-requested",
+  /** Windows 通知按钮回跳:payload = publish(打开发布页)/ site(打开发布站点) */
+  Navigate: "plainstruct://navigate",
 } as const;
 
 export type SyncProgressEvent = typeof Events.SyncProgress;

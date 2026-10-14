@@ -2798,6 +2798,8 @@ dependencies = [
  "tempfile",
  "trash",
  "walkdir",
+ "windows 0.61.3",
+ "winreg",
  "zip",
 ]
 

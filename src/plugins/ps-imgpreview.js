@@ -218,6 +218,11 @@
     return false;
   }
 
+  /** 烘焙上限:布局尺寸任一边超过该值(像素)就只烘焙到上限,剩余倍率留在
+   *  transform —— 超大图层会让后续每次缩放重绘都变得极慢(放到最大再缩小
+   *  卡顿的根源),清晰度在上限内仍远高于纯 transform 拉伸 */
+  var BAKE_MAX_DIM = 4096;
+
   function bakeNow() {
     if (sharpTimer) {
       window.clearTimeout(sharpTimer);
@@ -234,15 +239,26 @@
       }, 120);
       return;
     }
+    // 视觉已缩回到适配尺寸及以下:解除烘焙释放超大图层(视觉不变),
+    // 避免大图层在后续手势中拖慢合成
+    if (st.scale * bakedScale <= 1.001) {
+      unbakeNow();
+      return;
+    }
     if (st.scale <= 1.001) return;
     var w = img.offsetWidth;
     var h = img.offsetHeight;
+    var target = st.scale;
+    // 只烘焙到上限:多出的倍率留在 transform,视觉完全不变
+    var f = Math.min(1, BAKE_MAX_DIM / (w * target), BAKE_MAX_DIM / (h * target));
+    var bake = target * f;
+    if (bake <= 1.001) return;
     img.style.maxWidth = "none";
     img.style.maxHeight = "none";
-    img.style.width = w * st.scale + "px";
-    img.style.height = h * st.scale + "px";
-    bakedScale *= st.scale;
-    st.scale = 1;
+    img.style.width = w * bake + "px";
+    img.style.height = h * bake + "px";
+    bakedScale *= bake;
+    st.scale = target / bake;
     // 刷新帧禁用一切过渡:布局尺寸与 transform 归一同帧无动画完成,视觉零跳动
     var prevTransition = img.style.transition;
     img.style.transition = "none";
@@ -265,19 +281,26 @@
     }, cfg.sharpDelay);
   }
 
-  /** 解除烘焙:恢复布局尺寸并把累计倍率还给 st.scale(视觉不变,缩放数学回到原语义) */
+  /** 解除烘焙:恢复布局尺寸,把累计倍率合回 st.scale(视觉不变,缩放数学回到原语义)。
+   *  注意:必须在 st.scale ≠ 1 时也正确 —— 此前直接 st.scale = bakedScale,
+   *  会丢弃缩小时叠加的倍率(切换像素模式/双击时「缩放值莫名改变」的根源) */
   function unbakeNow() {
     if (sharpTimer) {
       window.clearTimeout(sharpTimer);
       sharpTimer = 0;
     }
-    if (bakedScale === 1) return;
+    if (bakedScale === 1) {
+      // 未烘焙也要打断进行中的内联过渡(如打开动画),避免后续 apply 被旧曲线接管
+      img.style.transition = "";
+      return;
+    }
+    st.scale = bakedScale * st.scale;
+    bakedScale = 1;
     img.style.maxWidth = "";
     img.style.maxHeight = "";
     img.style.width = "";
     img.style.height = "";
-    st.scale = bakedScale;
-    bakedScale = 1;
+    img.style.transition = ""; // 打断内联过渡:布局切换无动画,后续手势过渡由类接管
     setMode("ps-lb-dragging");
     apply();
   }

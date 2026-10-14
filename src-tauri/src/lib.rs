@@ -159,22 +159,76 @@ fn handle_site<R: tauri::Runtime>(
     }
 }
 
+/// Windows 通知按钮的协议回跳:唤起主窗口并发跳转事件给前端。
+/// payload:publish = 发布页;site = 打开发布站点(前端用系统浏览器)
+#[cfg(windows)]
+fn handle_protocol_arg(app: &tauri::AppHandle, arg: &str) {
+    use tauri::Emitter;
+    let payload = if arg.contains("publish") {
+        "publish"
+    } else if arg.contains("site") {
+        "site"
+    } else {
+        return;
+    };
+    if let Some(win) = app.get_webview_window("main") {
+        let _ = win.unminimize();
+        let _ = win.show();
+        let _ = win.set_focus();
+    }
+    let _ = app.emit("plainstruct://navigate", payload);
+}
+
 pub fn run() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            #[cfg(not(windows))]
+            let _ = argv;
             // 二次启动:macOS 关窗后进程保留、Windows 退出也存在短暂窗口期,
             // 此时旧实例的窗口可能已关闭 —— 把主窗口重新带回前台,
-            // 避免「关闭后立即重启软件看不到任何界面」
-            if let Some(win) = app.get_webview_window("main") {
-                let _ = win.unminimize();
-                let _ = win.show();
-                let _ = win.set_focus();
+            // 避免「关闭后立即重启软件看不到任何界面」。
+            // 若启动参数携带 plainstruct:// 协议(Windows 通知按钮),唤起后跳转对应页面
+            #[allow(unused_mut)]
+            let mut handled = false;
+            #[cfg(windows)]
+            for arg in &argv {
+                if arg.contains("plainstruct://") {
+                    handle_protocol_arg(app, arg);
+                    handled = true;
+                    break;
+                }
+            }
+            if !handled {
+                if let Some(win) = app.get_webview_window("main") {
+                    let _ = win.unminimize();
+                    let _ = win.show();
+                    let _ = win.set_focus();
+                }
             }
         }))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .manage(AppState::default())
+        .setup(|app| {
+            #[cfg(not(windows))]
+            let _ = app;
+            // Windows:注册通知身份(AUMID + 图标)与 plainstruct:// 协议(通知按钮回跳)。
+            // 非打包应用没有开始菜单快捷方式,注册表注册是系统通知显示正确身份的前提
+            #[cfg(windows)]
+            {
+                commands::system::ensure_windows_notification_identity(app.handle());
+                // 冷启动即由通知按钮拉起:等前端就绪后再发跳转事件
+                if let Some(arg) = std::env::args().find(|a| a.contains("plainstruct://")) {
+                    let handle = app.handle().clone();
+                    std::thread::spawn(move || {
+                        std::thread::sleep(std::time::Duration::from_millis(2_500));
+                        handle_protocol_arg(&handle, &arg);
+                    });
+                }
+            }
+            Ok(())
+        })
         .register_uri_scheme_protocol("site", handle_site)
         .invoke_handler(tauri::generate_handler![
             // 应用

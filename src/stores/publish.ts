@@ -1,7 +1,7 @@
 import { defineStore } from "pinia";
 import { ipc } from "@/ipc/ipc";
 import { Events, listen } from "@/ipc/events";
-import type { GithubConfig, PublishNotifyMode, SyncLogEntry, SyncProgress, SyncResult, VerifyResult } from "@/ipc/types";
+import type { GithubConfig, NotifyAction, PublishNotifyMode, SyncLogEntry, SyncProgress, SyncResult, VerifyResult } from "@/ipc/types";
 import { i18n } from "@/i18n";
 import { useAppStore } from "./app";
 import { useBuilderStore } from "./builder";
@@ -86,9 +86,9 @@ export const usePublishStore = defineStore("publish", {
       const mode: PublishNotifyMode = app.settings.publishNotify ?? "twice";
       if (mode === "off") return;
       const t = i18n.global.t;
-      const send = async (title: string, body: string) => {
+      const send = async (title: string, body: string, actions: NotifyAction[] = []) => {
         try {
-          await ipc.systemNotify(title, body);
+          await ipc.systemNotify(title, body, actions);
         } catch (e) {
           // 通知不可用不阻断发布流程,但让用户知道原因(发布日志可见)
           this.appendLog("info", `[系统通知] ${ipc.errText(e)}`);
@@ -97,14 +97,19 @@ export const usePublishStore = defineStore("publish", {
       if (kind === "published") {
         // 合并档位:发布成功不弹,等 Pages 构建完成后发一条合并通知
         if (mode === "twice") {
-          void send(t("publish.notifyPublishedTitle"), t("publish.notifyPublishedBody"));
+          void send(t("publish.notifyPublishedTitle"), t("publish.notifyPublishedBody"), [
+            { label: t("publish.notifyActionOpenApp"), arg: "plainstruct://publish" },
+          ]);
         }
         return;
       }
+      // Pages 构建完成(或合并通知):按钮直达站点(有自定义域名时为域名)
+      const site = this.siteUrl;
+      const actions: NotifyAction[] = site ? [{ label: t("publish.notifyActionViewSite"), arg: site }] : [];
       if (mode === "twice") {
-        void send(t("publish.notifyDeployedTitle"), t("publish.notifyDeployedBody"));
+        void send(t("publish.notifyDeployedTitle"), t("publish.notifyDeployedBody"), actions);
       } else {
-        void send(t("publish.notifyMergedTitle"), t("publish.notifyMergedBody"));
+        void send(t("publish.notifyMergedTitle"), t("publish.notifyMergedBody"), actions);
       }
     },
 

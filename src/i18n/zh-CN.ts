@@ -548,6 +548,8 @@ export default {
     proxyUrl: "代理服务器地址",
     proxyUrlPlaceholder: "http://127.0.0.1:7890 或 socks5://127.0.0.1:7890",
     proxyUrlHint: "填代理软件的 HTTP 或 SOCKS5 预留端口（混合端口也可），如 http://127.0.0.1:7890。",
+    notifyActionOpenApp: "查看发布情况",
+    notifyActionViewSite: "查看站点",
     notifyPublishedTitle: "发布成功",
     notifyPublishedBody: "站点已推送到 GitHub，正在等待 Pages 构建。",
     notifyDeployedTitle: "Pages 构建完成",

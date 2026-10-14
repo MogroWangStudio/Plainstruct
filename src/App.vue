@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { useAppStore } from "@/stores/app";
 import { useSiteStore } from "@/stores/site";
 import { useEditorStore } from "@/stores/editor";
+import { usePublishStore } from "@/stores/publish";
 import { ipc } from "@/ipc/ipc";
 import { Events, listen } from "@/ipc/events";
 import { useI18n } from "vue-i18n";
@@ -26,6 +27,7 @@ import AboutView from "@/views/AboutView.vue";
 const app = useAppStore();
 const site = useSiteStore();
 const editor = useEditorStore();
+const publish = usePublishStore();
 const { t } = useI18n();
 
 /* ---------- 关窗守卫:有未保存修改时先询问(保存并关闭 / 不保存 / 取消) ----------
@@ -83,6 +85,11 @@ onMounted(() => {
   void app.init();
   void installCloseGuard();
   installContextMenu();
+  // Windows 通知按钮回跳:publish = 打开发布页;site = 系统浏览器打开发布站点
+  void listen<string>(Events.Navigate, (payload) => {
+    if (payload === "publish") app.setView("publish");
+    else if (payload === "site") void publish.openSite();
+  });
 });
 </script>
 
