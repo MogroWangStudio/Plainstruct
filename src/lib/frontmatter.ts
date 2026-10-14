@@ -1,6 +1,6 @@
 /** 素构识别的配置头字段(写回时以表单值为准重建这些行;表单未管理的字段
  *  不在此列 —— 用户手写的行原样保留,如 order) */
-export const FM_KEYS = ["title", "description", "date", "cover", "author", "aigc", "hidden", "toc", "homegroups", "homeuncategorized", "homeuncategorizedlabel"];
+export const FM_KEYS = ["title", "description", "date", "cover", "author", "aigc", "hidden", "toc", "tags", "homegroups", "homeuncategorized", "homeuncategorizedlabel"];
 
 /** AIGC 声明:present = 存在 AIGC,none = 无任何 AIGC;缺省(不写字段)即不显示声明 */
 export type AigcDeclaration = "none" | "present";
@@ -20,6 +20,8 @@ export function applyFrontMatter(
     /** AIGC 声明 */
     aigc?: AigcDeclaration | "";
     hidden?: boolean;
+    /** 文章标签(逗号/顿号分隔);留空不落字段 */
+    tags?: string;
     /** 页面目录(博客文章页):on = 强制显示,false = 强制隐藏,"" = 不落字段,跟随主题设置 */
     toc?: "" | "on" | "off";
     /** 博客主页(根 index.md)专属:卡片流按分类分组 */
@@ -38,6 +40,7 @@ export function applyFrontMatter(
     ...(values.author?.trim() ? [`author: ${values.author.trim()}`] : []),
     ...(values.aigc === "none" || values.aigc === "present" ? [`aigc: ${values.aigc}`] : []),
     ...(values.hidden ? ["hidden: true"] : []),
+    ...(values.tags?.trim() ? [`tags: ${values.tags.trim()}`] : []),
     ...(values.toc === "on" ? ["toc: true"] : values.toc === "off" ? ["toc: false"] : []),
     ...(values.homeGroups ? ["homeGroups: true"] : []),
     // 显示未分类是缺省行为(不写字段);仅在用户隐藏时落 false
@@ -72,6 +75,8 @@ export interface FrontMatter {
   aigc?: AigcDeclaration;
   /** 隐藏文档:不进文章流与导航、不入搜索索引,仅可通过链接访问 */
   hidden?: boolean;
+  /** 文章标签(逗号分隔);缺省无标签 */
+  tags?: string[];
   /** 页面目录开关(博客文章页):true = 强制显示,false = 强制隐藏;缺省跟随主题设置 */
   toc?: boolean;
   /** 博客主页(根 index.md)专属:卡片流按分类分组(分类 = 顶层文件夹) */
@@ -118,6 +123,14 @@ export function parseFrontMatter(src: string): ParsedDoc {
       if (value === "none" || value === "present") data.aigc = value;
     } else if (key === "hidden") {
       if (value === "true" || value === "1") data.hidden = true;
+    } else if (key === "tags") {
+      // 标签:逗号/顿号分隔;也容忍 YAML 数组写法([a, b] 或多行),去空去重
+      const list = value
+        .replace(/^\[|\]$/g, "")
+        .split(/[,，、]/)
+        .map((s) => s.trim().replace(/^['"]|['"]$/g, ""))
+        .filter(Boolean);
+      if (list.length) data.tags = [...new Set(list)];
     } else if (key === "toc") {
       // 页面目录三态:缺省(不写字段)跟随主题设置,显式 true/false 强制覆盖
       if (value === "true" || value === "1") data.toc = true;

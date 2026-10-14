@@ -25,6 +25,8 @@ export interface PostSummary {
   description?: string;
   /** 封面图:content/ 相对路径或外链 URL,渲染时换算为页面相对地址 */
   cover?: string;
+  /** 文章标签(配置头 tags):name 为标签名,color 为主题配置的标签颜色(未设置时缺省,主题用强调色) */
+  tags?: { name: string; color?: string }[];
   /** 源文档最后修改时间(毫秒时间戳;渲染为卡片 data-updated,供页内按更新日期排序) */
   updated?: number;
 }

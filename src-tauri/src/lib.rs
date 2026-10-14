@@ -174,6 +174,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_notification::init())
         .manage(AppState::default())
         .register_uri_scheme_protocol("site", handle_site)
         .invoke_handler(tauri::generate_handler![
@@ -247,6 +248,7 @@ pub fn run() {
             commands::open_data_dir,
             commands::open_external,
             commands::reload_webview,
+            commands::system_notify,
         ])
         .on_window_event(|window, event| {
             // macOS 关窗惯例:主窗口隐藏而非销毁 —— 保留 WebView,单实例

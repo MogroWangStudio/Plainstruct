@@ -1,6 +1,6 @@
 [package]
 name = "plainstruct"
-version = "4.0.3"
+version = "4.1.0"
 description = "素构 Plainstruct - 本地静态文档（wiki）网站创建器"
 authors = ["MogroWang Studio"]
 edition = "2021"
@@ -18,12 +18,13 @@ tauri-plugin-single-instance = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-clipboard-manager = "2"
+tauri-plugin-notification = "2"
 
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha1 = "0.10"
 zip = { version = "2", default-features = false, features = ["deflate"] }
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "socks"] }
 base64 = "0.22"
 walkdir = "2"
 trash = "5"

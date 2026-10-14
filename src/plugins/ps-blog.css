@@ -298,6 +298,79 @@ body.ps-home .blog-main {
 .blog-entry.is-filtered {
   display: none;
 }
+/* 文章标签药丸(卡片流,描述下方;颜色随主题配置 --tag-c,缺省用主题强调色) */
+.blog-entry-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+.blog-entry-tag {
+  --tag-c: var(--ps-accent);
+  display: inline-flex;
+  align-items: center;
+  padding: 2.5px 11px;
+  border: 1px solid color-mix(in srgb, var(--tag-c) 26%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--tag-c) 10%, transparent);
+  color: var(--tag-c);
+  font-size: 0.72em;
+  font-weight: 500;
+  line-height: 1.6;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+/* 文件夹页标签筛选:药丸形 chips(从当前目录文章的标签自动汇总,单选筛选) */
+.blog-folder-tagbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 12px;
+}
+.blog-folder-tagbar:empty {
+  display: none;
+}
+.blog-folder-tagchip {
+  --tag-c: var(--ps-accent);
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 14px;
+  border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition:
+    border-color var(--duration-base, 160ms) var(--ease-plain, ease),
+    background-color var(--duration-base, 160ms) var(--ease-plain, ease),
+    color var(--duration-base, 160ms) var(--ease-plain, ease),
+    transform 100ms ease-out;
+}
+.blog-folder-tagchip:hover {
+  border-color: var(--tag-c);
+  color: var(--tag-c);
+}
+.blog-folder-tagchip:active {
+  transform: scale(0.95);
+}
+.blog-folder-tagchip.is-active {
+  border-color: var(--tag-c);
+  background: color-mix(in srgb, var(--tag-c) 14%, transparent);
+  color: var(--tag-c);
+  font-weight: 600;
+}
+@media (prefers-reduced-motion: reduce) {
+  .blog-folder-tagchip {
+    transition: none;
+  }
+  .blog-folder-tagchip:active {
+    transform: none;
+  }
+}
+
 /* 目录列表视图:自动目录页正文的列表样式(与 ps-home-list 同源结构) */
 .blog-folder-list .ps-home-list {
   margin: 22px 0 0;
@@ -314,6 +387,18 @@ body.ps-home .blog-main {
 }
 .blog-folder-list .ps-home-link:hover {
   color: var(--ps-accent);
+}
+
+/* 文章目录层级缩进:副标题(##)以下逐级收进;主题自身的层级规则(如 is-l3)在之后加载,
+   同权重时仍可覆盖;深层级配合目录容器的 overflow 裁剪,不出现横向滚动条 */
+.blog-toc-item.is-l4 a {
+  padding-left: 38px;
+}
+.blog-toc-item.is-l5 a {
+  padding-left: 50px;
+}
+.blog-toc-item.is-l6 a {
+  padding-left: 62px;
 }
 
 /* 页脚:说明文字 / 友情链接 / 构建信息(footer 全空时不占位、不显示边框) */

@@ -12,6 +12,7 @@ import type {
   Locale,
   ModalBackdropClose,
   Platform,
+  PublishNotifyMode,
   RecentSite,
   UiFontMode,
   UpdateProgress,
@@ -54,6 +55,8 @@ export interface EditorPrefs {
   editorIndentWidth?: number;
   autosaveDelay?: number;
   disableRefreshAnim?: boolean;
+  /** 发布系统通知档位:twice=两次 merged=合并一次 off=关闭 */
+  publishNotify?: PublishNotifyMode;
 }
 
 /** 常用字体栈(与素构站点主题一致) */

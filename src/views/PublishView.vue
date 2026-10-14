@@ -7,6 +7,7 @@ import { useAppStore } from "@/stores/app";
 import { useUiStore } from "@/stores/ui";
 import { fireConfetti } from "@/lib/confetti";
 import AppIcon from "@/components/AppIcon.vue";
+import SelectMenu from "@/components/SelectMenu.vue";
 import type { GithubAccountType } from "@/ipc/types";
 
 const { t } = useI18n();
@@ -100,6 +101,19 @@ const domainError = computed(() => {
   if (d.toLowerCase() === "github.io" || d.toLowerCase().endsWith(".github.io")) return t("publish.domainGithubIo");
   return "";
 });
+
+/* ---------- 代理设置 ---------- */
+
+const proxyOptions = computed(() => [
+  { value: "system", label: t("publish.proxySystem") },
+  { value: "none", label: t("publish.proxyNone") },
+  { value: "custom", label: t("publish.proxyCustom") },
+]);
+
+function setProxyMode(v: string) {
+  publish.config.proxyMode = v === "none" || v === "custom" ? v : "system";
+  void publish.save();
+}
 
 /* ---------- 运行日志 ---------- */
 
@@ -231,6 +245,28 @@ async function republish() {
             <input v-model="publish.config.autoCreate" type="checkbox" class="checkbox-input" />
             {{ t("publish.autoCreate") }}
           </label>
+
+          <!-- 代理设置:GitHub 直连缓慢时,可用代理软件的预留端口加速上传 -->
+          <div class="flex flex-col gap-2 rounded-lg border border-line bg-bg p-4">
+            <label class="flex flex-col gap-1">
+              <span class="field-label">{{ t("publish.proxyMode") }}</span>
+              <SelectMenu :model-value="publish.config.proxyMode" :options="proxyOptions" align="left" @update:model-value="setProxyMode" />
+              <p class="field-hint">{{ t("publish.proxyHint") }}</p>
+            </label>
+            <label v-if="publish.config.proxyMode === 'custom'" class="flex flex-col gap-1">
+              <span class="field-label">{{ t("publish.proxyUrl") }}</span>
+              <input
+                v-model="publish.config.proxyUrl"
+                class="input mono"
+                type="text"
+                :placeholder="t('publish.proxyUrlPlaceholder')"
+                spellcheck="false"
+                autocapitalize="off"
+                @change="publish.save()"
+              />
+              <p class="field-hint">{{ t("publish.proxyUrlHint") }}</p>
+            </label>
+          </div>
 
           <div class="flex flex-col gap-2">
             <div class="flex items-center gap-3">

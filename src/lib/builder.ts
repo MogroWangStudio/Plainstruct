@@ -60,6 +60,8 @@ export interface DocMeta {
   aigc?: string;
   /** 隐藏文档:不进文章流/导航/搜索索引,页面仍生成(仅可通过链接访问) */
   hidden?: boolean;
+  /** 文章标签(配置头 tags,逗号分隔) */
+  tags?: string[];
   /** 页面目录覆盖(博客文章页):true = 强制显示,false = 强制隐藏;缺省跟随主题设置 */
   toc?: boolean;
   /** 博客主页(根 index.md)专属:卡片流按分类分组 */
@@ -110,7 +112,8 @@ function stripLeadingTitle(body: string, title: string): string {
   return body;
 }
 
-function buildMetas(paths: string[], cache: DocsCache): Map<string, DocMeta> {
+/** 文档元数据表(配置头解析;导出供配置面板等处与构建同源地读标签/标题) */
+export function buildMetas(paths: string[], cache: DocsCache): Map<string, DocMeta> {
   const metas = new Map<string, DocMeta>();
   for (const path of paths) {
     const { data, body } = parseFrontMatter(cache[path] ?? "");
@@ -129,6 +132,7 @@ function buildMetas(paths: string[], cache: DocsCache): Map<string, DocMeta> {
       homeGroups: data.homeGroups === true,
       homeUncategorized: data.homeUncategorized === false ? false : undefined,
       homeUncategorizedLabel: data.homeUncategorizedLabel,
+      tags: data.tags,
       body: stripLeadingTitle(body, title),
     });
   }
@@ -167,6 +171,7 @@ function buildPosts(metas: Map<string, DocMeta>, mtimeMap?: Map<string, number>)
       date: m.date,
       description: m.description,
       cover: coverOf(m),
+      tags: m.tags?.map((name) => ({ name })),
       updated: mtimeMap?.get(mdToHtml(m.path).toLowerCase()),
     }));
   const withDate = posts
@@ -507,6 +512,19 @@ function parseFooterLinks(raw: string | number | boolean | undefined): { name: s
     .map((p) => ({ name: p[0], url: p[1], icon: p[2] || undefined }));
 }
 
+/** 主题配置的标签颜色表(config.tagColors,每行「标签名|颜色」) */
+function tagColorMapOf(config: Record<string, string | number | boolean>): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const line of String(config.tagColors ?? "").split("\n")) {
+    const i = line.indexOf("|");
+    if (i <= 0) continue;
+    const name = line.slice(0, i).trim();
+    const color = line.slice(i + 1).trim();
+    if (name && /^#[0-9a-fA-F]{3,8}$/.test(color)) map.set(name, color);
+  }
+  return map;
+}
+
 /** 构建信息:本次构建/预览时刻的日期与时间,按主题「构建信息格式」
  *  替换令牌得到成品文案({date}/{time}/{version},未知令牌原样保留) */
 function buildInfoOf(config: Record<string, string | number | boolean>): PageContext["page"]["build"] {
@@ -636,7 +654,9 @@ function renderOnePage(
   const cfgLogo = site.logo;
   // 站点外图标未单独设置时沿用站点内 logo(旧站点行为不变)
   const cfgFavicon = site.favicon || site.logo;
-  // 文章流条目统一换算:htmlPath/封面 → 当前页相对地址(预览封面为绝对协议地址)
+  // 文章流条目统一换算:htmlPath/封面 → 当前页相对地址(预览封面为绝对协议地址);
+  // 标签附上主题配置的颜色(未配置的颜色不落字段,模板用主题强调色兑底)
+  const tagColors = tagColorMapOf(config);
   const mapPost = (p: PostSummary) => ({
     ...p,
     url: encodePath(relPosix(outDir, p.htmlPath)),
@@ -644,6 +664,12 @@ function renderOnePage(
       ? /^(https?:|data:)/i.test(p.cover)
         ? p.cover
         : (coverUrl?.(p.cover) ?? encodePath(relPosix(outDir, p.cover)))
+      : undefined,
+    tags: p.tags?.length
+      ? p.tags.map((tag) => {
+          const color = tagColors.get(tag.name);
+          return color ? { name: tag.name, color } : tag;
+        })
       : undefined,
   });
   const ctx: PageContext = {
@@ -760,8 +786,10 @@ export function renderPreview(
   platform: Platform,
   /** 用户插件的文件内容(站点打开时预载,预览通道内联注入) */
   pluginContents: SitePluginFiles[] = [],
-  /** 「刷新时禁用动画」:mock 预览的页面加载不重播进场/加载动画(Tauri 产物由注入 shim 负责) */
+  /** 「刷新时禁用动画」:mock 预览的页面加载不重播进场/加载动画(Tauri 产物由注入 shim 负责)
+   *  demo:内容页/主题页演示预览 —— 搜索入口仅展示,点击提示前往构建查看完整站点 */
   suppressAnim = false,
+  demo = false,
 ): string {
   const paths = collectDocPaths(tree);
   const docCache = { ...cache };
@@ -815,7 +843,7 @@ export function renderPreview(
   );
   // 先内联主题资产,再追加插件:搜索数据内联在前,脚本在主题脚本之后执行
   let out = inlineThemeAssets(html, theme.files);
-  const pluginTags = inlinePreviewPlugins(site, pluginContents);
+  const pluginTags = inlinePreviewPlugins(site, pluginContents, demo);
   if (pluginTags.length) {
     const search = normalizePlugins(site).search ? [searchIndexTag(previewSearchPages(metas, tree))] : [];
     out = injectPluginTags(out, [...search, ...pluginTags]);
@@ -839,6 +867,7 @@ export async function renderSpecialPreview(
   platform: Platform,
   pluginContents: SitePluginFiles[] = [],
   suppressAnim = false,
+  demo = false,
 ): Promise<string> {
   const paths = collectDocPaths(tree);
   const metas = buildMetas(paths, cache);
@@ -932,7 +961,7 @@ export async function renderSpecialPreview(
     (icon) => siteUrl(platform, "content/" + icon),
   );
   let out = inlineThemeAssets(html, theme.files);
-  const tags = inlinePreviewPlugins(site, pluginContents);
+  const tags = inlinePreviewPlugins(site, pluginContents, demo);
   if (tags.length) {
     const search = normalizePlugins(site).search ? [searchIndexTag(previewSearchPages(metas, tree))] : [];
     out = injectPluginTags(out, [...search, ...tags]);

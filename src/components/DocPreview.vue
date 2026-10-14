@@ -41,6 +41,8 @@ async function computeHtml(): Promise<string> {
       app.platform,
       site.pluginContents,
       app.settings.disableRefreshAnim ?? false,
+      // 内容页演示预览:搜索入口仅展示,点击提示前往构建查看完整站点
+      true,
     );
   }
   // 博客的子文件夹 index.md:与构建产物一致,渲染「正文 + 文件夹卡片流」页面
@@ -59,6 +61,7 @@ async function computeHtml(): Promise<string> {
       app.platform,
       site.pluginContents,
       app.settings.disableRefreshAnim ?? false,
+      true,
     );
   }
   // 传原始内容,renderPreview 内统一解析 front-matter(标题/正文)
@@ -72,6 +75,7 @@ async function computeHtml(): Promise<string> {
     app.platform,
     site.pluginContents,
     app.settings.disableRefreshAnim ?? false,
+    true,
   );
 }
 

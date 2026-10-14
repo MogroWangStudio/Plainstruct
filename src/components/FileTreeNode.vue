@@ -225,7 +225,7 @@ function onDrop(e: DragEvent) {
         {{ label }}
       </span>
 
-      <span v-if="!selectMode" class="row-actions flex items-center opacity-0">
+      <span v-if="!selectMode" class="row-actions">
         <button v-if="isDir" class="btn-icon !h-6 !w-6" :title="$t('tree.importToFolder')" tabindex="-1" @click.stop="emit('importTo', node.path)">
           <AppIcon name="download" :size="13" />
         </button>
@@ -320,10 +320,53 @@ function onDrop(e: DragEvent) {
 .drop-line-bottom {
   bottom: -1.5px;
 }
+/* 文档名称贴满整行(不再为按钮区域预留空白),省略号紧贴行宽;
+   悬停时快捷按钮浮出,按钮下方一层「左透明 → 右行底色」的渐变遮罩,
+   避免长名称文字与按钮重叠难读 */
 .row-actions {
+  position: absolute;
+  top: 0;
+  right: 3px;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  opacity: 0;
   transition: opacity var(--duration-base) var(--ease-plain);
 }
 .tree-row:hover .row-actions {
   opacity: 1;
+}
+.tree-row::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 92px;
+  border-radius: inherit;
+  background: linear-gradient(to right, transparent, var(--row-bg, var(--color-surface)));
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--duration-base) var(--ease-plain);
+}
+.tree-row:hover {
+  --row-bg: var(--color-surface-2);
+}
+.tree-row.active {
+  --row-bg: var(--color-surface-3);
+}
+.tree-row.drag-over {
+  --row-bg: var(--color-accent-soft);
+}
+.tree-row:hover::after {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .row-actions,
+  .tree-row::after {
+    transition: none;
+  }
 }
 </style>

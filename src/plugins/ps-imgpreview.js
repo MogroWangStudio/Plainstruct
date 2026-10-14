@@ -32,9 +32,48 @@
   var overlay, img;
   var sourceImg = null; // 打开时的源图(隐藏,关闭时恢复)
   var opened = false;
+  var closing = false; // 关闭归位动画进行中:任何缩放/手势操作失效
   var reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   var pixel = false; // 本次预览的渲染方式:false = 抗锯齿(默认),true = 像素(点对点)
   var pixelCanvas = null; // 像素渲染画布:视口大小,最近邻采样,替代被隐藏的 <img>
+
+  /* ---------- 行为配置:构建产物经 script data 属性,内联预览经 window.__psImgCfg ---------- */
+  // sharpDelay:放大静止后自动刷新分辨率的延迟(ms),0 = 关闭,缺省 500
+  // closeDur/closeEase:关闭归位动画时长与曲线;closePreset 预设覆盖两者(自定义除外)
+  var cfg = { sharpDelay: 500, closeDur: 580, closeEase: "平滑", closePreset: "标准" };
+  (function () {
+    var me = document.currentScript;
+    if (me) {
+      var v = parseInt(me.getAttribute("data-sharp-delay") || "", 10);
+      if (Number.isFinite(v) && v >= 0) cfg.sharpDelay = v;
+      var d = parseInt(me.getAttribute("data-close-dur") || "", 10);
+      if (Number.isFinite(d) && d >= 240) cfg.closeDur = d;
+      var e = me.getAttribute("data-close-ease");
+      if (e) cfg.closeEase = e;
+    }
+    var inline = window.__psImgCfg || {};
+    if (typeof inline.mark === "string") window.__psImgRequireMark = inline.mark;
+    var is = Number(inline.sharpDelay);
+    if (Number.isFinite(is) && is >= 0) cfg.sharpDelay = is;
+    var id = Number(inline.closeDur);
+    if (Number.isFinite(id) && id >= 240) cfg.closeDur = id;
+    if (inline.closeEase) cfg.closeEase = inline.closeEase;
+    if (inline.closePreset) cfg.closePreset = inline.closePreset;
+  })();
+  // 预设档位:非「自定义」时覆盖时长与曲线
+  var CLOSE_PRESETS = {
+    标准: { dur: 580, ease: "平滑" },
+    轻快: { dur: 380, ease: "缓出" },
+    柔和: { dur: 860, ease: "平滑" },
+    回弹: { dur: 680, ease: "弹性" },
+  };
+  var closeAnim = CLOSE_PRESETS[cfg.closePreset] || { dur: cfg.closeDur, ease: cfg.closeEase };
+  var CLOSE_EASES = {
+    平滑: [0.32, 0.72, 0, 1],
+    缓出: [0.16, 1, 0.3, 1],
+    线性: [0, 0, 1, 1],
+    弹性: [0.34, 1.36, 0.64, 1],
+  };
 
   var ICON = {
     minus: '<path d="M5 12h14"/>',
@@ -114,7 +153,7 @@
   function apply() {
     img.style.transform =
       "translate(-50%,-50%) translate(" + st.tx + "px," + st.ty + "px) scale(" + st.scale + ") rotate(" + st.rot + "deg)";
-    if (scaleBtn) scaleBtn.textContent = Math.round(st.scale * 100) + "%";
+    if (scaleBtn) scaleBtn.textContent = Math.round(st.scale * bakedScale * 100) + "%";
     if (pixel && pixelCanvas) {
       // 像素渲染重绘合帧:指针事件流一帧多次触发只绘一次 —— 移动端拖拽/捏合帧率的主要保障
       pixelDirty = true;
@@ -123,6 +162,62 @@
   }
 
   var applyRaf = 0; // 拖拽/捏合的变换写入合帧句柄
+
+  /* ---------- 分辨率刷新(抗锯齿模式):缩放静止后把视觉尺寸烘进布局尺寸 ----------
+   *  transform 缩放由合成器以初始栅格拉伸,放大后发虚;布局尺寸变化会触发
+   *  全分辨率的重新栅格化。烘焙后 transform 缩放归一(st.scale=1),视觉不变;
+   *  下次缩放手势开始时先解除烘焙回到原语义,全部缩放数学保持不变。 */
+  var bakedScale = 1; // 已烘进布局尺寸的累计缩放
+  var sharpTimer = 0;
+
+  function bakeNow() {
+    if (sharpTimer) {
+      window.clearTimeout(sharpTimer);
+      sharpTimer = 0;
+    }
+    if (pixel || !opened || closing || reduced || st.scale <= 1.001) return;
+    var w = img.offsetWidth;
+    var h = img.offsetHeight;
+    img.style.maxWidth = "none";
+    img.style.maxHeight = "none";
+    img.style.width = w * st.scale + "px";
+    img.style.height = h * st.scale + "px";
+    bakedScale *= st.scale;
+    st.scale = 1;
+    // 布局尺寸变化与 transform 归一同帧无过渡完成,视觉无跳变
+    setMode("ps-lb-dragging");
+    apply();
+    requestAnimationFrame(function () {
+      if (opened && !pixel) setMode("ps-lb-spring");
+    });
+  }
+
+  /** 缩放静止 sharpDelay 毫秒后刷新分辨率(0 = 关闭;像素模式/减弱动态不适用) */
+  function scheduleBake() {
+    if (!cfg.sharpDelay || pixel || reduced) return;
+    if (sharpTimer) window.clearTimeout(sharpTimer);
+    sharpTimer = window.setTimeout(function () {
+      sharpTimer = 0;
+      bakeNow();
+    }, cfg.sharpDelay);
+  }
+
+  /** 解除烘焙:恢复布局尺寸并把累计倍率还给 st.scale(视觉不变,缩放数学回到原语义) */
+  function unbakeNow() {
+    if (sharpTimer) {
+      window.clearTimeout(sharpTimer);
+      sharpTimer = 0;
+    }
+    if (bakedScale === 1) return;
+    img.style.maxWidth = "";
+    img.style.maxHeight = "";
+    img.style.width = "";
+    img.style.height = "";
+    st.scale = bakedScale;
+    bakedScale = 1;
+    setMode("ps-lb-dragging");
+    apply();
+  }
 
   /** 手势路径:把变换写入合并到每一帧一次 —— 抗锯齿与像素两模式共用同一手势管线,
    *  移动端 pointermove 一帧多次不再重复写样式;进出场/复位等需同步布局的路径仍走 apply() */
@@ -313,6 +408,7 @@
 
   /** 缩放按钮/双击/键盘缩放:像素模式走补间(手感与抗锯齿一致),其余即时应用 */
   function zoomAnimated(px, py, next) {
+    unbakeNow(); // 新缩放手势从原语义开始(视觉连续),静止后重新烘焙
     if (pixel && !reduced) {
       setMode(null); // img 已隐,CSS 过渡无对象 —— 动画由画布补间承担
       animatePixel(zoomTarget(px, py, next), 380, EASE_SPRING);
@@ -320,6 +416,7 @@
       setMode("ps-lb-spring");
       zoomAt(px, py, next);
     }
+    scheduleBake();
   }
 
   function setMode(cls) {
@@ -329,8 +426,13 @@
 
   /* ---------- 打开/关闭 ---------- */
   function open(im) {
-    if (opened) return;
+    if (opened || closing) return;
     opened = true;
+    bakedScale = 1; // 新预览从原始布局尺寸开始(上一次的烘焙随关窗重置)
+    if (sharpTimer) {
+      window.clearTimeout(sharpTimer);
+      sharpTimer = 0;
+    }
     sourceImg = im;
     im.style.visibility = "hidden";
 
@@ -379,7 +481,8 @@
           return;
         }
         // FLIP:先无过渡摆到源图的位置与尺寸(基尺寸用布局值,避免测到过渡中间帧),
-        // 强制回流让起点生效,再切长曲线迁移到居中适配位
+        // 强制回流让起点生效,再切长曲线迁移到居中适配位。
+        // 布局尺寸从源图尺寸开始,与「烘焙后 st.scale=1」的语义一致
         setMode("ps-lb-dragging");
         st.scale = 1;
         st.tx = 0;
@@ -417,6 +520,7 @@
   function close() {
     if (!opened) return;
     opened = false;
+    closing = true; // 归位动画期间禁止一切缩放/手势操作(含重新打开)
     pixel = false;
     if (applyRaf) {
       cancelAnimationFrame(applyRaf);
@@ -426,9 +530,12 @@
     img.style.opacity = "";
     pointers.clear();
     drag = null;
+    overlay.style.pointerEvents = "none"; // 遮罩与工具条一并失去命中,手势从源头失效
     document.removeEventListener("keydown", onKey, true);
     var done = function () {
       overlay.remove();
+      closing = false;
+      bakedScale = 1;
       document.documentElement.style.overflow = "";
       for (var i = 0; i < lockedScroll.length; i++) {
         lockedScroll[i].el.style.overflow = "";
@@ -443,7 +550,15 @@
     if (visible) {
       // 空间一致:沿来路返回源图位置。基尺寸取 offsetWidth(布局尺寸,不受当前
       // transform 影响;getBoundingClientRect 会带上 scale 导致二次缩放跳变),
-      // 旋转在返回途中收正到最近的整圈,落地时与源图朝向一致
+      // 旋转在返回途中收正到最近的整圈,落地时与源图朝向一致。
+      // 归位动画时长与曲线来自插件配置(预设覆盖,自定义用时长+曲线)
+      var closeDur = reduced ? 200 : closeAnim.dur;
+      var bez = CLOSE_EASES[closeAnim.ease] || CLOSE_EASES["平滑"];
+      var cubic = "cubic-bezier(" + bez.join(",") + ")";
+      img.style.transition =
+        "transform " + closeDur + "ms " + cubic +
+        ", box-shadow " + closeDur + "ms " + cubic +
+        ", opacity 0.28s ease";
       setMode(null);
       var baseW = img.offsetWidth || 1;
       var baseH = img.offsetHeight || 1;
@@ -451,10 +566,10 @@
       st.tx = back.left + back.width / 2 - window.innerWidth / 2;
       st.ty = back.top + back.height / 2 - window.innerHeight / 2;
       st.rot = Math.round(st.rot / 360) * 360;
-      // 阴影随归位逐渐淡去(过渡由 CSS 同曲线接管),落地时与页面融为一体
+      // 阴影随归位逐渐淡去(过渡由上方内联曲线接管),落地时与页面融为一体
       img.style.boxShadow = "none";
       apply();
-      window.setTimeout(done, 580);
+      window.setTimeout(done, closeDur + 120);
     } else {
       done();
     }
@@ -517,6 +632,7 @@
       zoomAnimated(window.innerWidth / 2, window.innerHeight / 2, st.scale / 1.5);
     });
     scaleBtn = btn("", T.reset, function () {
+      unbakeNow(); // 复位 = 解除烘焙回到原始布局尺寸 + 100%
       if (pixel && !reduced) {
         setMode(null);
         animatePixel({ scale: 1, tx: 0, ty: 0 }, 550, EASE_LONG);
@@ -535,23 +651,28 @@
     var sep1 = document.createElement("span");
     sep1.className = "ps-lb-sep";
     var rot = btn(ICON.rotate, T.rotate, function () {
+      // 从最近的 90° 整数倍起算:补间被打断(拖拽接管)时会留下小数角度,
+      // 直接 +90 会累积出非 90° 倍数的朝向 —— 取整后再加,任何路径都落在正交角度
+      var base = Math.round(st.rot / 90) * 90;
       if (pixel && !reduced) {
         // 像素模式:旋转也走补间,收正过渡与缩放同一曲线
         setMode(null);
-        animatePixel({ scale: st.scale, tx: st.tx, ty: st.ty, rot: st.rot + 90 }, 380, EASE_SPRING);
+        animatePixel({ scale: st.scale, tx: st.tx, ty: st.ty, rot: base + 90 }, 380, EASE_SPRING);
       } else {
         setMode("ps-lb-spring");
-        st.rot += 90; // 累积角度:取模会让 270°→0° 沿原路倒转一大圈
+        st.rot = base + 90; // 累积角度:取模会让 270°→0° 沿原路倒转一大圈
         apply();
       }
     });
     // 渲染方式:像素放大(点对点,关闭插值,像素网格清晰)与抗锯齿放大(默认)切换
     var pixelBtn = btn(ICON.pixel, T.pixelOff, function () {
+      if (closing) return;
       pixel = !pixel;
       pixelBtn.classList.toggle("is-active", pixel);
       pixelBtn.title = pixel ? T.pixelOn : T.pixelOff;
       pixelBtn.setAttribute("aria-pressed", String(pixel));
       if (pixel) {
+        unbakeNow(); // 像素画布按 st.scale + 原图尺寸绘制,先解除烘焙回到原语义
         // 像素模式:淡出 <img>,由最近邻 canvas 呈现,彻底关闭抗锯齿。
         // 用 opacity 而非 visibility —— img 仍接收指针事件,拖拽/捏合/双击与
         // 抗锯齿模式完全同路(visibility 会把事件落到遮罩上,按下即触发关闭)
@@ -563,6 +684,7 @@
         unmountPixelCanvas();
         setMode("ps-lb-spring");
         apply();
+        scheduleBake();
       }
     });
     pixelBtn.setAttribute("aria-pressed", "false");
@@ -598,10 +720,13 @@
   /* ---------- 手势:滚轮 / 拖拽 / 双指 / 双击 ---------- */
   function onWheel(e) {
     e.preventDefault();
+    if (closing) return;
     cancelPixelAnim();
+    unbakeNow(); // 滚轮缩放从原语义开始,静止后重新烘焙
     setMode("ps-lb-spring");
     var k = Math.exp(-e.deltaY * (e.deltaMode === 1 ? 0.05 : 0.0016));
     zoomAt(e.clientX, e.clientY, st.scale * k);
+    scheduleBake();
   }
 
   var pointers = new Map();
@@ -611,6 +736,7 @@
   function onDown(e) {
     // 工具条上的按下完全豁免:不登记指针、不捕获 —— 按钮的 pointer 事件
     // 保持原生路径,click 正常派发(此前立即捕获把点击重定向到了遮罩,按钮全部失效)
+    if (closing) return;
     if (e.target.closest && e.target.closest(".ps-lb-bar")) return;
     cancelPixelAnim(); // 拖拽/捏合随时打断补间,从当前值接管(可打断)
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -633,6 +759,7 @@
       overlay.addEventListener("pointercancel", onUp);
     } else if (pointers.size === 2 && drag) {
       var pts = [...pointers.values()];
+      unbakeNow(); // 双指捏合从原语义开始,松手静止后重新烘焙
       drag.pinch0 = st.scale;
       drag.pinchDist0 = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
     }
@@ -654,7 +781,10 @@
       drag.st0 = { scale: st.scale, tx: st.tx, ty: st.ty };
       drag.baseX = mid.x;
       drag.baseY = mid.y;
-      if (prev !== st.scale) drag.moved = true;
+      if (prev !== st.scale) {
+        drag.moved = true;
+        scheduleBake(); // 捏合缩放静止后刷新分辨率
+      }
     } else {
       var dx = e.clientX - drag.baseX;
       var dy = e.clientY - drag.baseY;
@@ -703,6 +833,7 @@
       if (d.downTarget === img) {
         var now2 = e.timeStamp;
         if (now2 - lastTap < 320) {
+          unbakeNow(); // 双击切换倍率从原语义开始
           if (pixel && !reduced) {
             // 像素渲染:双击动画与抗锯齿一致(250%),由画布补间承担过渡
             setMode(null);
@@ -726,6 +857,7 @@
             st.scale = target;
           }
           apply();
+          scheduleBake();
           lastTap = 0;
           return;
         }
@@ -767,6 +899,7 @@
 
   /* ---------- 键盘 ---------- */
   function onKey(e) {
+    if (closing) return;
     if (e.key === "Escape") {
       e.preventDefault();
       close();
@@ -775,6 +908,7 @@
     } else if (e.key === "-" || e.key === "_") {
       zoomAnimated(window.innerWidth / 2, window.innerHeight / 2, st.scale / 1.4);
     } else if (e.key === "0") {
+      unbakeNow();
       if (pixel && !reduced) {
         setMode(null);
         animatePixel({ scale: 1, tx: 0, ty: 0 }, 550, EASE_LONG);
@@ -786,12 +920,13 @@
         apply();
       }
     } else if (e.key === "r" || e.key === "R") {
+      var baseR = Math.round(st.rot / 90) * 90;
       if (pixel && !reduced) {
         setMode(null);
-        animatePixel({ scale: st.scale, tx: st.tx, ty: st.ty, rot: st.rot + 90 }, 380, EASE_SPRING);
+        animatePixel({ scale: st.scale, tx: st.tx, ty: st.ty, rot: baseR + 90 }, 380, EASE_SPRING);
       } else {
         setMode("ps-lb-spring");
-        st.rot += 90; // 累积角度:取模会让 270°→0° 沿原路倒转一大圈
+        st.rot = baseR + 90;
         apply();
       }
     } else if (e.key.startsWith("Arrow")) {
@@ -812,6 +947,7 @@
   document.addEventListener(
     "click",
     function (e) {
+      if (closing) return; // 归位动画期间不重新进入预览
       if (!zoomable(e.target)) return;
       e.preventDefault();
       open(e.target);

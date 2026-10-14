@@ -386,7 +386,7 @@ const fmTarget = ref("");
 const fmBlogHome = ref(false);
 /** 是否显示「页面目录」开关:博客站点的任意文档页 */
 const fmBlogSite = ref(false);
-const fmInitial = reactive<FrontMatterForm>({ title: "", description: "", date: "", cover: "", author: "", aigc: "", hidden: false, toc: "", homeGroups: false, homeShowUncategorized: true, homeUncategorizedLabel: "" });
+const fmInitial = reactive<FrontMatterForm>({ title: "", description: "", date: "", cover: "", author: "", aigc: "", hidden: false, toc: "", tags: "", homeGroups: false, homeShowUncategorized: true, homeUncategorizedLabel: "" });
 
 /** 打开配置头表单:当前打开的文档取编辑器内容(含未保存修改),其余读磁盘版本 */
 async function openFmEditor(node: TreeNode) {
@@ -404,6 +404,7 @@ async function openFmEditor(node: TreeNode) {
   fmInitial.aigc = parsed.data.aigc ?? "";
   fmInitial.hidden = parsed.data.hidden === true;
   fmInitial.toc = parsed.data.toc === true ? "on" : parsed.data.toc === false ? "off" : "";
+  fmInitial.tags = (parsed.data.tags ?? []).join(", ");
   // 主页配置区:未分类缺省显示,标题空 = 缺省「未分类」
   const isHomeDoc = (site.config?.siteType ?? "docs") === "blog" && node.path.toLowerCase() === "index.md";
   fmBlogHome.value = isHomeDoc;
@@ -414,16 +415,21 @@ async function openFmEditor(node: TreeNode) {
   fmOpen.value = true;
 }
 
-/** 确认后写回文档:当前打开的文档经编辑器统一保存路径,其余直接落盘 */
+/** 确认后写回文档:当前打开的文档经编辑器统一保存路径,其余直接落盘。
+ *  标签去空去重后逗号连接(与编辑器内配置头编辑同一归一化) */
 async function onFmConfirm(form: FrontMatterForm) {
   fmOpen.value = false;
   const path = fmTarget.value;
+  const tagList = form.tags
+    .split(/[,，、]/)
+    .map((s) => s.trim())
+    .filter(Boolean);
   try {
     const base =
       editor.activePath === path
         ? editor.content
         : ((await ipc.readDocs([path]))[0] ?? "");
-    const next = applyFrontMatter(base, form);
+    const next = applyFrontMatter(base, { ...form, tags: tagList.join(", ") });
     if (next === base) return;
     if (editor.activePath === path) {
       editor.externalReplace = true;
@@ -831,10 +837,10 @@ async function onTreeDrop(e: DragEvent) {
         <span class="min-w-0 flex-1 truncate text-[calc(13px*var(--ui-font-scale))]" :class="homeActive ? 'font-medium' : ''">
           {{ t("tree.home") }}
         </span>
-        <!-- 主页快捷按钮:编辑配置头(主页 index.md 缺失时无从编辑,不显示) -->
+        <!-- 主页快捷按钮:编辑配置头(悬浮浮出,下方带渐变遮罩,不占行宽) -->
         <button
           v-if="homeNode && !selectMode"
-          class="btn-icon !h-6 !w-6 shrink-0 opacity-0"
+          class="btn-icon home-row-fm !h-6 !w-6"
           :title="t('tree.fmEdit')"
           tabindex="-1"
           @click.stop="homeNode && openFmEditor(homeNode)"
@@ -1078,9 +1084,49 @@ async function onTreeDrop(e: DragEvent) {
   color: var(--color-ink-3);
   opacity: 0.75;
 }
-/* 主页行的悬停快捷按钮(编辑配置头):与树行按钮同款悬停浮现 */
-.home-row:hover .btn-icon.opacity-0 {
+/* 主页行的悬停快捷按钮(编辑配置头):与树行按钮同款悬浮遮罩 */
+.home-row {
+  position: relative;
+}
+.home-row::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 44px;
+  border-radius: inherit;
+  background: linear-gradient(to right, transparent, var(--row-bg, var(--color-surface)));
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--duration-base) var(--ease-plain);
+}
+.home-row:hover {
+  --row-bg: var(--color-surface-2);
+}
+.home-row.active {
+  --row-bg: var(--color-surface-3);
+}
+.home-row:hover::after {
   opacity: 1;
+}
+.home-row-fm {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  bottom: 3px;
+  z-index: 2;
+  opacity: 0;
+  transition: opacity var(--duration-base) var(--ease-plain);
+}
+.home-row:hover .home-row-fm {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-row::after,
+  .home-row-fm {
+    transition: none;
+  }
 }
 
 /* 多选模式按钮激活态:实心墨底 */

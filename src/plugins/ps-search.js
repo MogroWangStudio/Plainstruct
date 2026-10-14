@@ -21,6 +21,7 @@
     noResult: zh ? "没有找到相关内容" : "No results",
     unavailable: zh ? "搜索索引不可用" : "Search index unavailable",
     openAria: zh ? "搜索" : "Search",
+    demoHint: zh ? "搜索入口预览:前往「构建」查看完整站点内容" : "Search entry preview: open Build to view the full site",
   };
 
   /* ---------- 明暗跟随站点:按 body 背景亮度判定(透明背景不判定) ---------- */
@@ -121,6 +122,25 @@
       document.body.appendChild(entry);
     }
     requestAnimationFrame(function () { entry.classList.add("ps-ready"); });
+  }
+
+  /* ---------- 演示预览(内容页/主题页):入口仅展示,点击提示前往构建 ---------- */
+  var demo = window.__psSearchDemo === true;
+  var demoToastTimer = 0;
+  function demoToast() {
+    var tip = document.getElementById("ps-search-demo-tip");
+    if (!tip) {
+      tip = document.createElement("div");
+      tip.id = "ps-search-demo-tip";
+      tip.setAttribute("role", "status");
+      document.body.appendChild(tip);
+    }
+    tip.textContent = T.demoHint;
+    tip.classList.add("is-show");
+    if (demoToastTimer) window.clearTimeout(demoToastTimer);
+    demoToastTimer = window.setTimeout(function () {
+      tip.classList.remove("is-show");
+    }, 2200);
   }
 
   function build() {
@@ -301,6 +321,11 @@
 
   /* ---------- 开合 ---------- */
   function show(prefill) {
+    // 演示预览:不展开结果面板,轻提示前往构建查看完整站点
+    if (demo) {
+      demoToast();
+      return;
+    }
     if (open) {
       // 已开着面板时携带新词(入口搜索框回车再次提交):直接以新词重查
       if (typeof prefill === "string") {

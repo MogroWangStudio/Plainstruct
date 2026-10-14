@@ -24,6 +24,8 @@ export interface FrontMatterForm {
   hidden: boolean;
   /** 页面目录(博客文章页):"" = 跟随主题设置,on = 强制显示,off = 强制隐藏 */
   toc: "" | "on" | "off";
+  /** 文章标签(逗号分隔);空 = 无标签(仅博客文章) */
+  tags: string;
   /** 博客主页专属:卡片流按分类分组(仅主页配置区展示) */
   homeGroups: boolean;
   /** 博客主页专属:分组时显示「未分类」组;缺省(勾选)= 显示 */
@@ -53,7 +55,7 @@ const { t } = useI18n();
 const site = useSiteStore();
 const ui = useUiStore();
 
-const form = reactive<FrontMatterForm>({ title: "", description: "", date: "", cover: "", author: "", aigc: "", hidden: false, toc: "", homeGroups: false, homeShowUncategorized: true, homeUncategorizedLabel: "" });
+const form = reactive<FrontMatterForm>({ title: "", description: "", date: "", cover: "", author: "", aigc: "", hidden: false, toc: "", tags: "", homeGroups: false, homeShowUncategorized: true, homeUncategorizedLabel: "" });
 
 /** AIGC 声明三档;选「不显示」时写回不落字段 */
 const aigcOptions = computed(() => [
@@ -155,6 +157,12 @@ async function importCover() {
         </label>
         <p class="opt-hint">{{ t("editor.fmTocHint") }}</p>
       </template>
+      <!-- 文章标签(仅博客站点的文章):逗号分隔,卡片流药丸展示 -->
+      <label v-if="blogSite" class="flex flex-col gap-1">
+        <span class="field-label">{{ t("editor.fmTags") }}</span>
+        <input v-model="form.tags" class="input" type="text" :placeholder="t('editor.fmTagsPlaceholder')" />
+        <p class="opt-hint">{{ t("editor.fmTagsHint") }}</p>
+      </label>
       <label class="flex flex-col gap-1">
         <span class="field-label">{{ t("editor.fmCover") }}</span>
         <div class="flex gap-2">

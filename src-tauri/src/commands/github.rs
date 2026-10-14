@@ -31,6 +31,12 @@ pub struct GithubConfig {
     /// 自定义域名(发布页设置):非空时发布自动写入 CNAME;留空则保留云端现有域名
     #[serde(default)]
     pub custom_domain: String,
+    /// 代理模式:"none" = 不使用代理,"system" = 跟随系统/环境变量(缺省),"custom" = 使用 proxy_url
+    #[serde(default = "default_proxy_mode")]
+    pub proxy_mode: String,
+    /// 自定义代理地址(如 http://127.0.0.1:7890 或 socks5://127.0.0.1:7890),仅 proxy_mode=custom 时生效
+    #[serde(default)]
+    pub proxy_url: String,
 }
 
 fn default_branch() -> String {
@@ -41,7 +47,41 @@ fn default_account_type() -> String {
     "user".into()
 }
 
+fn default_proxy_mode() -> String {
+    "system".into()
+}
+
 impl GithubConfig {
+    /// 为本次发布/验证构建 HTTP 客户端:按代理配置应用代理。
+    /// 缺省跟随系统环境变量(reqwest 默认行为);custom 时解析用户填写的代理地址。
+    fn http_client(&self) -> Result<reqwest::Client, String> {
+        let mut builder = reqwest::Client::builder()
+            .user_agent("Plainstruct")
+            .connect_timeout(std::time::Duration::from_secs(10))
+            .timeout(std::time::Duration::from_secs(120));
+        match self.proxy_mode.as_str() {
+            "none" => builder = builder.no_proxy(),
+            "custom" => {
+                let url = self.proxy_url.trim();
+                if url.is_empty() {
+                    return Err("已选择自定义代理，但代理地址为空。".into());
+                }
+                let proxy = reqwest::Proxy::all(url).map_err(|e| {
+                    format!(
+                        "代理地址无效:「{url}」({e})。可用 http:// 或 socks5:// 开头的地址，如 http://127.0.0.1:7890。"
+                    )
+                })?;
+                builder = builder.proxy(proxy);
+            }
+            _ => {
+                // system:保持 reqwest 默认(读取 HTTP_PROXY/HTTPS_PROXY 等环境变量)
+            }
+        }
+        builder
+            .build()
+            .map_err(|e| format!("网络客户端创建失败: {e}"))
+    }
+
     /// 是否组织账户(空值/未知值一律按个人处理,兼容旧配置)
     fn is_org(&self) -> bool {
         self.account_type.eq_ignore_ascii_case("org")
@@ -256,9 +296,9 @@ pub fn github_save_config(window: tauri::WebviewWindow, state: State<'_, AppStat
 }
 
 #[tauri::command]
-pub async fn github_verify(window: tauri::WebviewWindow, state: State<'_, AppState>, cfg: GithubConfig) -> Result<VerifyResult, String> {
+pub async fn github_verify(window: tauri::WebviewWindow, _state: State<'_, AppState>, cfg: GithubConfig) -> Result<VerifyResult, String> {
     ensure_main(&window)?;
-    let http = state.http.clone();
+    let http = cfg.http_client()?;
     if cfg.token.is_empty() {
         return Ok(VerifyResult::failed("invalid-token"));
     }
@@ -394,7 +434,7 @@ pub async fn github_preflight(
     // 云端外部更新:分支存在且其最新提交与本站点上次发布的记录不一致
     let mut remote_dirty = false;
     if !cfg.owner.is_empty() && !cfg.repo.is_empty() && !cfg.branch.trim().is_empty() {
-        let http = state.http.clone();
+        let http = cfg.http_client()?;
         let ref_url = repo_api(&cfg, &format!("/git/ref/heads/{}", cfg.branch.replace('/', "%2F")));
         let (ref_status, ref_body) = request(&http, reqwest::Method::GET, &ref_url, &cfg.token, None).await?;
         if ref_status == 200 {
@@ -420,12 +460,12 @@ pub async fn github_preflight(
 #[tauri::command]
 pub async fn github_pages_status(
     window: tauri::WebviewWindow,
-    state: State<'_, AppState>,
+    _state: State<'_, AppState>,
     cfg: GithubConfig,
     commit: String,
 ) -> Result<PagesStatus, String> {
     ensure_main(&window)?;
-    let http = state.http.clone();
+    let http = cfg.http_client()?;
     let (status, body) = request(
         &http,
         reqwest::Method::GET,
@@ -489,7 +529,7 @@ async fn github_sync_inner(app: &AppHandle, state: &AppState, cfg: GithubConfig)
     if files.is_empty() {
         return Err("构建目录为空,请先构建站点".into());
     }
-    let http = state.http.clone();
+    let http = cfg.http_client()?;
     let total = files.len() as u32;
     emit_log(app, "info", format!("准备发布:共 {total} 个文件"));
 

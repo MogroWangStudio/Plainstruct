@@ -3,4 +3,5 @@
   {{#if this.date}}<time class="blog-entry-date">{{this.date}}</time>{{/if}}
   <h2 class="blog-entry-title"><a href="{{this.url}}">{{this.title}}</a></h2>
   {{#if this.description}}<p class="blog-entry-desc">{{this.description}}</p>{{/if}}
+  {{#if this.tags}}<div class="blog-entry-tags" role="list" aria-label="文章标签">{{#each this.tags}}<span class="blog-entry-tag" role="listitem" data-tag="{{this.name}}"{{#if this.color}} style="--tag-c: {{this.color}}"{{/if}}>{{this.name}}</span>{{/each}}</div>{{/if}}
 </article>

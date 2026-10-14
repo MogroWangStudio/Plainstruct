@@ -396,6 +396,11 @@ export const useSiteStore = defineStore("site", {
       searchBarWidth?: number;
       /** 移动端搜索栏宽度(px),缺省沿用 PC 配置 */
       searchBarWidthM?: number;
+      /** 图片预览:分辨率刷新延迟(ms)与关闭归位动画(时长/曲线/预设) */
+      imgPreviewSharpDelay?: number;
+      imgPreviewCloseDur?: number;
+      imgPreviewCloseEase?: string;
+      imgPreviewClosePreset?: string;
       custom?: SitePluginEntry[];
     }) {
       if (!this.config) return;
@@ -413,6 +418,10 @@ export const useSiteStore = defineStore("site", {
           // 搜索栏宽度:缺省 undefined(用样式默认值),仅在配置过时落盘;移动端缺省沿用 PC
           searchBarWidth: patch.searchBarWidth ?? current.searchBarWidth,
           searchBarWidthM: patch.searchBarWidthM ?? current.searchBarWidthM,
+          imgPreviewSharpDelay: patch.imgPreviewSharpDelay ?? current.imgPreviewSharpDelay,
+          imgPreviewCloseDur: patch.imgPreviewCloseDur ?? current.imgPreviewCloseDur,
+          imgPreviewCloseEase: patch.imgPreviewCloseEase ?? current.imgPreviewCloseEase,
+          imgPreviewClosePreset: patch.imgPreviewClosePreset ?? current.imgPreviewClosePreset,
           custom: patch.custom ?? current.custom,
         },
       });

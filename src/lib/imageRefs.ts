@@ -161,3 +161,18 @@ export function countImageRefs(
   }
   return counts;
 }
+
+/** 主题配置页脚友情链接的图标引用:每行「名称|链接|图标地址(可选)」,
+ *  图标按站点根(与根级文档同一相对规则)解析;命中返回 true */
+export function footerIconRef(
+  imagePath: string,
+  footerLinksRaw: string | number | boolean | undefined,
+): boolean {
+  return String(footerLinksRaw ?? "")
+    .split("\n")
+    .some((line) => {
+      const parts = line.split("|").map((s) => s.trim());
+      const icon = parts[2];
+      return !!icon && resolveRef("index.md", icon) === imagePath;
+    });
+}

@@ -11,7 +11,7 @@ import {
 } from "@/stores/app";
 import { useUiStore } from "@/stores/ui";
 import { ipc } from "@/ipc/ipc";
-import type { ConfettiLevel, EditorBreakKey, EditorFontMode, EditorIndentKey, Locale, ModalBackdropClose, UiFontMode } from "@/ipc/types";
+import type { ConfettiLevel, EditorBreakKey, EditorFontMode, EditorIndentKey, Locale, ModalBackdropClose, PublishNotifyMode, UiFontMode } from "@/ipc/types";
 import { APP_THEMES, type AppThemeSwatch } from "@/lib/app-themes";
 import { fireConfetti } from "@/lib/confetti";
 import { formatSize } from "@/lib/format";
@@ -145,6 +145,18 @@ const backdropCloseOptions = computed<{ value: ModalBackdropClose; label: string
 const backdropCloseModel = computed({
   get: () => app.settings.modalBackdropClose ?? "double",
   set: (v: ModalBackdropClose) => void app.setAppearance({ modalBackdropClose: v }),
+});
+
+/** 发布系统通知档位:两次(发布成功+Pages 构建成功)/合并一次/关闭 */
+const publishNotifyOptions = computed<{ value: PublishNotifyMode; label: string }[]>(() => [
+  { value: "twice", label: t("settings.notifyTwice") },
+  { value: "merged", label: t("settings.notifyMerged") },
+  { value: "off", label: t("settings.notifyOff") },
+]);
+
+const publishNotifyModel = computed({
+  get: () => app.settings.publishNotify ?? "twice",
+  set: (v: PublishNotifyMode) => void app.setEditorPrefs({ publishNotify: v }),
 });
 
 /* ---------- 界面字号/字重:预设选择框 + 自定义数值(范围输入) ---------- */
@@ -687,8 +699,17 @@ function openRelease(url: string) {
                   </div>
                 </div>
 
-                <!-- 弹窗背景模糊 -->
+                <!-- 发布系统通知:发布成功与 Pages 构建完成的系统级通知 -->
                 <div class="settings-row" style="--i: 7">
+                  <div class="min-w-0">
+                    <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.publishNotify") }}</p>
+                    <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.publishNotifyHint") }}</p>
+                  </div>
+                  <SelectMenu v-model="publishNotifyModel" :options="publishNotifyOptions" align="right" class="shrink-0" />
+                </div>
+
+                <!-- 弹窗背景模糊 -->
+                <div class="settings-row" style="--i: 8">
                   <div class="min-w-0">
                     <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.modalBlur") }}</p>
                     <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.modalBlurHint") }}</p>

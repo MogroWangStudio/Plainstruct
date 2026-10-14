@@ -42,7 +42,61 @@ const editorRef = ref<InstanceType<typeof MarkdownEditor>>();
 const previewRef = ref<InstanceType<typeof DocPreview>>();
 const splitHost = ref<HTMLElement>();
 const hostRef = ref<HTMLElement>();
-const ratio = ref(0.52);
+
+/* ---------- 布局记忆:分栏比例、文件树宽度与显示模式跨页面切换(乃至重启)保持 ---------- */
+
+const LAYOUT_KEY = "plainstruct.editorLayout";
+
+function readLayout(): { treeW: number; ratio: number; mode: EditorMode } {
+  try {
+    const raw = JSON.parse(localStorage.getItem(LAYOUT_KEY) ?? "") as Partial<{
+      treeW: number;
+      ratio: number;
+      mode: EditorMode;
+    }>;
+    const treeW = Number(raw.treeW);
+    const ratio = Number(raw.ratio);
+    return {
+      treeW: Number.isFinite(treeW) ? Math.min(360, Math.max(180, treeW)) : 240,
+      ratio: Number.isFinite(ratio) ? Math.min(0.8, Math.max(0.2, ratio)) : 0.52,
+      mode: raw.mode === "edit" || raw.mode === "preview" || raw.mode === "split" ? raw.mode : "split",
+    };
+  } catch {
+    return { treeW: 240, ratio: 0.52, mode: "split" };
+  }
+}
+
+const savedLayout = readLayout();
+const ratio = ref(savedLayout.ratio);
+const treeW = ref(savedLayout.treeW);
+editor.mode = savedLayout.mode;
+let layoutSaveTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** 防抖落盘:拖动分栏/树宽的过程中只写一次,避免高频 localStorage 写入 */
+function saveLayout() {
+  if (layoutSaveTimer) clearTimeout(layoutSaveTimer);
+  layoutSaveTimer = setTimeout(() => {
+    layoutSaveTimer = null;
+    try {
+      localStorage.setItem(
+        LAYOUT_KEY,
+        JSON.stringify({ treeW: treeW.value, ratio: ratio.value, mode: editor.mode }),
+      );
+    } catch {
+      /* 存储不可用时仅失去记忆 */
+    }
+  }, 200);
+}
+
+watch(ratio, saveLayout);
+watch(treeW, saveLayout);
+watch(
+  () => editor.mode,
+  () => {
+    saveLayout();
+  },
+);
+
 let syncing = false;
 
 const modes: { value: EditorMode; icon: string; label: string }[] = [
@@ -77,10 +131,8 @@ function onDividerUp() {
   splitDragging = false;
 }
 
-/* ---------- 文件树宽度可拖(右缘分隔线) ---------- */
+/* ---------- 文件树宽度可拖(右缘分隔线);宽度记忆见上方布局记忆段 ---------- */
 
-const treeW = ref(240);
-/** 拖动中标记:只有在本分隔线上按下后才跟踪移动,避免编辑器内拖动选字划过分隔线时误触 */
 let treeDragging = false;
 
 function onTreeDividerDown(e: PointerEvent) {

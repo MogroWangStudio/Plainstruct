@@ -425,6 +425,18 @@ a.blog-page-step:active {
   padding-left: 26px;
 }
 
+.blog-toc-item.is-l4 a {
+  padding-left: 38px;
+}
+
+.blog-toc-item.is-l5 a {
+  padding-left: 50px;
+}
+
+.blog-toc-item.is-l6 a {
+  padding-left: 62px;
+}
+
 .blog-toc-item a:hover {
   color: var(--ps-ink);
 }
@@ -1624,12 +1636,13 @@ body[data-hv-cover="淡化"] .blog-entry:hover .blog-entry-cover img {
 }
 
 body[data-entry="淡入"] .blog-entry {
-  animation: ps-entry-fade 480ms cubic-bezier(0.23, 1, 0.32, 1) both;
+  /* backwards 而非 both:动画结束后不再保持关键帧值,不覆盖悬停 transform */
+  animation: ps-entry-fade 480ms cubic-bezier(0.23, 1, 0.32, 1) backwards;
 }
 
 body[data-entry="上浮"] .blog-entry,
 body[data-entry="交错上浮"] .blog-entry {
-  animation: ps-entry-rise 520ms cubic-bezier(0.23, 1, 0.32, 1) both;
+  animation: ps-entry-rise 520ms cubic-bezier(0.23, 1, 0.32, 1) backwards;
 }
 
 /* 交错上浮:按卡片顺序依次浮现,8 张以后同拍到达 */

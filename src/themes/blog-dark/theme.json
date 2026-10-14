@@ -1092,6 +1092,14 @@
       "default": "",
       "category": "页脚",
       "hint": "逐条添加名称、链接与图标（图标可选）"
+    },
+    {
+      "key": "tagColors",
+      "label": "文章标签颜色",
+      "type": "textarea",
+      "default": "",
+      "category": "文章标签",
+      "hint": "为文章标签单独设置颜色，未设置的标签使用主题强调色"
     }
   ]
 }

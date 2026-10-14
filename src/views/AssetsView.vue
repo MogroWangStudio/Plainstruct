@@ -5,7 +5,7 @@ import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { collectDocPaths } from "@/lib/builder";
 import { formatSize } from "@/lib/format";
-import { moveImageRefs, countImageRefs, findImageRefs, replaceImageRefs, type ImageRef } from "@/lib/imageRefs";
+import { moveImageRefs, countImageRefs, findImageRefs, footerIconRef, replaceImageRefs, type ImageRef } from "@/lib/imageRefs";
 import { basename, dirname, ASSET_MIME, isImageFile, isImportableAsset } from "@/lib/paths";
 import { siteUrl } from "@/lib/preview";
 import { toCssPx } from "@/lib/scale";
@@ -471,6 +471,18 @@ function onDividerUp() {
 const selectedRefs = computed<ImageRef[]>(() =>
   onlyOne.value ? findImageRefs(onlyOne.value, Object.keys(docs.value), docs.value) : [],
 );
+
+/** 页脚引用:主题配置的友情链接图标引用了此图片(引用处在站点页脚,非文档) */
+const selectedFooterRef = computed(() =>
+  onlyOne.value
+    ? footerIconRef(onlyOne.value, site.config?.theme?.config?.footerLinks)
+    : false,
+);
+
+/** 前往主题页修改页脚友情链接 */
+function gotoTheme() {
+  app.setView("theme");
+}
 
 const selectedNode = computed(() => images.value.find((i) => i.path === onlyOne.value));
 const selectedNodeSize = computed(() => selectedNode.value?.size);
@@ -951,7 +963,13 @@ async function removeFolder(g: { dir: string; label: string; images: TreeNode[] 
             </button>
           </li>
         </ul>
-        <p v-else class="mt-1 text-[calc(12px*var(--ui-font-scale))] text-ink-3">{{ t("assets.noRefs") }}</p>
+        <!-- 页脚引用:主题配置的友情链接图标,引用处在站点页脚 -->
+        <button v-if="selectedFooterRef" class="ref-row" :title="t('assets.footerRefHint')" @click="gotoTheme">
+          <AppIcon name="globe" :size="13" />
+          <span class="min-w-0 flex-1 truncate text-left">{{ t("assets.footerRef") }}</span>
+          <AppIcon name="arrowRight" :size="12" class="shrink-0 text-ink-3" />
+        </button>
+        <p v-if="!selectedRefs.length && !selectedFooterRef" class="mt-1 text-[calc(12px*var(--ui-font-scale))] text-ink-3">{{ t("assets.noRefs") }}</p>
         </div>
         </div>
         </div>

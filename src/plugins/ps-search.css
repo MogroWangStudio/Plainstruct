@@ -1,4 +1,37 @@
 /* 素构 · 站内搜索插件样式 -- 毛玻璃面板 + 中性层次,强调色随主题 --ps-accent */
+/* ---------- 演示预览提示(内容页/主题页:点击入口后浮出) ---------- */
+#ps-search-demo-tip {
+  position: fixed;
+  left: 50%;
+  bottom: 86px;
+  z-index: 10001;
+  max-width: 86vw;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: rgba(40, 40, 43, 0.78);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  backdrop-filter: blur(14px) saturate(1.4);
+  color: rgba(240, 240, 244, 0.94);
+  font: 400 12.5px/1.5 system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  text-align: center;
+  opacity: 0;
+  transform: translate(-50%, 6px);
+  transition:
+    opacity 0.24s ease,
+    transform 0.24s cubic-bezier(0.32, 0.72, 0, 1);
+  pointer-events: none;
+}
+#ps-search-demo-tip.is-show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+@media (prefers-reduced-motion: reduce) {
+  #ps-search-demo-tip {
+    transition: opacity 0.2s ease;
+    transform: translate(-50%, 0);
+  }
+}
+
 /* ---------- 入口(按钮式 / 长条文本框式 × 右下 / 左下 / 顶栏) ---------- */
 .ps-search-entry {
   position: fixed;

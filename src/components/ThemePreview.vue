@@ -61,7 +61,7 @@ function apply() {
   currentPath = page;
   let html = "";
   try {
-    html = renderPreview(site.config, bundle, site.tree, site.docsCache, page, undefined, app.platform, site.pluginContents, app.settings.disableRefreshAnim ?? false);
+    html = renderPreview(site.config, bundle, site.tree, site.docsCache, page, undefined, app.platform, site.pluginContents, app.settings.disableRefreshAnim ?? false, true);
   } catch {
     html = "<p style='font:13px system-ui;padding:16px;color:var(--color-danger)'>模板渲染出错,请检查语法。</p>";
   }

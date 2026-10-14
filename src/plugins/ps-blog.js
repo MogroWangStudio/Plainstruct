@@ -165,13 +165,32 @@
   /* ---------- 顶栏滚动态 ---------- */
   var tb = doc.querySelector(".blog-topbar");
   if (tb) {
-    var syncBar = function () {
-      var at = parseInt(body.getAttribute("data-topbar-scroll-at") || "24", 10);
-      if (!isFinite(at) || at < 0) at = 24;
-      tb.classList.toggle("is-scrolled", (window.scrollY || doc.documentElement.scrollTop || 0) > at);
-    };
-    window.addEventListener("scroll", syncBar, { passive: true });
-    syncBar();
+    /* 顶栏变形(药丸/圆角矩形)单次触发:首次滚过阈值后永久保持变形态。
+       此前随滚动阈值反复切换,过渡在中间帧被重启动画,观感上卡在某一处;
+       单次触发后变形动画只播一次,不再重启。页面加载时已处于滚动位置
+       (浏览器恢复阅读位置/刷新)的话,直接无过渡落位,不重播变形 */
+    var at = parseInt(body.getAttribute("data-topbar-scroll-at") || "24", 10);
+    if (!isFinite(at) || at < 0) at = 24;
+    var y0 = window.scrollY || doc.documentElement.scrollTop || 0;
+    if (y0 > at) {
+      tb.style.transition = "none";
+      tb.classList.add("is-scrolled");
+      void tb.getBoundingClientRect();
+      requestAnimationFrame(function () {
+        tb.style.transition = "";
+      });
+    } else {
+      var tbMorphed = false;
+      var syncBar = function () {
+        if (tbMorphed) return;
+        if ((window.scrollY || doc.documentElement.scrollTop || 0) > at) {
+          tbMorphed = true;
+          tb.classList.add("is-scrolled");
+        }
+      };
+      window.addEventListener("scroll", syncBar, { passive: true });
+      syncBar();
+    }
   }
   /* 文档主题顶栏:同一套滚动态标记,下拉变形形态由主题配置(data-topbar-shape)驱动 */
   var ptb = doc.querySelector(".ps-topbar");
@@ -255,13 +274,59 @@
     }
     var filter = folder.querySelector(".blog-folder-filter");
     if (filter) {
-      filter.addEventListener("input", function () {
+      /* 标签筛选:从当前目录文章的标签汇总为药丸 chips,单选过滤;
+         与文本筛选同时生效(卡片需同时满足两个条件才显示) */
+      var stream = folder.querySelector('.blog-folder-pane[data-fpane="stream"] .blog-stream');
+      var activeTag = "";
+      var tagbar = doc.createElement("div");
+      tagbar.className = "blog-folder-tagbar";
+      filter.insertAdjacentElement("afterend", tagbar);
+      var applyFilters = function () {
         var q = filter.value.trim().toLowerCase();
         Array.prototype.forEach.call(folder.querySelectorAll('.blog-folder-pane[data-fpane="stream"] .blog-entry'), function (card) {
           var text = (card.textContent || "").toLowerCase();
-          card.classList.toggle("is-filtered", !!q && text.indexOf(q) === -1);
+          var byText = !!q && text.indexOf(q) === -1;
+          var names = " " + (card.getAttribute("data-tags") || "") + " ";
+          var byTag = !!activeTag && names.indexOf(" " + activeTag + " ") === -1;
+          card.classList.toggle("is-filtered", byText || byTag);
         });
-      });
+      };
+      if (stream) {
+        var tagCount = {};
+        var tagColorEl = {};
+        Array.prototype.forEach.call(stream.querySelectorAll(".blog-entry"), function (card) {
+          var names = [];
+          Array.prototype.forEach.call(card.querySelectorAll(".blog-entry-tag[data-tag]"), function (pill) {
+            var n = pill.getAttribute("data-tag");
+            if (!n) return;
+            names.push(n);
+            tagCount[n] = (tagCount[n] || 0) + 1;
+            if (!tagColorEl[n] && pill.style.getPropertyValue("--tag-c")) tagColorEl[n] = pill.style.getPropertyValue("--tag-c");
+          });
+          if (names.length) card.setAttribute("data-tags", names.join(" "));
+        });
+        var chips = [];
+        var makeChip = function (label, tag, color) {
+          var chip = doc.createElement("button");
+          chip.type = "button";
+          chip.className = "blog-folder-tagchip";
+          chip.textContent = label;
+          if (color) chip.style.setProperty("--tag-c", color);
+          chip.addEventListener("click", function () {
+            activeTag = activeTag === tag ? "" : tag;
+            Array.prototype.forEach.call(chips, function (c) {
+              c.classList.toggle("is-active", c === chip && !!activeTag);
+            });
+            applyFilters();
+          });
+          chips.push(chip);
+          return chip;
+        };
+        Object.keys(tagCount).forEach(function (n) {
+          tagbar.appendChild(makeChip(n, n, tagColorEl[n]));
+        });
+        filter.addEventListener("input", applyFilters);
+      }
 
       /* 排序:默认 / 更新日期 / 发布日期 / 标题,方向按钮切正倒序。
          排序在筛选之后仍成立(筛选是 class 状态,不随重排丢失) */

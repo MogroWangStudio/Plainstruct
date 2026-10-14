@@ -4,7 +4,7 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import type { ThemeField } from "@/ipc/types";
-import { BLOG_ARCHIVE_KEY, BLOG_ARCHIVE_TITLE, navMaxOf, topNavItems, type NavPickerItem } from "@/lib/builder";
+import { BLOG_ARCHIVE_KEY, BLOG_ARCHIVE_TITLE, buildMetas, collectDocPaths, navMaxOf, topNavItems, type NavPickerItem } from "@/lib/builder";
 import { normalizePlugins } from "@/lib/plugins";
 import { siteUrl } from "@/lib/preview";
 import { useAppStore } from "@/stores/app";
@@ -542,12 +542,16 @@ const plugins = computed(() =>
         search: true,
         imgPreview: true,
         imgPreviewRequireMark: "mws_ps_imgpreview",
-        searchStyle: "button",
-        searchPosition: "bottom-right",
+        searchStyle: "button" as const,
+        searchPosition: "bottom-right" as const,
         searchStyleM: undefined,
         searchPositionM: undefined,
         searchBarWidth: undefined,
         searchBarWidthM: undefined,
+        imgPreviewSharpDelay: undefined,
+        imgPreviewCloseDur: undefined,
+        imgPreviewCloseEase: undefined,
+        imgPreviewClosePreset: undefined,
         custom: [],
       },
 );
@@ -574,6 +578,76 @@ async function removePlugin(id: string, name: string) {
     confirmText: t("theme.pluginRemove"),
   });
   if (ok) await site.removePlugin(id);
+}
+
+/* ---------- 图片预览行为配置:归位动画预设(预设选中时自动带出时长与曲线) ---------- */
+
+const CLOSE_PRESET_VALUES: Record<string, { dur: number; ease: string }> = {
+  标准: { dur: 580, ease: "平滑" },
+  轻快: { dur: 380, ease: "缓出" },
+  柔和: { dur: 860, ease: "平滑" },
+  回弹: { dur: 680, ease: "弹性" },
+};
+
+function applyClosePreset(v: string) {
+  const hit = CLOSE_PRESET_VALUES[v];
+  if (hit) {
+    void site.savePlugins({
+      imgPreviewClosePreset: v,
+      imgPreviewCloseDur: hit.dur,
+      imgPreviewCloseEase: hit.ease,
+    });
+  } else {
+    void site.savePlugins({ imgPreviewClosePreset: "自定义" });
+  }
+}
+
+/** 手动改时长/曲线:预设自动转为「自定义」(所存时长与曲线始终生效) */
+function setCloseDur(v: number) {
+  void site.savePlugins({ imgPreviewCloseDur: v, imgPreviewClosePreset: "自定义" });
+}
+
+function setCloseEase(v: string) {
+  void site.savePlugins({ imgPreviewCloseEase: v, imgPreviewClosePreset: "自定义" });
+}
+
+/* ---------- 文章标签颜色(博客主题 tagColors 字段):标签汇总自全部文档配置头 ---------- */
+
+const knownTags = computed<string[]>(() => {
+  if (!site.config) return [];
+  try {
+    const metas = buildMetas(collectDocPaths(site.tree), site.docsCache);
+    const set = new Set<string>();
+    for (const m of metas.values()) for (const tag of m.tags ?? []) set.add(tag);
+    return [...set].sort((a, b) => a.localeCompare(b, "zh-Hans-CN"));
+  } catch {
+    return [];
+  }
+});
+
+function tagColorMapOfRaw(raw: string | number | boolean): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const line of String(raw ?? "").split("\n")) {
+    const i = line.indexOf("|");
+    if (i <= 0) continue;
+    const name = line.slice(0, i).trim();
+    const color = line.slice(i + 1).trim();
+    if (name && /^#[0-9a-fA-F]{3,8}$/.test(color)) map.set(name, color);
+  }
+  return map;
+}
+
+function tagRows(field: ThemeField): { name: string; color: string }[] {
+  const map = tagColorMapOfRaw(fieldValue(field));
+  return knownTags.value.map((name) => ({ name, color: map.get(name) ?? "" }));
+}
+
+/** 设置/清除一个标签的颜色(清除 = 回退主题强调色) */
+function setTagColor(field: ThemeField, name: string, color: string) {
+  const map = tagColorMapOfRaw(fieldValue(field));
+  if (color) map.set(name, color);
+  else map.delete(name);
+  onField(field, [...map.entries()].map(([n, c]) => `${n}|${c}`).join("\n"));
 }
 </script>
 
@@ -622,17 +696,21 @@ async function removePlugin(id: string, name: string) {
       <!-- 分组标题:面板顶部的分类按钮滚动到这里,跳转后短暂闪烁变色提示落点 -->
       <h3 v-if="group.id" :id="group.id" class="cat-head">{{ group.label }}</h3>
 
-      <!-- 站点插件分组:内置插件开关 + 用户导入的插件,站点级配置,对所有主题全局生效 -->
+      <!-- 站点插件分组:插件卡片(卡片始终在配置组的圆角矩形框内) + 导入入口 -->
       <template v-if="group.id === PLUGINS_ID">
-        <label class="flex cursor-pointer items-center gap-2">
+        <!-- 搜索插件卡片 -->
+        <section class="plugin-card">
+        <header class="plugin-card-head">
+          <span class="plugin-card-name">{{ t("theme.pluginSearch") }}</span>
           <input
             type="checkbox"
             class="checkbox-input"
             :checked="plugins.search"
+            :aria-label="t('theme.pluginSearch')"
             @change="setBuiltin('search', ($event.target as HTMLInputElement).checked)"
           />
-          <span class="text-[calc(13px*var(--ui-font-scale))] text-ink-2">{{ t("theme.pluginSearch") }}</span>
-        </label>
+        </header>
+        <div class="plugin-card-body">
         <p class="opt-hint">{{ t("theme.pluginSearchHint") }}</p>
 
         <label v-if="deviceMode === 'pc'" class="flex flex-col gap-1">
@@ -747,22 +825,29 @@ async function removePlugin(id: string, name: string) {
           <p class="opt-hint">{{ t("theme.pluginSearchBarWidthMHint") }}</p>
         </div>
 
-        <label class="flex cursor-pointer items-center gap-2">
+        </div>
+        </section>
+
+        <!-- 图片预览插件卡片 -->
+        <section class="plugin-card">
+        <header class="plugin-card-head">
+          <span class="plugin-card-name">{{ t("theme.pluginImgPreview") }}</span>
           <input
             type="checkbox"
             class="checkbox-input"
             :checked="plugins.imgPreview"
+            :aria-label="t('theme.pluginImgPreview')"
             @change="setBuiltin('imgPreview', ($event.target as HTMLInputElement).checked)"
           />
-          <span class="text-[calc(13px*var(--ui-font-scale))] text-ink-2">{{ t("theme.pluginImgPreview") }}</span>
-        </label>
+        </header>
+        <div class="plugin-card-body">
         <p class="opt-hint">{{ t("theme.pluginImgPreviewHint") }}</p>
 
         <!-- 图片预览的 class 标记模式:设置后仅带该 class 的图片可预览 -->
         <label class="flex flex-col gap-1">
           <span class="field-label">{{ t("theme.pluginImgPreviewMark") }}</span>
           <input
-            class="input !w-64"
+            class="input !w-64 max-w-full"
             type="text"
             :value="plugins.imgPreviewRequireMark"
             :placeholder="t('theme.pluginImgPreviewMarkPlaceholder')"
@@ -771,39 +856,111 @@ async function removePlugin(id: string, name: string) {
           <p class="opt-hint">{{ t("theme.pluginImgPreviewMarkHint") }}</p>
         </label>
 
-        <div class="flex flex-col gap-1 border-t border-line pt-3">
-          <template v-if="plugins.custom.length">
-            <div
-              v-for="entry in plugins.custom"
-              :key="entry.id"
-              class="plugin-row"
-              :title="entry.files.join('\n')"
+        <!-- 放大后自动刷新分辨率:缩放静止指定延迟后把视觉尺寸烘进布局尺寸,全分辨率重绘不再发虚 -->
+        <div class="flex flex-col gap-1">
+          <span class="field-label">{{ t("theme.pluginImgSharpDelay") }}</span>
+          <div class="flex items-center gap-3">
+            <input
+              type="range"
+              class="range-input min-w-0 flex-1"
+              min="0"
+              max="2000"
+              step="50"
+              :value="plugins.imgPreviewSharpDelay ?? 500"
+              @change="site.savePlugins({ imgPreviewSharpDelay: Number(($event.target as HTMLInputElement).value) })"
+            />
+            <span class="mono w-14 shrink-0 text-right text-[calc(12px*var(--ui-font-scale))] text-ink-2">
+              {{ (plugins.imgPreviewSharpDelay ?? 500) === 0 ? t("theme.pluginOff") : (plugins.imgPreviewSharpDelay ?? 500) + "ms" }}
+            </span>
+            <button
+              v-if="plugins.imgPreviewSharpDelay !== undefined"
+              type="button"
+              class="btn-icon h-6 w-6 shrink-0"
+              :title="t('theme.resetValue')"
+              @click="site.savePlugins({ imgPreviewSharpDelay: undefined })"
             >
-              <input
-                type="checkbox"
-                class="checkbox-input"
-                :checked="entry.enabled"
-                @change="site.setPluginEnabled(entry.id, ($event.target as HTMLInputElement).checked)"
-              />
-              <span class="min-w-0 flex-1 truncate text-[calc(13px*var(--ui-font-scale))] text-ink-2">{{ entry.name }}</span>
-              <span class="shrink-0 text-[calc(11px*var(--ui-font-scale))] text-ink-3">
-                {{ t("theme.pluginFileCount", { n: entry.files.length }) }}
-              </span>
-              <button type="button" class="btn-icon h-6 w-6 shrink-0" :title="t('theme.pluginRemove')" @click="removePlugin(entry.id, entry.name)">
-                <AppIcon name="trash" :size="12" />
-              </button>
-            </div>
-          </template>
-          <p v-else class="text-[calc(13px*var(--ui-font-scale))] text-ink-3">{{ t("theme.pluginEmpty") }}</p>
+              <AppIcon name="refresh" :size="12" />
+            </button>
+          </div>
+          <p class="opt-hint">{{ t("theme.pluginImgSharpDelayHint") }}</p>
         </div>
 
-        <div>
+        <!-- 关闭归位动画:预设带出时长与曲线,也可切「自定义」单独调 -->
+        <div class="flex flex-col gap-1">
+          <span class="field-label">{{ t("theme.pluginImgClosePreset") }}</span>
+          <SelectMenu
+            :model-value="plugins.imgPreviewClosePreset ?? '标准'"
+            :options="[
+              { value: '标准', label: t('theme.pluginImgClosePresetStd') },
+              { value: '轻快', label: t('theme.pluginImgClosePresetSwift') },
+              { value: '柔和', label: t('theme.pluginImgClosePresetSoft') },
+              { value: '回弹', label: t('theme.pluginImgClosePresetBounce') },
+              { value: '自定义', label: t('theme.pluginImgClosePresetCustom') },
+            ]"
+            align="left"
+            @update:model-value="applyClosePreset"
+          />
+        </div>
+        <div class="flex flex-col gap-1">
+          <span class="field-label">{{ t("theme.pluginImgCloseDur") }}</span>
+          <div class="flex items-center gap-3">
+            <input
+              type="range"
+              class="range-input min-w-0 flex-1"
+              min="240"
+              max="1200"
+              step="20"
+              :value="plugins.imgPreviewCloseDur ?? 580"
+              @change="setCloseDur(Number(($event.target as HTMLInputElement).value))"
+            />
+            <span class="mono w-14 shrink-0 text-right text-[calc(12px*var(--ui-font-scale))] text-ink-2">{{ plugins.imgPreviewCloseDur ?? 580 }}ms</span>
+          </div>
+        </div>
+        <div class="flex flex-col gap-1">
+          <span class="field-label">{{ t("theme.pluginImgCloseEase") }}</span>
+          <SelectMenu
+            :model-value="plugins.imgPreviewCloseEase ?? '平滑'"
+            :options="[
+              { value: '平滑', label: t('theme.pluginEaseSmooth') },
+              { value: '缓出', label: t('theme.pluginEaseOut') },
+              { value: '线性', label: t('theme.pluginEaseLinear') },
+              { value: '弹性', label: t('theme.pluginEaseSpring') },
+            ]"
+            align="left"
+            @update:model-value="setCloseEase"
+          />
+        </div>
+        </div>
+        </section>
+
+        <!-- 用户导入的插件:每个插件一张卡片 -->
+        <p v-if="!plugins.custom.length" class="text-[calc(13px*var(--ui-font-scale))] text-ink-3">{{ t("theme.pluginEmpty") }}</p>
+        <section v-for="entry in plugins.custom" :key="entry.id" class="plugin-card">
+          <header class="plugin-card-head">
+            <span class="plugin-card-name" :title="entry.files.join('\n')">{{ entry.name }}</span>
+            <input
+              type="checkbox"
+              class="checkbox-input"
+              :checked="entry.enabled"
+              :aria-label="entry.name"
+              @change="site.setPluginEnabled(entry.id, ($event.target as HTMLInputElement).checked)"
+            />
+          </header>
+          <div class="plugin-card-meta">
+            <span class="text-[calc(11px*var(--ui-font-scale))] text-ink-3">{{ t("theme.pluginFileCount", { n: entry.files.length }) }}</span>
+            <button type="button" class="btn-icon h-6 w-6 shrink-0 hover:!text-danger" :title="t('theme.pluginRemove')" @click="removePlugin(entry.id, entry.name)">
+              <AppIcon name="trash" :size="12" />
+            </button>
+          </div>
+        </section>
+
+        <div class="plugin-card-footer">
           <button type="button" class="btn btn-secondary" @click="importPlugin">
             <AppIcon name="plus" :size="13" />
             {{ t("theme.pluginImport") }}
           </button>
+          <p class="opt-hint">{{ t("theme.pluginHint") }}</p>
         </div>
-        <p class="opt-hint">{{ t("theme.pluginHint") }}</p>
       </template>
 
       <template v-else>
@@ -1007,6 +1164,30 @@ async function removePlugin(id: string, name: string) {
             <AppIcon name="plus" :size="13" />
             {{ t("theme.linkAdd") }}
           </button>
+        </div>
+
+        <!-- 文章标签颜色(博客主题):标签汇总自全部文档配置头,逐个取色,未设置用强调色 -->
+        <div v-else-if="field.key === 'tagColors'" class="flex flex-col gap-2">
+          <p v-if="!tagRows(field).length" class="text-[calc(12px*var(--ui-font-scale))] text-ink-3">{{ t("theme.tagColorsEmpty") }}</p>
+          <div v-for="row in tagRows(field)" :key="row.name" class="flex items-center gap-2">
+            <span class="tag-pill-demo" :style="row.color ? { '--tag-c': row.color } : undefined">{{ row.name }}</span>
+            <span class="min-w-0 flex-1" />
+            <ColorPicker
+              :model-value="row.color || '#9e9e9e'"
+              :label="t('theme.tagColorOf', { tag: row.name })"
+              @update:model-value="(v: string) => setTagColor(field, row.name, v)"
+            />
+            <button
+              v-if="row.color"
+              type="button"
+              class="btn-icon h-6 w-6 shrink-0"
+              :title="t('theme.tagColorReset')"
+              @click="setTagColor(field, row.name, '')"
+            >
+              <AppIcon name="refresh" :size="12" />
+            </button>
+          </div>
+          <p v-if="field.hint" class="opt-hint">{{ field.hint }}</p>
         </div>
 
         <!-- 多行文本:如页脚友情链接(每行一条) -->
@@ -1213,6 +1394,71 @@ async function removePlugin(id: string, name: string) {
   .cat-chip:active {
     transform: none;
   }
+}
+
+/* 插件卡片:每个插件一张圆角卡片,始终位于配置组的圆角矩形框内 */
+.plugin-card {
+  max-width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--color-line);
+  border-radius: 10px;
+  background: var(--color-bg);
+}
+.plugin-card + .plugin-card,
+.plugin-card + p,
+p + .plugin-card {
+  margin-top: 10px;
+}
+.plugin-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.plugin-card-name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: calc(13px * var(--ui-font-scale));
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.plugin-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.plugin-card-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.plugin-card-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 12px;
+}
+/* 标签颜色行的药丸预览:与站点卡片上的标签同形 */
+.tag-pill-demo {
+  --tag-c: var(--color-accent);
+  display: inline-flex;
+  align-items: center;
+  max-width: 160px;
+  overflow: hidden;
+  padding: 2.5px 11px;
+  border: 1px solid color-mix(in srgb, var(--tag-c) 26%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--tag-c) 10%, transparent);
+  color: var(--tag-c);
+  font-size: calc(11.5px * var(--ui-font-scale));
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .navlist-row {

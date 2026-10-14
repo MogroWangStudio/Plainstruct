@@ -33,6 +33,14 @@ export function normalizePlugins(site: SiteConfig): {
   searchBarWidth?: number;
   /** 移动端搜索栏宽度(px),缺省沿用 PC 配置 */
   searchBarWidthM?: number;
+  /** 放大后自动刷新分辨率的延迟(ms):0 = 关闭,缺省 500 */
+  imgPreviewSharpDelay?: number;
+  /** 关闭归位动画时长(ms):240–1200,缺省 580 */
+  imgPreviewCloseDur?: number;
+  /** 关闭归位动画曲线:平滑/缓出/线性/弹性,缺省平滑 */
+  imgPreviewCloseEase?: string;
+  /** 归位动画效果预设:标准/轻快/柔和/回弹/自定义(自定义时用上方时长+曲线) */
+  imgPreviewClosePreset?: string;
   custom: SitePluginEntry[];
 } {
   const p = site.plugins ?? {};
@@ -55,6 +63,27 @@ export function normalizePlugins(site: SiteConfig): {
     searchPositionM:
       p.searchPositionM === "bottom-left" || p.searchPositionM === "topbar" || p.searchPositionM === "bottom-right"
         ? p.searchPositionM
+        : undefined,
+    imgPreviewSharpDelay: (() => {
+      const n = Math.round(Number(p.imgPreviewSharpDelay));
+      return Number.isFinite(n) ? Math.min(2000, Math.max(0, n)) : undefined;
+    })(),
+    imgPreviewCloseDur: (() => {
+      const n = Math.round(Number(p.imgPreviewCloseDur));
+      return Number.isFinite(n) ? Math.min(1200, Math.max(240, n)) : undefined;
+    })(),
+    imgPreviewCloseEase:
+      p.imgPreviewCloseEase === "缓出" || p.imgPreviewCloseEase === "线性" || p.imgPreviewCloseEase === "弹性"
+        ? p.imgPreviewCloseEase
+        : p.imgPreviewCloseEase === "平滑"
+          ? p.imgPreviewCloseEase
+          : undefined,
+    imgPreviewClosePreset:
+      p.imgPreviewClosePreset === "轻快" ||
+      p.imgPreviewClosePreset === "柔和" ||
+      p.imgPreviewClosePreset === "回弹" ||
+      p.imgPreviewClosePreset === "自定义"
+        ? p.imgPreviewClosePreset
         : undefined,
     custom: Array.isArray(p.custom) ? p.custom : [],
   };
@@ -93,7 +122,12 @@ export function pluginTags(prefix: string, site: SiteConfig): string[] {
   }
   if (p.imgPreview) {
     const mark = p.imgPreviewRequireMark ? ` data-require-mark="${p.imgPreviewRequireMark.replace(/"/g, "&quot;")}"` : "";
-    tags.push(pluginScript(prefix, "assets/ps-plugins/ps-imgpreview.js", mark));
+    // 图片预览行为配置:分辨率刷新延迟与归位动画(时长/曲线),经 data 属性下发
+    const sharp = p.imgPreviewSharpDelay !== undefined ? ` data-sharp-delay="${p.imgPreviewSharpDelay}"` : "";
+    const closeCfg =
+      (p.imgPreviewCloseDur !== undefined ? ` data-close-dur="${p.imgPreviewCloseDur}"` : "") +
+      (p.imgPreviewCloseEase ? ` data-close-ease="${p.imgPreviewCloseEase}"` : "");
+    tags.push(pluginScript(prefix, "assets/ps-plugins/ps-imgpreview.js", mark + sharp + closeCfg));
   }
   if (p.search) {
     tags.push(
@@ -192,8 +226,9 @@ export function searchIndexTag(pages: SearchPage[]): string {
 
 /* ---------- 预览内联 ---------- */
 
-/** 预览通道:插件样式/脚本与搜索索引内联为标签(无外部请求,行为对齐构建产物) */
-export function inlinePreviewPlugins(site: SiteConfig, contents: SitePluginFiles[]): string[] {
+/** 预览通道:插件样式/脚本与搜索索引内联为标签(无外部请求,行为对齐构建产物)。
+ *  demo = 内容页/主题页的演示预览:搜索入口照常展示,点击提示前往构建查看完整站点 */
+export function inlinePreviewPlugins(site: SiteConfig, contents: SitePluginFiles[], demo = false): string[] {
   const p = normalizePlugins(site);
   const tags: string[] = [];
   const style = (css: string) => `<style>\n${css}\n</style>`;
@@ -208,16 +243,21 @@ export function inlinePreviewPlugins(site: SiteConfig, contents: SitePluginFiles
     }
   }
   if (p.imgPreview) {
-    // 内联无 data 属性载体:标记模式由紧随其后的初始化脚本设置
+    // 内联无 data 属性载体:标记模式与行为配置由紧随其后的初始化脚本设置
     tags.push(script(imgPreviewJs));
-    if (p.imgPreviewRequireMark) {
-      const mark = JSON.stringify(p.imgPreviewRequireMark).replace(/</g, "\\u003c");
-      tags.push(`<script>window.__psImgRequireMark=${mark};</script>`);
-    }
+    const cfg = {
+      mark: p.imgPreviewRequireMark,
+      sharpDelay: p.imgPreviewSharpDelay,
+      closeDur: p.imgPreviewCloseDur,
+      closeEase: p.imgPreviewCloseEase,
+    };
+    tags.push(`<script>window.__psImgCfg=${JSON.stringify(cfg).replace(/</g, "\\u003c")};</script>`);
   }
   if (p.search) {
     const cfg = JSON.stringify({ style: p.searchStyle, position: p.searchPosition, styleM: p.searchStyleM, positionM: p.searchPositionM, barWidth: p.searchBarWidth, barWidthM: p.searchBarWidthM }).replace(/</g, "\\u003c");
     tags.push(`<script>window.__psSearchCfg=${cfg};</script>`);
+    // 演示预览:入口仅展示形态,点击不展开结果面板,提示前往构建页查看完整站点
+    if (demo) tags.push(`<script>window.__psSearchDemo=true;</script>`);
     tags.push(script(searchJs));
   }
   return tags;

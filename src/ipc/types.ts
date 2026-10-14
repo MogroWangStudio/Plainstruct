@@ -19,6 +19,9 @@ export type EditorIndentKey = "tab" | "modShiftI" | "none";
 /** 发布成功彩带程度 */
 export type ConfettiLevel = "off" | "light" | "standard" | "grand";
 
+/** 发布系统通知档位:twice=两次(发布成功+Pages 构建成功) merged=合并一次 off=关闭 */
+export type PublishNotifyMode = "twice" | "merged" | "off";
+
 export interface AppSettings {
   locale: Locale;
   autosave: boolean;
@@ -45,6 +48,8 @@ export interface AppSettings {
   editorIndentWidth?: number;
   /** 发布成功彩带程度,默认 standard(标准) */
   confetti?: ConfettiLevel;
+  /** 发布系统通知档位,默认 twice(两次) */
+  publishNotify?: PublishNotifyMode;
   /** 弹窗遮罩的背景模糊,默认开启;个性化设置可关 */
   modalBlur?: boolean;
   /** 点击弹窗空白区域(模糊遮罩)的关窗方式:never=不关闭 single=一次 double=两次(默认) */
@@ -133,6 +138,14 @@ export interface SitePluginsConfig {
   imgPreview?: boolean;
   /** 图片预览的 class 标记模式:设置后仅 class 含该标记(如 mws_ps_imgpreview)的图片可预览 */
   imgPreviewRequireMark?: string;
+  /** 放大后自动刷新分辨率的延迟(ms):0 = 关闭;缺省 500 */
+  imgPreviewSharpDelay?: number;
+  /** 关闭归位动画时长(ms);缺省 580 */
+  imgPreviewCloseDur?: number;
+  /** 关闭归位动画曲线:平滑(缺省)/缓出/线性/弹性 */
+  imgPreviewCloseEase?: string;
+  /** 归位动画效果预设:标准(缺省)/轻快/柔和/回弹/自定义(自定义时用时长+曲线) */
+  imgPreviewClosePreset?: string;
   /** 搜索入口形式:button = 毛玻璃按钮(缺省),bar = 长条文本框 */
   searchStyle?: "button" | "bar";
   /** 搜索入口位置:bottom-right(缺省)/ bottom-left / topbar(顶栏最右侧) */
@@ -245,6 +258,10 @@ export interface GithubConfig {
   accountType: GithubAccountType;
   /** 自定义域名:非空时发布自动写入 CNAME;留空则保留云端现有域名 */
   customDomain: string;
+  /** 代理模式:system=跟随系统环境变量(缺省) none=不使用代理 custom=使用自定义代理地址 */
+  proxyMode: "system" | "none" | "custom";
+  /** 自定义代理地址(如 http://127.0.0.1:7890 或 socks5://127.0.0.1:7890) */
+  proxyUrl: string;
 }
 
 export interface VerifyResult {

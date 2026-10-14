@@ -1,8 +1,9 @@
 import { defineStore } from "pinia";
 import { ipc } from "@/ipc/ipc";
 import { Events, listen } from "@/ipc/events";
-import type { GithubConfig, SyncLogEntry, SyncProgress, SyncResult, VerifyResult } from "@/ipc/types";
+import type { GithubConfig, PublishNotifyMode, SyncLogEntry, SyncProgress, SyncResult, VerifyResult } from "@/ipc/types";
 import { i18n } from "@/i18n";
+import { useAppStore } from "./app";
 import { useBuilderStore } from "./builder";
 import { useUiStore } from "./ui";
 
@@ -39,7 +40,7 @@ function ensureLogListener() {
 
 export const usePublishStore = defineStore("publish", {
   state: (): State => ({
-    config: { owner: "", repo: "", branch: "gh-pages", token: "", autoCreate: true, accountType: "user", customDomain: "" },
+    config: { owner: "", repo: "", branch: "gh-pages", token: "", autoCreate: true, accountType: "user", customDomain: "", proxyMode: "system", proxyUrl: "" },
     loaded: false,
     verifying: false,
     verifyResult: null,
@@ -76,10 +77,37 @@ export const usePublishStore = defineStore("publish", {
       this.logs = [];
     },
 
+    /** 发布系统通知:档位由设置决定(两次/合并一次/关闭)。浏览器 mock 为空操作 */
+    notifyOf(kind: "published" | "deployed") {
+      const app = useAppStore();
+      if (app.platform === "browser") return;
+      const mode: PublishNotifyMode = app.settings.publishNotify ?? "twice";
+      if (mode === "off") return;
+      const t = i18n.global.t;
+      if (kind === "published") {
+        // 合并档位:发布成功不弹,等 Pages 构建完成后发一条合并通知
+        if (mode === "twice") {
+          void ipc.systemNotify(t("publish.notifyPublishedTitle"), t("publish.notifyPublishedBody"));
+        }
+        return;
+      }
+      if (mode === "twice") {
+        void ipc.systemNotify(t("publish.notifyDeployedTitle"), t("publish.notifyDeployedBody"));
+      } else {
+        void ipc.systemNotify(t("publish.notifyMergedTitle"), t("publish.notifyMergedBody"));
+      }
+    },
+
     async load() {
       const cfg = await ipc.githubReadConfig();
-      // 旧配置没有账户类型字段时按个人账号处理(与后端反序列化默认值一致)
-      this.config = { ...cfg, accountType: cfg.accountType === "org" ? "org" : "user" };
+      // 旧配置没有账户类型字段时按个人账号处理(与后端反序列化默认值一致);
+      // 代理字段同理:缺省跟随系统,地址为空
+      this.config = {
+        ...cfg,
+        accountType: cfg.accountType === "org" ? "org" : "user",
+        proxyMode: cfg.proxyMode === "none" || cfg.proxyMode === "custom" ? cfg.proxyMode : "system",
+        proxyUrl: cfg.proxyUrl ?? "",
+      };
       this.loaded = true;
     },
 
@@ -147,7 +175,8 @@ export const usePublishStore = defineStore("publish", {
         this.result = await ipc.githubSync(this.config, (p) => {
           this.progress = p;
         });
-        // 发布成功:自动监听 Pages 构建,完成后亮起「查看站点」并提示
+        // 发布成功:系统通知(按设置档位),并自动监听 Pages 构建
+        this.notifyOf("published");
         void this.watchDeploy();
       } catch (e) {
         this.error = ipc.errText(e);
@@ -177,6 +206,7 @@ export const usePublishStore = defineStore("publish", {
             this.deployState = "ready";
             this.appendLog("success", t("publish.deployReadyToast"));
             ui.toast(t("publish.deployReadyToast"), "success");
+            this.notifyOf("deployed");
             return;
           }
           if (st.errored) {

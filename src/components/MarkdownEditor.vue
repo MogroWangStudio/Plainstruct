@@ -3,9 +3,9 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { Decoration, DecorationSet, EditorView, keymap, KeyBinding, ViewPlugin, ViewUpdate, WidgetType } from "@codemirror/view";
-import { Compartment, EditorState, type Extension, type Text, RangeSetBuilder } from "@codemirror/state";
+import { Compartment, EditorState, Text, type Extension, RangeSetBuilder } from "@codemirror/state";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
-import { highlightSelectionMatches, searchKeymap } from "@codemirror/search";
+import { highlightSelectionMatches, search, SearchQuery, setSearchQuery, findNext, findPrevious, replaceNext, replaceAll } from "@codemirror/search";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { HighlightStyle, syntaxHighlighting, syntaxTree } from "@codemirror/language";
 import type { SyntaxNode } from "@lezer/common";
@@ -300,6 +300,86 @@ function setHeading(level: number) {
   });
 }
 
+/* ---------- 查找与替换:自绘中文面板(支持大小写/正则开关),替代 CodeMirror 内建英文面板 ---------- */
+
+const findOpen = ref(false);
+const findText = ref("");
+const replaceText = ref("");
+const findCase = ref(false); // true = 区分大小写
+const findRegexp = ref(false); // true = 正则表达式
+const matchCount = ref(0);
+const findInputRef = ref<HTMLInputElement>();
+
+function buildQuery(): SearchQuery {
+  return new SearchQuery({
+    search: findText.value,
+    caseSensitive: findCase.value,
+    regexp: findRegexp.value,
+    replace: replaceText.value,
+  });
+}
+
+/** 当前查询的匹配数(上限 999,避免长文档全量扫描卡顿) */
+function refreshCount() {
+  matchCount.value = 0;
+  if (!view || !findText.value) return;
+  try {
+    const cursor = buildQuery().getCursor(view.state.doc);
+    let step = cursor.next();
+    while (!step.done) {
+      if (++matchCount.value >= 999) break;
+      step = cursor.next();
+    }
+  } catch {
+    /* 无效正则:按 0 处理,面板以红字提示 */
+  }
+}
+
+function applyQuery() {
+  if (!view) return;
+  view.dispatch({ effects: setSearchQuery.of(buildQuery()) });
+  refreshCount();
+}
+
+/** 打开面板:预填选区文本,焦点落在查找框 */
+function openFind() {
+  if (!view) return;
+  const range = view.state.selection.main;
+  const selected = view.state.sliceDoc(range.from, range.to);
+  if (selected && !selected.includes("\n") && selected.length <= 200) findText.value = selected;
+  findOpen.value = true;
+  applyQuery();
+  requestAnimationFrame(() => findInputRef.value?.select());
+}
+
+/** 关闭面板并清空查询高亮 */
+function closeFind() {
+  findOpen.value = false;
+  if (view) view.dispatch({ effects: setSearchQuery.of(new SearchQuery({ search: "" })) });
+}
+
+function findStep(dir: 1 | -1) {
+  if (!view) return;
+  applyQuery();
+  if (!findText.value) return;
+  if (dir === 1) findNext(view);
+  else findPrevious(view);
+}
+
+function doReplace() {
+  if (!view) return;
+  applyQuery();
+  replaceNext(view);
+  refreshCount();
+}
+
+function doReplaceAll() {
+  if (!view) return;
+  applyQuery();
+  replaceAll(view);
+  refreshCount();
+}
+
 /* ---------- 插入类 ---------- */
 
 /** 链接插入弹窗:URL、显示文本(预填选区)与「在新窗口打开」 */
@@ -338,7 +418,7 @@ function frontMatterEnd(doc: Text): number | null {
 /* ---------- 配置头可视化编辑:表单弹窗(FrontMatterModal),确认后就地写回 ---------- */
 
 const fmOpen = ref(false);
-const fmInitial: FrontMatterForm = reactive({ title: "", description: "", date: "", cover: "", author: "", aigc: "", hidden: false, toc: "", homeGroups: false, homeShowUncategorized: true, homeUncategorizedLabel: "" });
+const fmInitial: FrontMatterForm = reactive({ title: "", description: "", date: "", cover: "", author: "", aigc: "", hidden: false, toc: "", tags: "", homeGroups: false, homeShowUncategorized: true, homeUncategorizedLabel: "" });
 
 /** 是否显示主页配置区:博客站点 + 当前文档是根 index.md */
 const isBlogHomeDoc = computed(
@@ -373,6 +453,7 @@ function openFmEditor() {
   fmInitial.aigc = parsed.data.aigc ?? "";
   fmInitial.hidden = parsed.data.hidden === true;
   fmInitial.toc = parsed.data.toc === true ? "on" : parsed.data.toc === false ? "off" : "";
+  fmInitial.tags = (parsed.data.tags ?? []).join(", ");
   // 主页配置区预填:未分类缺省显示,标题空 = 缺省「未分类」
   fmInitial.homeGroups = parsed.data.homeGroups === true;
   fmInitial.homeShowUncategorized = parsed.data.homeUncategorized !== false;
@@ -380,11 +461,35 @@ function openFmEditor() {
   fmOpen.value = true;
 }
 
-/** 把表单值写回 front-matter:识别字段以表单为准,用户手写的其它字段原样保留 */
+/** 把表单值写回 front-matter:识别字段以表单为准,用户手写的其它字段原样保留。
+ *  选区映射:配置头长度变化会让正文整体平移,光标必须跟着平移 ——
+ *  原选区在配置头内(或文档没有配置头)时落到新配置头末尾,在正文时保持相对位置,
+ *  否则会莫名跳到文档最后。 */
 function writeFrontMatter(form: FrontMatterForm) {
   if (!view) return;
-  const next = applyFrontMatter(view.state.doc.toString(), form);
-  commit(0, view.state.doc.length, next, next.length, next.length);
+  const doc = view.state.doc;
+  const oldFmEnd = frontMatterEnd(doc);
+  // 标签写回:去空去重后逗号连接(配置头为单行值)
+  const tagList = form.tags
+    .split(/[,，、]/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const next = applyFrontMatter(doc.toString(), { ...form, tags: tagList.join(", ") });
+  const range = view.state.selection.main;
+  const newFmEnd = frontMatterEnd(Text.of(next.split("\n"))) ?? next.length;
+  let anchor: number;
+  let head: number;
+  if (oldFmEnd === null || range.head <= oldFmEnd) {
+    // 原光标在配置头内(或原本没有配置头):落到新配置头末尾(正文开头)
+    anchor = head = newFmEnd;
+  } else {
+    // 原光标在正文:按配置头长度差平移,保持在原文本位置
+    const shift = newFmEnd - oldFmEnd;
+    const map = (p: number) => Math.min(next.length, Math.max(newFmEnd, p + shift));
+    anchor = map(range.anchor);
+    head = map(range.head);
+  }
+  view.dispatch({ changes: { from: 0, to: doc.length, insert: next }, selection: { anchor, head }, scrollIntoView: true });
   fmOpen.value = false;
 }
 
@@ -859,6 +964,21 @@ onMounted(() => {
               return true;
             },
           },
+          {
+            key: "Mod-f",
+            run: () => {
+              openFind();
+              return true;
+            },
+          },
+          {
+            key: "Escape",
+            run: () => {
+              if (!findOpen.value) return false;
+              closeFind();
+              return true;
+            },
+          },
           { key: "Mod-b", run: () => (wrapSelection("**"), true) },
           { key: "Mod-i", run: () => (wrapSelection("*"), true) },
           { key: "Mod-1", run: () => (setHeading(1), true) },
@@ -877,10 +997,10 @@ onMounted(() => {
           { key: "Mod-Shift-t", run: () => (toggleTask(), true) },
           ...defaultKeymap,
           ...historyKeymap,
-          ...searchKeymap,
           indentWithTab,
         ]),
         highlightSelectionMatches(),
+        search(), // 查找状态与匹配高亮:自绘面板经 setSearchQuery 驱动
         markdown({ base: markdownLanguage }),
         syntaxHighlighting(plainHighlight),
         assetDrop,
@@ -888,6 +1008,8 @@ onMounted(() => {
         EditorView.updateListener.of((u) => {
           if (u.docChanged) editor.onInput(u.state.doc.toString());
           if (u.docChanged || u.selectionSet) updateActiveFormats();
+          // 查找面板打开时文档变动:匹配数随内容刷新(替换后计数同步)
+          if (u.docChanged && findOpen.value) refreshCount();
         }),
       ],
     }),
@@ -1026,6 +1148,57 @@ defineExpose({
 
     <div ref="host" class="min-h-0 flex-1 overflow-hidden" />
 
+    <!-- 查找与替换:自绘中文面板(替代 CodeMirror 内建英文面板),Mod-f/Esc 开关 -->
+    <div v-if="findOpen" class="find-panel">
+      <div class="find-row">
+        <AppIcon name="search" :size="14" class="shrink-0 text-ink-3" />
+        <input
+          ref="findInputRef"
+          v-model="findText"
+          class="find-input"
+          type="text"
+          :placeholder="t('editor.find.find')"
+          @input="applyQuery"
+          @keydown.enter.prevent="findStep($event.shiftKey ? -1 : 1)"
+          @keydown.esc.prevent="closeFind"
+        />
+        <span class="find-count" :class="{ 'is-none': !matchCount && findText }">
+          {{ findText ? (matchCount ? t("editor.find.matches", { n: matchCount }) : t("editor.find.noMatch")) : t("editor.find.hint") }}
+        </span>
+        <button class="tb-btn" :title="t('editor.find.prev')" @click="findStep(-1)">
+          <AppIcon name="chevronUp" :size="14" />
+        </button>
+        <button class="tb-btn" :title="t('editor.find.next')" @click="findStep(1)">
+          <AppIcon name="chevronDown" :size="14" />
+        </button>
+      </div>
+      <div class="find-row">
+        <span class="find-spacer" aria-hidden="true" />
+        <input
+          v-model="replaceText"
+          class="find-input"
+          type="text"
+          :placeholder="t('editor.find.replace')"
+          @keydown.enter.prevent="doReplace"
+          @keydown.esc.prevent="closeFind"
+        />
+        <button class="find-btn" @click="doReplace">{{ t("editor.find.replaceBtn") }}</button>
+        <button class="find-btn" @click="doReplaceAll">{{ t("editor.find.replaceAll") }}</button>
+      </div>
+      <div class="find-row find-opts">
+        <label class="flex cursor-pointer items-center gap-1.5">
+          <input v-model="findCase" type="checkbox" class="checkbox-input" @change="applyQuery" />
+          <span class="text-[calc(12px*var(--ui-font-scale))] text-ink-2">{{ t("editor.find.case") }}</span>
+        </label>
+        <label class="flex cursor-pointer items-center gap-1.5">
+          <input v-model="findRegexp" type="checkbox" class="checkbox-input" @change="applyQuery" />
+          <span class="text-[calc(12px*var(--ui-font-scale))] text-ink-2">{{ t("editor.find.regexp") }}</span>
+        </label>
+        <span class="min-w-0 flex-1" />
+        <button class="find-btn" @click="closeFind">{{ t("common.close") }}</button>
+      </div>
+    </div>
+
     <!-- 配置头可视化编辑:表单控件替代手写字段,确认后就地写回 front-matter -->
     <FrontMatterModal
       :open="fmOpen"
@@ -1046,6 +1219,70 @@ defineExpose({
 </template>
 
 <style scoped>
+/* 查找与替换面板:编辑区下方的内嵌条,与编辑器同一表面 */
+.find-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--color-line);
+  background: var(--color-surface);
+}
+.find-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.find-input {
+  height: 26px;
+  min-width: 0;
+  flex: 1;
+  padding: 0 8px;
+  border: 1px solid var(--color-line);
+  border-radius: 6px;
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-size: calc(12.5px * var(--ui-font-scale));
+}
+.find-input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+.find-count {
+  flex-shrink: 0;
+  font-size: calc(11px * var(--ui-font-scale));
+  color: var(--color-ink-3);
+  white-space: nowrap;
+}
+.find-count.is-none {
+  color: var(--color-danger);
+}
+.find-spacer {
+  flex-shrink: 0;
+  width: 20px;
+}
+.find-btn {
+  flex-shrink: 0;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--color-line);
+  border-radius: 6px;
+  background: var(--color-surface);
+  color: var(--color-ink-2);
+  font-size: calc(12px * var(--ui-font-scale));
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-plain),
+    color var(--duration-fast) var(--ease-plain);
+}
+.find-btn:hover {
+  background: var(--color-surface-2);
+  color: var(--color-ink);
+}
+.find-opts {
+  margin-top: -2px;
+}
+
 .tb-btn {
   display: flex;
   flex-shrink: 0;
