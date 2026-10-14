@@ -5,6 +5,7 @@ import type {
   CopyItem,
   FolderMeta,
   GithubConfig,
+  ImportedPlugin,
   OutputFile,
   PagesBuildStatus,
   PublishPreflight,
@@ -131,10 +132,11 @@ export const ipc = {
   },
 
   /* ---------- 站点插件 ---------- */
-  /** 导入插件文件(多选 .js/.css 合并为一个插件条目,复制进 .plainstruct/plugins/<id>/) */
-  importSitePlugin(srcPaths: string[]): Promise<SitePluginEntry> {
+  /** 导入插件文件(多选 .js/.css 合并为一个插件条目,复制进 .plainstruct/plugins/<id>/);
+   *  同时做 Plainstruct 插件识别(文件头标记 + 元数据 JSON) */
+  importSitePlugin(srcPaths: string[]): Promise<ImportedPlugin> {
     return inTauri
-      ? invoke<SitePluginEntry>("import_site_plugin", { srcPaths })
+      ? invoke<ImportedPlugin>("import_site_plugin", { srcPaths })
       : mock.importSitePlugin(srcPaths);
   },
   deleteSitePlugin(id: string): Promise<void> {
@@ -145,6 +147,32 @@ export const ipc = {
     return inTauri
       ? invoke<SitePluginFiles[]>("read_site_plugin_files", { entries })
       : mock.readSitePluginFiles(entries);
+  },
+  /** 新建自定义插件(复制内置插件/脚手架):写入文件集并返回条目 */
+  createSitePluginFiles(payload: {
+    name: string;
+    description?: string;
+    developer?: string;
+    version?: string;
+    builtinCopyOf?: string;
+    files: { name: string; content: string }[];
+  }): Promise<SitePluginEntry> {
+    return inTauri
+      ? invoke<SitePluginEntry>("create_site_plugin_files", {
+          name: payload.name,
+          description: payload.description,
+          developer: payload.developer,
+          version: payload.version,
+          builtinCopyOf: payload.builtinCopyOf,
+          files: payload.files,
+        })
+      : mock.createSitePluginFiles(payload);
+  },
+  /** 保存自定义插件的单个文件(二次开发) */
+  writeSitePluginFile(id: string, name: string, content: string): Promise<void> {
+    return inTauri
+      ? invoke<void>("write_site_plugin_file", { id, name, content })
+      : mock.writeSitePluginFile(id, name, content);
   },
 
   /* ---------- 内容 ---------- */

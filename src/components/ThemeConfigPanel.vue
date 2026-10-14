@@ -1,16 +1,14 @@
 <script setup lang="ts">
 /** 主题可视化配置面板 -- 由 theme.json 的 config schema 自动生成表单;
- *  末尾追加站点级「插件」分组(内置搜索/图片预览开关 + 用户导入的插件),对所有主题生效 */
+ *  站点级插件配置已独立到「插件」页(PluginsView) */
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import type { ThemeField } from "@/ipc/types";
 import { BLOG_ARCHIVE_KEY, BLOG_ARCHIVE_TITLE, buildMetas, collectDocPaths, navMaxOf, topNavItems, type NavPickerItem } from "@/lib/builder";
-import { normalizePlugins } from "@/lib/plugins";
 import { siteUrl } from "@/lib/preview";
 import { useAppStore } from "@/stores/app";
 import { useSiteStore } from "@/stores/site";
 import { useThemeStore } from "@/stores/theme";
-import { useUiStore } from "@/stores/ui";
 import Modal from "@/components/Modal.vue";
 import SelectMenu from "@/components/SelectMenu.vue";
 import ColorPicker from "@/components/ColorPicker.vue";
@@ -19,7 +17,6 @@ import AppIcon from "@/components/AppIcon.vue";
 const { t } = useI18n();
 const theme = useThemeStore();
 const site = useSiteStore();
-const ui = useUiStore();
 const app = useAppStore();
 
 function onField(field: ThemeField, value: string | number | boolean) {
@@ -33,19 +30,15 @@ function fieldValue(field: ThemeField): string | number | boolean {
 /* ---------- 配置分组(theme.json 的 category;无分类的旧主题保持平铺) ---------- */
 
 interface Section {
-  id: string;
-  label: string;
+  id?: string;
+  label?: string;
   fields: ThemeField[];
 }
 
-/** 站点插件分组(固定追加在所有主题配置之后,不属于任何 theme.json schema) */
-const PLUGINS_ID = "theme-cat-plugins";
-
-/** 全部分组(按 theme.json 中的出现顺序);字段没有分类时归入「其他」;插件分组始终尾随 */
+/** 全部分组(按 theme.json 中的出现顺序);字段没有分类时归入「其他」 */
 const sections = computed<Section[]>(() => {
   const fields = (theme.activeMeta?.config ?? []).filter((f) => !f.hidden);
-  const pluginSection: Section = { id: PLUGINS_ID, label: t("theme.pluginsCategory"), fields: [] };
-  if (!fields.some((f) => f.category)) return [pluginSection];
+  if (!fields.some((f) => f.category)) return [{ fields }];
   const order: string[] = [];
   const groups = new Map<string, ThemeField[]>();
   for (const f of fields) {
@@ -56,7 +49,7 @@ const sections = computed<Section[]>(() => {
     }
     groups.get(label)!.push(f);
   }
-  return [...order.map((label, i) => ({ id: `theme-cat-${i}`, label, fields: groups.get(label)! })), pluginSection];
+  return order.map((label, i) => ({ id: `theme-cat-${i}`, label, fields: groups.get(label)! }));
 });
 
 /** 渲染分组:分类主题每组一个圆角边框容器;无分类的旧主题合成单个无标题组平铺 */
@@ -95,25 +88,20 @@ function byDevice(f: ThemeField): boolean {
 const groupedRows = computed<{ id?: string; label?: string; fields: ThemeField[] }[]>(() => {
   const fields = (theme.activeMeta?.config ?? []).filter((f) => !f.hidden);
   if (!fields.some((f) => f.category)) {
-    return [
-      { fields: fields.filter((f) => isVisible(f) && byDevice(f)) },
-      { id: PLUGINS_ID, label: t("theme.pluginsCategory"), fields: [] },
-    ];
+    return [{ fields: fields.filter((f) => isVisible(f) && byDevice(f)) }];
   }
   const out: { id?: string; label?: string; fields: ThemeField[] }[] = [];
   for (const section of sections.value) {
     const groupFields = section.fields.filter((f) => isVisible(f) && byDevice(f));
-    if (!groupFields.length && section.id !== PLUGINS_ID) continue;
+    if (!groupFields.length) continue;
     out.push({ id: section.id, label: section.label, fields: groupFields });
   }
   return out;
 });
 
-/** 顶部快速跳转按钮:只列当前设备标签下有可见配置的分类(插件分组恒在) */
+/** 顶部快速跳转按钮:只列当前设备标签下有可见配置的分类 */
 const navSections = computed(() =>
-  sections.value.filter(
-    (s) => s.id === PLUGINS_ID || s.fields.some((f) => isVisible(f) && byDevice(f)),
-  ),
+  sections.value.filter((s) => s.fields.some((f) => isVisible(f) && byDevice(f))),
 );
 
 /* 悬浮分类栏:圆角矩形浮层,滚动时内容从其下方穿过。分组标题的让位距离
@@ -152,7 +140,8 @@ onBeforeUnmount(() => {
 
 /** 点击分类按钮滚动到对应分组,落点由 --cat-float 精确让位(减弱动态时直接跳位);
  *  跳转后分组标题短暂闪烁变色,提示落点位置 */
-function jumpTo(id: string) {
+function jumpTo(id?: string) {
+  if (!id) return;
   const el = document.getElementById(id);
   if (!el) return;
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -533,84 +522,6 @@ function confirmPicker() {
   pickerOpen.value = false;
 }
 
-/* ---------- 站点插件:内置插件开关 + 用户导入的插件(站点级,所有主题全局生效) ---------- */
-
-const plugins = computed(() =>
-  site.config
-    ? normalizePlugins(site.config)
-    : {
-        search: true,
-        imgPreview: true,
-        imgPreviewRequireMark: "mws_ps_imgpreview",
-        searchStyle: "button" as const,
-        searchPosition: "bottom-right" as const,
-        searchStyleM: undefined,
-        searchPositionM: undefined,
-        searchBarWidth: undefined,
-        searchBarWidthM: undefined,
-        imgPreviewSharpDelay: undefined,
-        imgPreviewCloseDur: undefined,
-        imgPreviewCloseEase: undefined,
-        imgPreviewClosePreset: undefined,
-        custom: [],
-      },
-);
-
-function setBuiltin(key: "search" | "imgPreview", on: boolean) {
-  void site.savePlugins({ [key]: on });
-}
-
-/** 图片预览的 class 标记模式(如 mws_ps_imgpreview);留空对所有正文图片生效 */
-function setImgPreviewMark(mark: string) {
-  void site.savePlugins({ imgPreviewRequireMark: mark.trim() });
-}
-
-async function importPlugin() {
-  const ok = await site.importPlugin();
-  if (ok) ui.toast(t("theme.pluginImported"), "success");
-}
-
-async function removePlugin(id: string, name: string) {
-  const ok = await ui.confirmDialog({
-    title: t("theme.pluginRemoveTitle"),
-    body: t("theme.pluginRemoveBody", { name }),
-    danger: true,
-    confirmText: t("theme.pluginRemove"),
-  });
-  if (ok) await site.removePlugin(id);
-}
-
-/* ---------- 图片预览行为配置:归位动画预设(预设选中时自动带出时长与曲线) ---------- */
-
-const CLOSE_PRESET_VALUES: Record<string, { dur: number; ease: string }> = {
-  标准: { dur: 580, ease: "平滑" },
-  轻快: { dur: 380, ease: "缓出" },
-  柔和: { dur: 860, ease: "平滑" },
-  回弹: { dur: 680, ease: "弹性" },
-};
-
-function applyClosePreset(v: string) {
-  const hit = CLOSE_PRESET_VALUES[v];
-  if (hit) {
-    void site.savePlugins({
-      imgPreviewClosePreset: v,
-      imgPreviewCloseDur: hit.dur,
-      imgPreviewCloseEase: hit.ease,
-    });
-  } else {
-    void site.savePlugins({ imgPreviewClosePreset: "自定义" });
-  }
-}
-
-/** 手动改时长/曲线:预设自动转为「自定义」(所存时长与曲线始终生效) */
-function setCloseDur(v: number) {
-  void site.savePlugins({ imgPreviewCloseDur: v, imgPreviewClosePreset: "自定义" });
-}
-
-function setCloseEase(v: string) {
-  void site.savePlugins({ imgPreviewCloseEase: v, imgPreviewClosePreset: "自定义" });
-}
-
 /* ---------- 文章标签颜色(博客主题 tagColors 字段):标签汇总自全部文档配置头 ---------- */
 
 const knownTags = computed<string[]>(() => {
@@ -696,275 +607,8 @@ function setTagColor(field: ThemeField, name: string, color: string) {
       <!-- 分组标题:面板顶部的分类按钮滚动到这里,跳转后短暂闪烁变色提示落点 -->
       <h3 v-if="group.id" :id="group.id" class="cat-head">{{ group.label }}</h3>
 
-      <!-- 站点插件分组:插件卡片(卡片始终在配置组的圆角矩形框内) + 导入入口 -->
-      <template v-if="group.id === PLUGINS_ID">
-        <!-- 搜索插件卡片 -->
-        <section class="plugin-card">
-        <header class="plugin-card-head">
-          <span class="plugin-card-name">{{ t("theme.pluginSearch") }}</span>
-          <input
-            type="checkbox"
-            class="checkbox-input"
-            :checked="plugins.search"
-            :aria-label="t('theme.pluginSearch')"
-            @change="setBuiltin('search', ($event.target as HTMLInputElement).checked)"
-          />
-        </header>
-        <div class="plugin-card-body">
-        <p class="opt-hint">{{ t("theme.pluginSearchHint") }}</p>
-
-        <label v-if="deviceMode === 'pc'" class="flex flex-col gap-1">
-          <span class="field-label">{{ t("theme.pluginSearchStyle") }}</span>
-          <SelectMenu
-            :model-value="plugins.searchStyle"
-            :options="[
-              { value: 'button', label: t('theme.pluginSearchStyleButton') },
-              { value: 'bar', label: t('theme.pluginSearchStyleBar') },
-            ]"
-            align="left"
-            @update:model-value="(v: string) => site.savePlugins({ searchStyle: v as 'button' | 'bar' })"
-          />
-        </label>
-        <label v-if="deviceMode === 'pc'" class="flex flex-col gap-1">
-          <span class="field-label">{{ t("theme.pluginSearchPosition") }}</span>
-          <SelectMenu
-            :model-value="plugins.searchPosition"
-            :options="[
-              { value: 'bottom-right', label: t('theme.pluginSearchPosBr') },
-              { value: 'bottom-left', label: t('theme.pluginSearchPosBl') },
-              { value: 'topbar', label: t('theme.pluginSearchPosTop') },
-            ]"
-            align="left"
-            @update:model-value="(v: string) => site.savePlugins({ searchPosition: v as 'bottom-right' | 'bottom-left' | 'topbar' })"
-          />
-        </label>
-
-        <!-- 移动端独立设置:缺省沿用上方 PC 配置;仅在移动端标签显示 -->
-        <label v-if="deviceMode === 'm'" class="flex flex-col gap-1">
-          <span class="field-label">{{ t("theme.pluginSearchStyleM") }}</span>
-          <SelectMenu
-            :model-value="plugins.searchStyleM ?? ''"
-            :options="[
-              { value: '', label: t('theme.pluginSearchFollowPc') },
-              { value: 'button', label: t('theme.pluginSearchStyleButton') },
-              { value: 'bar', label: t('theme.pluginSearchStyleBar') },
-            ]"
-            align="left"
-            @update:model-value="(v: string) => site.savePlugins({ searchStyleM: (v || undefined) as 'button' | 'bar' | undefined })"
-          />
-          <p class="opt-hint">{{ t("theme.pluginSearchStyleMHint") }}</p>
-        </label>
-        <label v-if="deviceMode === 'm'" class="flex flex-col gap-1">
-          <span class="field-label">{{ t("theme.pluginSearchPositionM") }}</span>
-          <SelectMenu
-            :model-value="plugins.searchPositionM ?? ''"
-            :options="[
-              { value: '', label: t('theme.pluginSearchFollowPc') },
-              { value: 'bottom-right', label: t('theme.pluginSearchPosBr') },
-              { value: 'bottom-left', label: t('theme.pluginSearchPosBl') },
-              { value: 'topbar', label: t('theme.pluginSearchPosTop') },
-            ]"
-            align="left"
-            @update:model-value="(v: string) => site.savePlugins({ searchPositionM: (v || undefined) as 'bottom-right' | 'bottom-left' | 'topbar' | undefined })"
-          />
-        </label>
-
-        <!-- 文本框搜索栏宽度:仅搜索栏形式下可调,双端独立 —— 桌面端标签改 PC 值,移动端标签改移动端值(缺省沿用 PC) -->
-        <div v-if="deviceMode === 'pc' && plugins.searchStyle === 'bar'" class="flex flex-col gap-1">
-          <span class="field-label">{{ t("theme.pluginSearchBarWidth") }}</span>
-          <div class="flex items-center gap-3">
-            <input
-              type="range"
-              class="range-input min-w-0 flex-1"
-              min="160"
-              max="420"
-              step="10"
-              :value="plugins.searchBarWidth ?? 240"
-              @change="site.savePlugins({ searchBarWidth: Number(($event.target as HTMLInputElement).value) })"
-            />
-            <span class="mono w-12 shrink-0 text-right text-[calc(12px*var(--ui-font-scale))] text-ink-2">
-              {{ plugins.searchBarWidth ?? 240 }}px
-            </span>
-            <button
-              v-if="plugins.searchBarWidth !== undefined"
-              type="button"
-              class="btn-icon h-6 w-6 shrink-0"
-              :title="t('theme.resetValue')"
-              @click="site.savePlugins({ searchBarWidth: undefined })"
-            >
-              <AppIcon name="refresh" :size="12" />
-            </button>
-          </div>
-          <p class="opt-hint">{{ t("theme.pluginSearchBarWidthHint") }}</p>
-        </div>
-        <div v-if="deviceMode === 'm' && (plugins.searchStyleM ?? plugins.searchStyle) === 'bar'" class="flex flex-col gap-1">
-          <span class="field-label">{{ t("theme.pluginSearchBarWidth") }}</span>
-          <div class="flex items-center gap-3">
-            <input
-              type="range"
-              class="range-input min-w-0 flex-1"
-              min="160"
-              max="420"
-              step="10"
-              :value="plugins.searchBarWidthM ?? plugins.searchBarWidth ?? 240"
-              @change="site.savePlugins({ searchBarWidthM: Number(($event.target as HTMLInputElement).value) })"
-            />
-            <span class="mono w-12 shrink-0 text-right text-[calc(12px*var(--ui-font-scale))] text-ink-2">
-              {{ plugins.searchBarWidthM ?? plugins.searchBarWidth ?? 240 }}px
-            </span>
-            <button
-              v-if="plugins.searchBarWidthM !== undefined"
-              type="button"
-              class="btn-icon h-6 w-6 shrink-0"
-              :title="t('theme.pluginSearchFollowPc')"
-              @click="site.savePlugins({ searchBarWidthM: undefined })"
-            >
-              <AppIcon name="refresh" :size="12" />
-            </button>
-          </div>
-          <p class="opt-hint">{{ t("theme.pluginSearchBarWidthMHint") }}</p>
-        </div>
-
-        </div>
-        </section>
-
-        <!-- 图片预览插件卡片 -->
-        <section class="plugin-card">
-        <header class="plugin-card-head">
-          <span class="plugin-card-name">{{ t("theme.pluginImgPreview") }}</span>
-          <input
-            type="checkbox"
-            class="checkbox-input"
-            :checked="plugins.imgPreview"
-            :aria-label="t('theme.pluginImgPreview')"
-            @change="setBuiltin('imgPreview', ($event.target as HTMLInputElement).checked)"
-          />
-        </header>
-        <div class="plugin-card-body">
-        <p class="opt-hint">{{ t("theme.pluginImgPreviewHint") }}</p>
-
-        <!-- 图片预览的 class 标记模式:设置后仅带该 class 的图片可预览 -->
-        <label class="flex flex-col gap-1">
-          <span class="field-label">{{ t("theme.pluginImgPreviewMark") }}</span>
-          <input
-            class="input !w-64 max-w-full"
-            type="text"
-            :value="plugins.imgPreviewRequireMark"
-            :placeholder="t('theme.pluginImgPreviewMarkPlaceholder')"
-            @change="setImgPreviewMark(($event.target as HTMLInputElement).value)"
-          />
-          <p class="opt-hint">{{ t("theme.pluginImgPreviewMarkHint") }}</p>
-        </label>
-
-        <!-- 放大后自动刷新分辨率:缩放静止指定延迟后把视觉尺寸烘进布局尺寸,全分辨率重绘不再发虚 -->
-        <div class="flex flex-col gap-1">
-          <span class="field-label">{{ t("theme.pluginImgSharpDelay") }}</span>
-          <div class="flex items-center gap-3">
-            <input
-              type="range"
-              class="range-input min-w-0 flex-1"
-              min="0"
-              max="2000"
-              step="50"
-              :value="plugins.imgPreviewSharpDelay ?? 500"
-              @change="site.savePlugins({ imgPreviewSharpDelay: Number(($event.target as HTMLInputElement).value) })"
-            />
-            <span class="mono w-14 shrink-0 text-right text-[calc(12px*var(--ui-font-scale))] text-ink-2">
-              {{ (plugins.imgPreviewSharpDelay ?? 500) === 0 ? t("theme.pluginOff") : (plugins.imgPreviewSharpDelay ?? 500) + "ms" }}
-            </span>
-            <button
-              v-if="plugins.imgPreviewSharpDelay !== undefined"
-              type="button"
-              class="btn-icon h-6 w-6 shrink-0"
-              :title="t('theme.resetValue')"
-              @click="site.savePlugins({ imgPreviewSharpDelay: undefined })"
-            >
-              <AppIcon name="refresh" :size="12" />
-            </button>
-          </div>
-          <p class="opt-hint">{{ t("theme.pluginImgSharpDelayHint") }}</p>
-        </div>
-
-        <!-- 关闭归位动画:预设带出时长与曲线,也可切「自定义」单独调 -->
-        <div class="flex flex-col gap-1">
-          <span class="field-label">{{ t("theme.pluginImgClosePreset") }}</span>
-          <SelectMenu
-            :model-value="plugins.imgPreviewClosePreset ?? '标准'"
-            :options="[
-              { value: '标准', label: t('theme.pluginImgClosePresetStd') },
-              { value: '轻快', label: t('theme.pluginImgClosePresetSwift') },
-              { value: '柔和', label: t('theme.pluginImgClosePresetSoft') },
-              { value: '回弹', label: t('theme.pluginImgClosePresetBounce') },
-              { value: '自定义', label: t('theme.pluginImgClosePresetCustom') },
-            ]"
-            align="left"
-            @update:model-value="applyClosePreset"
-          />
-        </div>
-        <div class="flex flex-col gap-1">
-          <span class="field-label">{{ t("theme.pluginImgCloseDur") }}</span>
-          <div class="flex items-center gap-3">
-            <input
-              type="range"
-              class="range-input min-w-0 flex-1"
-              min="240"
-              max="1200"
-              step="20"
-              :value="plugins.imgPreviewCloseDur ?? 580"
-              @change="setCloseDur(Number(($event.target as HTMLInputElement).value))"
-            />
-            <span class="mono w-14 shrink-0 text-right text-[calc(12px*var(--ui-font-scale))] text-ink-2">{{ plugins.imgPreviewCloseDur ?? 580 }}ms</span>
-          </div>
-        </div>
-        <div class="flex flex-col gap-1">
-          <span class="field-label">{{ t("theme.pluginImgCloseEase") }}</span>
-          <SelectMenu
-            :model-value="plugins.imgPreviewCloseEase ?? '平滑'"
-            :options="[
-              { value: '平滑', label: t('theme.pluginEaseSmooth') },
-              { value: '缓出', label: t('theme.pluginEaseOut') },
-              { value: '线性', label: t('theme.pluginEaseLinear') },
-              { value: '弹性', label: t('theme.pluginEaseSpring') },
-            ]"
-            align="left"
-            @update:model-value="setCloseEase"
-          />
-        </div>
-        </div>
-        </section>
-
-        <!-- 用户导入的插件:每个插件一张卡片 -->
-        <p v-if="!plugins.custom.length" class="text-[calc(13px*var(--ui-font-scale))] text-ink-3">{{ t("theme.pluginEmpty") }}</p>
-        <section v-for="entry in plugins.custom" :key="entry.id" class="plugin-card">
-          <header class="plugin-card-head">
-            <span class="plugin-card-name" :title="entry.files.join('\n')">{{ entry.name }}</span>
-            <input
-              type="checkbox"
-              class="checkbox-input"
-              :checked="entry.enabled"
-              :aria-label="entry.name"
-              @change="site.setPluginEnabled(entry.id, ($event.target as HTMLInputElement).checked)"
-            />
-          </header>
-          <div class="plugin-card-meta">
-            <span class="text-[calc(11px*var(--ui-font-scale))] text-ink-3">{{ t("theme.pluginFileCount", { n: entry.files.length }) }}</span>
-            <button type="button" class="btn-icon h-6 w-6 shrink-0 hover:!text-danger" :title="t('theme.pluginRemove')" @click="removePlugin(entry.id, entry.name)">
-              <AppIcon name="trash" :size="12" />
-            </button>
-          </div>
-        </section>
-
-        <div class="plugin-card-footer">
-          <button type="button" class="btn btn-secondary" @click="importPlugin">
-            <AppIcon name="plus" :size="13" />
-            {{ t("theme.pluginImport") }}
-          </button>
-          <p class="opt-hint">{{ t("theme.pluginHint") }}</p>
-        </div>
-      </template>
-
-      <template v-else>
-        <div v-for="field in group.fields" :key="field.key" class="flex flex-col">
+      <!-- 分组字段(站点级插件配置已迁至「插件」页) -->
+      <div v-for="field in group.fields" :key="field.key" class="flex flex-col">
         <!-- 开关自带行内标签,不再重复渲染标题 -->
         <label v-if="field.type !== 'boolean'" class="field-label">{{ field.label }}</label>
 
@@ -1222,7 +866,6 @@ function setTagColor(field: ThemeField, name: string, color: string) {
         <!-- 行为边界说明(来自 theme.json 的 hint):如「首页不显示」之类,在配置处即可见 -->
         <p v-if="field.hint" class="opt-hint">{{ field.hint }}</p>
         </div>
-      </template>
     </section>
 
     <p v-if="!(theme.activeMeta?.config ?? []).length" class="text-[calc(13px*var(--ui-font-scale))] text-ink-3">
@@ -1396,53 +1039,6 @@ function setTagColor(field: ThemeField, name: string, color: string) {
   }
 }
 
-/* 插件卡片:每个插件一张圆角卡片,始终位于配置组的圆角矩形框内 */
-.plugin-card {
-  max-width: 100%;
-  padding: 12px 14px;
-  border: 1px solid var(--color-line);
-  border-radius: 10px;
-  background: var(--color-bg);
-}
-.plugin-card + .plugin-card,
-.plugin-card + p,
-p + .plugin-card {
-  margin-top: 10px;
-}
-.plugin-card-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 8px;
-}
-.plugin-card-name {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--color-ink);
-  font-size: calc(13px * var(--ui-font-scale));
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.plugin-card-body {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  min-width: 0;
-}
-.plugin-card-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-.plugin-card-footer {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-top: 12px;
-}
 /* 标签颜色行的药丸预览:与站点卡片上的标签同形 */
 .tag-pill-demo {
   --tag-c: var(--color-accent);
@@ -1468,13 +1064,6 @@ p + .plugin-card {
   padding: 5px 0;
   cursor: pointer;
   transition: opacity var(--duration-base) var(--ease-plain);
-}
-/* 插件列表行:启用开关 + 名称 + 文件数 + 删除 */
-.plugin-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 0;
 }
 .navlist-row.off {
   opacity: 0.4;

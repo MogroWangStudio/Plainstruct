@@ -1,8 +1,8 @@
 import { defineStore } from "pinia";
 import { ipc } from "@/ipc/ipc";
-import type { SiteConfig, SitePluginEntry, SitePluginFiles, TreeNode } from "@/ipc/types";
+import type { ImportedPlugin, SiteConfig, SitePluginEntry, SitePluginFiles, TreeNode } from "@/ipc/types";
 import { collectDocPaths, type DocsCache } from "@/lib/builder";
-import { enabledPlugins, normalizePlugins } from "@/lib/plugins";
+import { BUILTIN_PLUGINS, enabledPlugins, normalizePlugins } from "@/lib/plugins";
 import { remapDocRefsForMove } from "@/lib/imageRefs";
 import { dirname, isAssetDirName, isImageFile } from "@/lib/paths";
 import { useEditorStore } from "./editor";
@@ -429,14 +429,45 @@ export const useSiteStore = defineStore("site", {
       void useBuilderStore().onSiteChanged();
     },
 
-    /** 导入插件文件(多选合并为一个条目);取消选择返回 false */
-    async importPlugin(): Promise<boolean> {
+    /** 导入插件文件(多选合并为一个条目),同时做 Plainstruct 插件识别;
+     *  取消选择返回 null */
+    async importPlugin(): Promise<ImportedPlugin | null> {
       const paths = await ipc.pickPluginFiles();
-      if (!paths?.length) return false;
-      const entry = await ipc.importSitePlugin(paths);
+      if (!paths?.length) return null;
+      const result = await ipc.importSitePlugin(paths);
+      const current = this.config ? normalizePlugins(this.config) : { search: true, imgPreview: true, custom: [] };
+      await this.savePlugins({ custom: [...current.custom, result.entry] });
+      return result;
+    },
+
+    /** 复制内置插件为自定义插件(源码写入站点插件目录,可自由修改与二次开发) */
+    async duplicateBuiltinPlugin(key: "search" | "imgPreview", name: string): Promise<SitePluginEntry> {
+      const meta = BUILTIN_PLUGINS.find((m) => m.key === key);
+      if (!meta) throw new Error("未知内置插件");
+      const entry = await ipc.createSitePluginFiles({
+        name,
+        description: undefined,
+        developer: meta.developer,
+        version: meta.version,
+        builtinCopyOf: key,
+        files: meta.files,
+      });
       const current = this.config ? normalizePlugins(this.config) : { search: true, imgPreview: true, custom: [] };
       await this.savePlugins({ custom: [...current.custom, entry] });
-      return true;
+      return entry;
+    },
+
+    /** 编辑自定义插件的名称与描述(条目内元数据,不动文件) */
+    async savePluginMeta(id: string, patch: { name?: string; description?: string }) {
+      const current = this.config ? normalizePlugins(this.config) : { search: true, imgPreview: true, custom: [] };
+      await this.savePlugins({
+        custom: current.custom.map((e) => (e.id === id ? { ...e, ...patch } : e)),
+      });
+    },
+
+    /** 保存自定义插件的单个文件(二次开发) */
+    async writePluginFile(id: string, name: string, content: string) {
+      await ipc.writeSitePluginFile(id, name, content);
     },
 
     async removePlugin(id: string) {

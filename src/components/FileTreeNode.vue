@@ -360,10 +360,12 @@ function onDrop(e: DragEvent) {
   top: 0;
   right: 0;
   bottom: 0;
-  /* 宽度随快捷按钮个数变化(--row-mask-w,行内样式按按钮数给出) */
+  /* 宽度随快捷按钮个数变化(--row-mask-w,行内样式按按钮数给出);
+     渐变色标:透明在最左,纯色定在按钮区域最左侧端点(距遮罩左缘 10px,
+     即首按钮左沿),纯色完整覆盖全部按钮下方,渐变只在名称侧收尾 */
   width: var(--row-mask-w, 92px);
   border-radius: inherit;
-  background: linear-gradient(to right, transparent, var(--row-bg, var(--color-surface)));
+  background: linear-gradient(to right, transparent, var(--row-bg, var(--color-surface)) 10px);
   opacity: 0;
   pointer-events: none;
   transition: opacity var(--duration-base) var(--ease-plain);

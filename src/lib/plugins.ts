@@ -265,3 +265,42 @@ export function inlinePreviewPlugins(site: SiteConfig, contents: SitePluginFiles
   }
   return tags;
 }
+
+/* ---------- 内置插件元数据(插件页展示与复制为自定义插件) ---------- */
+
+export interface BuiltinPluginMeta {
+  /** 站点配置中的开关键(plugins.search / plugins.imgPreview) */
+  key: "search" | "imgPreview";
+  /** 展示名/描述的 i18n 键 */
+  nameKey: string;
+  descKey: string;
+  developer: string;
+  version: string;
+  /** 复制为自定义插件时写入的文件集(原始内容) */
+  files: { name: string; content: string }[];
+}
+
+export const BUILTIN_PLUGINS: BuiltinPluginMeta[] = [
+  {
+    key: "search",
+    nameKey: "theme.pluginSearch",
+    descKey: "theme.pluginSearchHint",
+    developer: "MogroWang Studio",
+    version: "1.2.0",
+    files: [
+      { name: "ps-search.css", content: searchCss },
+      { name: "ps-search.js", content: searchJs },
+    ],
+  },
+  {
+    key: "imgPreview",
+    nameKey: "theme.pluginImgPreview",
+    descKey: "theme.pluginImgPreviewHint",
+    developer: "MogroWang Studio",
+    version: "1.3.0",
+    files: [
+      { name: "ps-imgpreview.css", content: imgPreviewCss },
+      { name: "ps-imgpreview.js", content: imgPreviewJs },
+    ],
+  },
+];

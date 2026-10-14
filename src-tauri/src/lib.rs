@@ -207,6 +207,8 @@ pub fn run() {
             commands::import_site_plugin,
             commands::delete_site_plugin,
             commands::read_site_plugin_files,
+            commands::create_site_plugin_files,
+            commands::write_site_plugin_file,
             // 内容
             commands::list_tree,
             commands::save_doc_order,

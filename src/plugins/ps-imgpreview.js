@@ -187,15 +187,25 @@
     }
   }
 
+  /** img 上是否有进行中的 CSS 过渡(缩小弹性曲线中途会穿过目标值,
+     仅靠矩阵比对会在过零点误判为静止 —— 动画存在即推迟烘焙) */
+  function transformBusy() {
+    try {
+      if (img.getAnimations) return img.getAnimations().length > 0;
+    } catch (e) { /* 引擎不支持则退回矩阵比对 */ }
+    return false;
+  }
+
   function bakeNow() {
     if (sharpTimer) {
       window.clearTimeout(sharpTimer);
       sharpTimer = 0;
     }
     if (pixel || !opened || closing || reduced) return;
-    // CSS 过渡进行中(视觉缩放 ≠ 逻辑缩放)时推迟:把中间帧烘进布局会造成跳动;
-    // 只在变换完全静止后刷新 —— 刷新本身不带任何动画,仅重栅格化图像
-    if (Math.abs(visualScale() - st.scale) > 0.004) {
+    // CSS 过渡进行中(视觉缩放 ≠ 逻辑缩放,或 img 上仍有活动过渡 —— 弹性曲线
+    // 中途会穿过目标值,矩阵比对会漏判)时推迟:把中间帧烘进布局会造成位置乱
+    // 变动与闪烁;只在变换完全静止后刷新 —— 刷新本身不带任何动画,仅重栅格化
+    if (transformBusy() || Math.abs(visualScale() - st.scale) > 0.004) {
       sharpTimer = window.setTimeout(function () {
         sharpTimer = 0;
         bakeNow();

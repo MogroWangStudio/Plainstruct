@@ -10,6 +10,7 @@ import type {
   PublishPreflight,
   RecentSite,
   SiteConfig,
+  ImportedPlugin,
   SitePluginEntry,
   SitePluginFiles,
   SyncProgress,
@@ -391,7 +392,7 @@ async readSiteConfig(): Promise<SiteConfig> {
 
   /* ---------- 站点插件(mock 内存虚拟文件系统) ---------- */
 
-  async importSitePlugin(srcPaths: string[]): Promise<SitePluginEntry> {
+  async importSitePlugin(srcPaths: string[]): Promise<ImportedPlugin> {
     if (!srcPaths.length) throw new Error("未选择插件文件");
     const pluginsFor = (root: string) => {
       let m = mockPlugins.get(root);
@@ -420,7 +421,53 @@ async readSiteConfig(): Promise<SiteConfig> {
       if (!name) name = stem || original;
     }
     store.set(id, { name, files });
-    return { id, name, files: [...files.keys()], enabled: true };
+    // mock 通道:文件为占位内容,一律按未识别处理
+    return {
+      entry: { id, name, files: [...files.keys()], enabled: true },
+      recognized: false,
+    };
+  },
+
+  async createSitePluginFiles(payload: {
+    name: string;
+    description?: string;
+    developer?: string;
+    version?: string;
+    builtinCopyOf?: string;
+    files: { name: string; content: string }[];
+  }): Promise<SitePluginEntry> {
+    const pluginsFor = (root: string) => {
+      let m = mockPlugins.get(root);
+      if (!m) {
+        m = new Map();
+        mockPlugins.set(root, m);
+      }
+      return m;
+    };
+    const store = pluginsFor(currentRoot!);
+    let id = "";
+    do {
+      id = `plugin-${Date.now() % 1_000_000}-${Math.floor(Math.random() * 9973)}`;
+    } while (store.has(id));
+    const files = new Map<string, string>();
+    for (const f of payload.files) files.set(f.name, f.content);
+    store.set(id, { name: payload.name, files });
+    return {
+      id,
+      name: payload.name,
+      files: [...files.keys()],
+      enabled: true,
+      description: payload.description,
+      developer: payload.developer,
+      version: payload.version,
+      builtinCopyOf: payload.builtinCopyOf,
+    };
+  },
+
+  async writeSitePluginFile(id: string, name: string, content: string): Promise<void> {
+    const plugin = mockPlugins.get(currentRoot!)?.get(id);
+    if (!plugin || !plugin.files.has(name)) throw new Error(`插件文件不存在: ${name}`);
+    plugin.files.set(name, content);
   },
 
   async deleteSitePlugin(id: string): Promise<void> {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-/** 通用代码编辑器(主题制作器用):html / css / json */
+/** 通用代码编辑器(主题制作器/插件源码用):html / css / json / markdown / javascript */
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { EditorView, keymap } from "@codemirror/view";
 import { Compartment, EditorState } from "@codemirror/state";
@@ -10,10 +10,11 @@ import { tags as tg } from "@lezer/highlight";
 import { html } from "@codemirror/lang-html";
 import { css } from "@codemirror/lang-css";
 import { json } from "@codemirror/lang-json";
+import { javascript } from "@codemirror/lang-javascript";
 import { markdown } from "@codemirror/lang-markdown";
 import { registerCmView, unregisterCmView } from "@/lib/contextMenu";
 
-const props = defineProps<{ modelValue: string; language: "html" | "css" | "json" | "markdown" }>();
+const props = defineProps<{ modelValue: string; language: "html" | "css" | "json" | "markdown" | "javascript" }>();
 const emit = defineEmits<{ "update:modelValue": [value: string] }>();
 
 const host = ref<HTMLElement>();
@@ -45,6 +46,8 @@ function langExtension() {
       return css();
     case "json":
       return json();
+    case "javascript":
+      return javascript();
     default:
       return markdown();
   }

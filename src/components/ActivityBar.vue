@@ -13,6 +13,7 @@ const items: { view: AppView; icon: string; label: string }[] = [
   { view: "assets", icon: "assets", label: "nav.assets" },
   { view: "site", icon: "sliders", label: "nav.site" },
   { view: "theme", icon: "palette", label: "nav.theme" },
+  { view: "plugins", icon: "puzzle", label: "nav.plugins" },
   { view: "build", icon: "box", label: "nav.build" },
   { view: "publish", icon: "upload", label: "nav.publish" },
 ];

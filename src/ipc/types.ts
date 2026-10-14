@@ -123,11 +123,25 @@ export interface FolderMeta {
 export interface SitePluginEntry {
   /** 插件目录名(自动生成,避免重名) */
   id: string;
-  /** 显示名(取首个导入文件的名称) */
+  /** 显示名(导入识别或首个导入文件名;可编辑) */
   name: string;
   /** 插件目录内的文件名列表(.js/.css) */
   files: string[];
   enabled: boolean;
+  /** 插件描述(导入识别/复制内置时预填,可编辑) */
+  description?: string;
+  /** 开发者(导入识别/复制内置时预填) */
+  developer?: string;
+  /** 插件版本(导入识别/复制内置时预填) */
+  version?: string;
+  /** 复制自哪个内置插件(search/imgPreview):界面据此标注来源 */
+  builtinCopyOf?: string;
+}
+
+/** 导入结果:条目 + 是否识别为 Plainstruct 插件(recognized 不落盘) */
+export interface ImportedPlugin {
+  entry: SitePluginEntry;
+  recognized: boolean;
 }
 
 /** 站点插件配置:内置插件(搜索/图片预览)开关 + 用户导入的插件列表 */

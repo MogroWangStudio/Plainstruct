@@ -18,6 +18,7 @@ import AssetsView from "@/views/AssetsView.vue";
 import SiteSettingsView from "@/views/SiteSettingsView.vue";
 import BuildView from "@/views/BuildView.vue";
 import ThemesView from "@/views/ThemesView.vue";
+import PluginsView from "@/views/PluginsView.vue";
 import PublishView from "@/views/PublishView.vue";
 import SettingsView from "@/views/SettingsView.vue";
 import AboutView from "@/views/AboutView.vue";
@@ -71,6 +72,7 @@ const viewMap = {
   site: SiteSettingsView,
   build: BuildView,
   theme: ThemesView,
+  plugins: PluginsView,
   publish: PublishView,
   settings: SettingsView,
 } as const;
