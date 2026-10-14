@@ -17,7 +17,7 @@ import { useUiStore } from "@/stores/ui";
 import { ipc } from "@/ipc/ipc";
 import { applyFrontMatter, parseFrontMatter } from "@/lib/frontmatter";
 import { encodePath, stripExt, ASSET_MIME, assetRefPrefix, relPosix } from "@/lib/paths";
-import { registerCmView, unregisterCmView } from "@/lib/contextMenu";
+import { registerCmView, registerCmFind, unregisterCmView, unregisterCmFind } from "@/lib/contextMenu";
 import AppIcon from "@/components/AppIcon.vue";
 import FrontMatterModal, { type FrontMatterForm } from "@/components/FrontMatterModal.vue";
 import ImageInsertModal, { type ImageInsertResult, type ImageInsertSource } from "@/components/ImageInsertModal.vue";
@@ -1015,8 +1015,10 @@ onMounted(() => {
     }),
     parent: host.value!,
   });
-  // 注册到右键菜单:编辑器内的右键文本操作直接作用于 CodeMirror 选区
+  // 注册到右键菜单:编辑器内的右键文本操作直接作用于 CodeMirror 选区;
+  // 同时登记「查找与替换」面板入口(右键菜单第一项调用 openFind)
   registerCmView(host.value!, view);
+  registerCmFind(host.value!, openFind);
   // 登记到全局 store:侧边栏的全局撤销/重做按钮经 store 驱动编辑器历史
   editor.registerView(view);
   updateActiveFormats();
@@ -1059,7 +1061,10 @@ watch(
 );
 
 onBeforeUnmount(() => {
-  if (host.value) unregisterCmView(host.value);
+  if (host.value) {
+    unregisterCmView(host.value);
+    unregisterCmFind(host.value);
+  }
   editor.unregisterView(view!);
   view?.destroy();
   view = null;

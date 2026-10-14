@@ -7,20 +7,6 @@ import { useAppStore } from "./app";
 import { useBuilderStore } from "./builder";
 import { useUiStore } from "./ui";
 
-/** 发送系统通知:官方通知插件 —— 首次发送前先请求系统通知权限
- *  (macOS 的 UNUserNotificationCenter 未授权时直接 show 会静默失败);
- *  权限拒绝或插件不可用时静默跳过,不影响发布流程 */
-async function sendSystemNotification(title: string, body: string): Promise<void> {
-  try {
-    const plugin = await import("@tauri-apps/plugin-notification");
-    let granted = await plugin.isPermissionGranted();
-    if (!granted) granted = (await plugin.requestPermission()) === "granted";
-    if (granted) plugin.sendNotification({ title, body });
-  } catch {
-    /* 通知不可用(权限拒绝/环境不支持):静默跳过 */
-  }
-}
-
 /** Pages 构建监听状态:building = 自动轮询中,ready = 本次提交已构建完成 */
 export type DeployState = "idle" | "building" | "ready" | "errored" | "timeout";
 
@@ -91,7 +77,8 @@ export const usePublishStore = defineStore("publish", {
       this.logs = [];
     },
 
-    /** 发布系统通知:档位由设置决定(两次/合并一次/关闭)。权限未授予时先请求;
+    /** 发布系统通知:档位由设置决定(两次/合并一次/关闭)。后端直接投递
+     *  (macOS 现代通知中心/Windows AUMID 兕底),失败信息落入发布日志,
      *  浏览器 mock 为空操作 */
     notifyOf(kind: "published" | "deployed") {
       const app = useAppStore();
@@ -99,17 +86,25 @@ export const usePublishStore = defineStore("publish", {
       const mode: PublishNotifyMode = app.settings.publishNotify ?? "twice";
       if (mode === "off") return;
       const t = i18n.global.t;
+      const send = async (title: string, body: string) => {
+        try {
+          await ipc.systemNotify(title, body);
+        } catch (e) {
+          // 通知不可用不阻断发布流程,但让用户知道原因(发布日志可见)
+          this.appendLog("info", `[系统通知] ${ipc.errText(e)}`);
+        }
+      };
       if (kind === "published") {
         // 合并档位:发布成功不弹,等 Pages 构建完成后发一条合并通知
         if (mode === "twice") {
-          void sendSystemNotification(t("publish.notifyPublishedTitle"), t("publish.notifyPublishedBody"));
+          void send(t("publish.notifyPublishedTitle"), t("publish.notifyPublishedBody"));
         }
         return;
       }
       if (mode === "twice") {
-        void sendSystemNotification(t("publish.notifyDeployedTitle"), t("publish.notifyDeployedBody"));
+        void send(t("publish.notifyDeployedTitle"), t("publish.notifyDeployedBody"));
       } else {
-        void sendSystemNotification(t("publish.notifyMergedTitle"), t("publish.notifyMergedBody"));
+        void send(t("publish.notifyMergedTitle"), t("publish.notifyMergedBody"));
       }
     },
 

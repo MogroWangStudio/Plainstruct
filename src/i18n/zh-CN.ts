@@ -47,6 +47,9 @@ export default {
     title: "插件",
     subtitle: "站点级功能扩展,应用于全站所有页面",
     globalHint: "插件应用于全站所有页面,与主题无关",
+    openAnim: "打开归位动画预设（进入灯箱）",
+    openAnimDur: "打开动画时长",
+    openAnimEase: "打开动画曲线",
     builtin: "内置插件",
     custom: "自定义插件",
     noCustom: "还没有自定义插件。导入插件,或把内置插件复制下来进行修改与二次开发。",
@@ -687,6 +690,7 @@ export default {
     swipeHint: "按住拖动带惯性，左缘右滑返回上一页。",
   },
   menu: {
+    find: "查找与替换…",
     cut: "剪切",
     copy: "复制",
     paste: "粘贴",

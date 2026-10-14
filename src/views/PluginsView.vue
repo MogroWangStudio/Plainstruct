@@ -37,6 +37,9 @@ const plugins = computed(() =>
         imgPreviewCloseDur: undefined,
         imgPreviewCloseEase: undefined,
         imgPreviewClosePreset: undefined,
+        imgPreviewOpenDur: undefined,
+        imgPreviewOpenEase: undefined,
+        imgPreviewOpenPreset: undefined,
         custom: [],
       },
 );
@@ -97,6 +100,28 @@ function setCloseDur(v: number) {
 
 function setCloseEase(v: string) {
   void site.savePlugins({ imgPreviewCloseEase: v, imgPreviewClosePreset: "自定义" });
+}
+
+/** 打开归位动画(进入灯箱):与关闭动画同预设表,手动改时长/曲线自动转「自定义」 */
+function applyOpenPreset(v: string) {
+  const hit = CLOSE_PRESET_VALUES[v];
+  if (hit) {
+    void site.savePlugins({
+      imgPreviewOpenPreset: v,
+      imgPreviewOpenDur: hit.dur,
+      imgPreviewOpenEase: hit.ease,
+    });
+  } else {
+    void site.savePlugins({ imgPreviewOpenPreset: "自定义" });
+  }
+}
+
+function setOpenDur(v: number) {
+  void site.savePlugins({ imgPreviewOpenDur: v, imgPreviewOpenPreset: "自定义" });
+}
+
+function setOpenEase(v: string) {
+  void site.savePlugins({ imgPreviewOpenEase: v, imgPreviewOpenPreset: "自定义" });
 }
 
 /* ---------- 卡片展开:内置插件卡片点「配置」就地展开设置 ---------- */
@@ -518,6 +543,51 @@ function copySourceOf(entry: SitePluginEntry): string {
                     </button>
                   </div>
                   <p class="opt-hint">{{ t("theme.pluginImgSharpDelayHint") }}</p>
+                </div>
+
+                <div class="flex flex-col gap-1">
+                  <span class="field-label">{{ t("plugins.openAnim") }}</span>
+                  <SelectMenu
+                    :model-value="plugins.imgPreviewOpenPreset ?? '标准'"
+                    :options="[
+                      { value: '标准', label: t('theme.pluginImgClosePresetStd') },
+                      { value: '轻快', label: t('theme.pluginImgClosePresetSwift') },
+                      { value: '柔和', label: t('theme.pluginImgClosePresetSoft') },
+                      { value: '回弹', label: t('theme.pluginImgClosePresetBounce') },
+                      { value: '自定义', label: t('theme.pluginImgClosePresetCustom') },
+                    ]"
+                    align="left"
+                    @update:model-value="applyOpenPreset"
+                  />
+                </div>
+                <div class="flex flex-col gap-1">
+                  <span class="field-label">{{ t("plugins.openAnimDur") }}</span>
+                  <div class="flex items-center gap-3">
+                    <input
+                      type="range"
+                      class="range-input min-w-0 flex-1"
+                      min="240"
+                      max="1200"
+                      step="20"
+                      :value="plugins.imgPreviewOpenDur ?? 580"
+                      @change="setOpenDur(Number(($event.target as HTMLInputElement).value))"
+                    />
+                    <span class="mono w-14 shrink-0 text-right text-[calc(12px*var(--ui-font-scale))] text-ink-2">{{ plugins.imgPreviewOpenDur ?? 580 }}ms</span>
+                  </div>
+                </div>
+                <div class="flex flex-col gap-1">
+                  <span class="field-label">{{ t("plugins.openAnimEase") }}</span>
+                  <SelectMenu
+                    :model-value="plugins.imgPreviewOpenEase ?? '平滑'"
+                    :options="[
+                      { value: '平滑', label: t('theme.pluginEaseSmooth') },
+                      { value: '缓出', label: t('theme.pluginEaseOut') },
+                      { value: '线性', label: t('theme.pluginEaseLinear') },
+                      { value: '弹性', label: t('theme.pluginEaseSpring') },
+                    ]"
+                    align="left"
+                    @update:model-value="setOpenEase"
+                  />
                 </div>
 
                 <div class="flex flex-col gap-1">

@@ -18,7 +18,6 @@
     "core:window:allow-hide",
     "core:window:allow-unminimize",
     "core:window:allow-set-focus",
-    "notification:default",
     "core:webview:allow-create-webview-window",
     "core:webview:allow-webview-close",
     "core:webview:allow-get-all-webviews",

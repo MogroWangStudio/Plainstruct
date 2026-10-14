@@ -39,8 +39,14 @@ export function normalizePlugins(site: SiteConfig): {
   imgPreviewCloseDur?: number;
   /** 关闭归位动画曲线:平滑/缓出/线性/弹性,缺省平滑 */
   imgPreviewCloseEase?: string;
-  /** 归位动画效果预设:标准/轻快/柔和/回弹/自定义(自定义时用上方时长+曲线) */
+  /** 关闭归位动画效果预设:标准/轻快/柔和/回弹/自定义(自定义时用上方时长+曲线) */
   imgPreviewClosePreset?: string;
+  /** 打开归位动画(进入灯箱)时长(ms):240–1200,缺省 580 */
+  imgPreviewOpenDur?: number;
+  /** 打开归位动画曲线:平滑/缓出/线性/弹性,缺省平滑 */
+  imgPreviewOpenEase?: string;
+  /** 打开归位动画效果预设:标准/轻快/柔和/回弹/自定义 */
+  imgPreviewOpenPreset?: string;
   custom: SitePluginEntry[];
 } {
   const p = site.plugins ?? {};
@@ -85,6 +91,23 @@ export function normalizePlugins(site: SiteConfig): {
       p.imgPreviewClosePreset === "自定义"
         ? p.imgPreviewClosePreset
         : undefined,
+    imgPreviewOpenDur: (() => {
+      const n = Math.round(Number(p.imgPreviewOpenDur));
+      return Number.isFinite(n) ? Math.min(1200, Math.max(240, n)) : undefined;
+    })(),
+    imgPreviewOpenEase:
+      p.imgPreviewOpenEase === "缓出" || p.imgPreviewOpenEase === "线性" || p.imgPreviewOpenEase === "弹性"
+        ? p.imgPreviewOpenEase
+        : p.imgPreviewOpenEase === "平滑"
+          ? p.imgPreviewOpenEase
+          : undefined,
+    imgPreviewOpenPreset:
+      p.imgPreviewOpenPreset === "轻快" ||
+      p.imgPreviewOpenPreset === "柔和" ||
+      p.imgPreviewOpenPreset === "回弹" ||
+      p.imgPreviewOpenPreset === "自定义"
+        ? p.imgPreviewOpenPreset
+        : undefined,
     custom: Array.isArray(p.custom) ? p.custom : [],
   };
 }
@@ -128,7 +151,11 @@ export function pluginTags(prefix: string, site: SiteConfig): string[] {
       (p.imgPreviewClosePreset ? ` data-close-preset="${p.imgPreviewClosePreset}"` : "") +
       (p.imgPreviewCloseDur !== undefined ? ` data-close-dur="${p.imgPreviewCloseDur}"` : "") +
       (p.imgPreviewCloseEase ? ` data-close-ease="${p.imgPreviewCloseEase}"` : "");
-    tags.push(pluginScript(prefix, "assets/ps-plugins/ps-imgpreview.js", mark + sharp + closeCfg));
+    const openCfg =
+      (p.imgPreviewOpenPreset ? ` data-open-preset="${p.imgPreviewOpenPreset}"` : "") +
+      (p.imgPreviewOpenDur !== undefined ? ` data-open-dur="${p.imgPreviewOpenDur}"` : "") +
+      (p.imgPreviewOpenEase ? ` data-open-ease="${p.imgPreviewOpenEase}"` : "");
+    tags.push(pluginScript(prefix, "assets/ps-plugins/ps-imgpreview.js", mark + sharp + closeCfg + openCfg));
   }
   if (p.search) {
     tags.push(
@@ -249,6 +276,9 @@ export function inlinePreviewPlugins(site: SiteConfig, contents: SitePluginFiles
     const cfg = {
       mark: p.imgPreviewRequireMark,
       sharpDelay: p.imgPreviewSharpDelay,
+      openPreset: p.imgPreviewOpenPreset,
+      openDur: p.imgPreviewOpenDur,
+      openEase: p.imgPreviewOpenEase,
       closePreset: p.imgPreviewClosePreset,
       closeDur: p.imgPreviewCloseDur,
       closeEase: p.imgPreviewCloseEase,

@@ -62,6 +62,10 @@ export const ipc = {
   repairWebviewData(): Promise<void> {
     return inTauri ? invoke<void>("repair_webview_data") : Promise.resolve();
   },
+  /** 系统通知(发布成功 / Pages 构建完成):后端直接投递,失败返回错误文本;浏览器 mock 为空操作 */
+  systemNotify(title: string, body: string): Promise<void> {
+    return inTauri ? invoke<void>("system_notify", { title, body }) : Promise.resolve();
+  },
   checkUpdate(): Promise<UpdateInfo> {
     return inTauri ? invoke<UpdateInfo>("check_update") : mock.checkUpdate();
   },

@@ -11,6 +11,8 @@ import { useContextMenuStore, type MenuItem } from "@/stores/contextMenu";
 /* ---------- CodeMirror 实例注册表(编辑器组件挂载时注册) ---------- */
 
 const cmViews = new Map<HTMLElement, EditorView>();
+/** 各编辑器自绘「查找与替换」面板的打开函数(右键菜单项调用) */
+const cmFindHandlers = new Map<HTMLElement, () => void>();
 
 export function registerCmView(host: HTMLElement, view: EditorView) {
   cmViews.set(host, view);
@@ -20,9 +22,25 @@ export function unregisterCmView(host: HTMLElement) {
   cmViews.delete(host);
 }
 
+/** 注册编辑器的查找面板入口(编辑器组件挂载时调用) */
+export function registerCmFind(host: HTMLElement, open: () => void) {
+  cmFindHandlers.set(host, open);
+}
+
+export function unregisterCmFind(host: HTMLElement) {
+  cmFindHandlers.delete(host);
+}
+
 function cmViewFor(target: HTMLElement): EditorView | null {
   for (const [host, view] of cmViews) {
     if (host.contains(target)) return view;
+  }
+  return null;
+}
+
+function cmFindFor(target: HTMLElement): (() => void) | null {
+  for (const [host, open] of cmFindHandlers) {
+    if (host.contains(target)) return open;
   }
   return null;
 }
@@ -203,8 +221,17 @@ export function installContextMenu() {
 
     const cm = cmViewFor(target);
     if (cm) {
+      const openFind = cmFindFor(target);
       void ipc.readClipboardText().then((clipboard) => {
-        openMenuAt(e, cmMenuItems(cm, clipboard));
+        const items = cmMenuItems(cm, clipboard);
+        // 查找与替换:编辑器提供自绘面板时才出现在菜单里(置于文本操作之前)
+        if (openFind) {
+          items.unshift(
+            { id: "find", label: t("menu.find"), icon: "search", shortcut: `${modKey()}F`, run: () => openFind() },
+            { id: "find-sep", separator: true },
+          );
+        }
+        openMenuAt(e, items);
       });
       return;
     }

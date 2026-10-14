@@ -160,6 +160,12 @@ export interface SitePluginsConfig {
   imgPreviewCloseEase?: string;
   /** 归位动画效果预设:标准(缺省)/轻快/柔和/回弹/自定义(自定义时用时长+曲线) */
   imgPreviewClosePreset?: string;
+  /** 打开归位动画(进入灯箱)时长(ms):240–1200,缺省 580 */
+  imgPreviewOpenDur?: number;
+  /** 打开归位动画曲线:平滑(缺省)/缓出/线性/弹性 */
+  imgPreviewOpenEase?: string;
+  /** 打开归位动画效果预设:标准(缺省)/轻快/柔和/回弹/自定义 */
+  imgPreviewOpenPreset?: string;
   /** 搜索入口形式:button = 毛玻璃按钮(缺省),bar = 长条文本框 */
   searchStyle?: "button" | "bar";
   /** 搜索入口位置:bottom-right(缺省)/ bottom-left / topbar(顶栏最右侧) */

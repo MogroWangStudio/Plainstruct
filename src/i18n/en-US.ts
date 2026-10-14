@@ -47,6 +47,9 @@ export default {
     title: "Plugins",
     subtitle: "Site-level extensions applied to every page",
     globalHint: "Plugins apply to all pages of the site, regardless of theme",
+    openAnim: "Open animation preset (enter lightbox)",
+    openAnimDur: "Open animation duration",
+    openAnimEase: "Open animation easing",
     builtin: "Built-in plugins",
     custom: "Custom plugins",
     noCustom: "No custom plugins yet. Import one, or copy a built-in plugin to customize and extend it.",
@@ -687,6 +690,7 @@ export default {
     swipeHint: "Drag to scroll with momentum · swipe from the left edge to go back · pointer clicks are delivered as real touch events",
   },
   menu: {
+    find: "Find & Replace…",
     cut: "Cut",
     copy: "Copy",
     paste: "Paste",

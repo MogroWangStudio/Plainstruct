@@ -396,11 +396,14 @@ export const useSiteStore = defineStore("site", {
       searchBarWidth?: number;
       /** 移动端搜索栏宽度(px),缺省沿用 PC 配置 */
       searchBarWidthM?: number;
-      /** 图片预览:分辨率刷新延迟(ms)与关闭归位动画(时长/曲线/预设) */
+      /** 图片预览:分辨率刷新延迟(ms)与打开/关闭归位动画(时长/曲线/预设) */
       imgPreviewSharpDelay?: number;
       imgPreviewCloseDur?: number;
       imgPreviewCloseEase?: string;
       imgPreviewClosePreset?: string;
+      imgPreviewOpenDur?: number;
+      imgPreviewOpenEase?: string;
+      imgPreviewOpenPreset?: string;
       custom?: SitePluginEntry[];
     }) {
       if (!this.config) return;
@@ -422,6 +425,9 @@ export const useSiteStore = defineStore("site", {
           imgPreviewCloseDur: patch.imgPreviewCloseDur ?? current.imgPreviewCloseDur,
           imgPreviewCloseEase: patch.imgPreviewCloseEase ?? current.imgPreviewCloseEase,
           imgPreviewClosePreset: patch.imgPreviewClosePreset ?? current.imgPreviewClosePreset,
+          imgPreviewOpenDur: patch.imgPreviewOpenDur ?? current.imgPreviewOpenDur,
+          imgPreviewOpenEase: patch.imgPreviewOpenEase ?? current.imgPreviewOpenEase,
+          imgPreviewOpenPreset: patch.imgPreviewOpenPreset ?? current.imgPreviewOpenPreset,
           custom: patch.custom ?? current.custom,
         },
       });

@@ -39,14 +39,29 @@
 
   /* ---------- 行为配置:构建产物经 script data 属性,内联预览经 window.__psImgCfg ---------- */
   // sharpDelay:放大静止后自动刷新分辨率的延迟(ms),0 = 关闭,缺省 500
-  // closePreset/closeDur/closeEase:关闭归位动画 —— 预设(标准/轻快/柔和/回弹)覆盖
-  // 时长与曲线,「自定义」时用下方两项(配置面板改时长/曲线会自动切到自定义)
-  var cfg = { sharpDelay: 500, closeDur: 580, closeEase: "平滑", closePreset: "标准" };
+  // openPreset/openDur/openEase:进入灯箱(点击时)的归位动画 —— 预设(标准/轻快/柔和/回弹)
+  //   覆盖时长与曲线,「自定义」时用下方两项
+  // closePreset/closeDur/closeEase:关闭灯箱的归位动画,规则同上
+  var cfg = {
+    sharpDelay: 500,
+    openDur: 580,
+    openEase: "平滑",
+    openPreset: "标准",
+    closeDur: 580,
+    closeEase: "平滑",
+    closePreset: "标准",
+  };
   (function () {
     var me = document.currentScript;
     if (me) {
       var v = parseInt(me.getAttribute("data-sharp-delay") || "", 10);
       if (Number.isFinite(v) && v >= 0) cfg.sharpDelay = v;
+      var od = parseInt(me.getAttribute("data-open-dur") || "", 10);
+      if (Number.isFinite(od) && od >= 240) cfg.openDur = od;
+      var oe = me.getAttribute("data-open-ease");
+      if (oe) cfg.openEase = oe;
+      var opr = me.getAttribute("data-open-preset");
+      if (opr) cfg.openPreset = opr;
       var d = parseInt(me.getAttribute("data-close-dur") || "", 10);
       if (Number.isFinite(d) && d >= 240) cfg.closeDur = d;
       var e = me.getAttribute("data-close-ease");
@@ -58,20 +73,27 @@
     if (typeof inline.mark === "string") window.__psImgRequireMark = inline.mark;
     var is = Number(inline.sharpDelay);
     if (Number.isFinite(is) && is >= 0) cfg.sharpDelay = is;
+    var iod = Number(inline.openDur);
+    if (Number.isFinite(iod) && iod >= 240) cfg.openDur = iod;
+    if (inline.openEase) cfg.openEase = inline.openEase;
+    if (inline.openPreset) cfg.openPreset = inline.openPreset;
     var id = Number(inline.closeDur);
     if (Number.isFinite(id) && id >= 240) cfg.closeDur = id;
     if (inline.closeEase) cfg.closeEase = inline.closeEase;
     if (inline.closePreset) cfg.closePreset = inline.closePreset;
   })();
   // 预设档位:「自定义」(或未知值)回落到配置的时长与曲线
-  var CLOSE_PRESETS = {
+  var ANIM_PRESETS = {
     标准: { dur: 580, ease: "平滑" },
     轻快: { dur: 380, ease: "缓出" },
     柔和: { dur: 860, ease: "平滑" },
     回弹: { dur: 680, ease: "弹性" },
   };
+  function openAnimOf() {
+    return ANIM_PRESETS[cfg.openPreset] || { dur: cfg.openDur, ease: cfg.openEase };
+  }
   function closeAnimOf() {
-    return CLOSE_PRESETS[cfg.closePreset] || { dur: cfg.closeDur, ease: cfg.closeEase };
+    return ANIM_PRESETS[cfg.closePreset] || { dur: cfg.closeDur, ease: cfg.closeEase };
   }
   var CLOSE_EASES = {
     平滑: [0.32, 0.72, 0, 1],
@@ -426,9 +448,12 @@
   }
 
   /** 以视口点 p 为缩放中心的目标变换(保持该点下的内容不动;不直接应用)。
-   *  像素模式与抗锯齿同参数:不做整数倍吸附,缩放范围同为 MIN–MAX。 */
+   *  像素模式与抗锯齿同参数:不做整数倍吸附。缩放范围 MIN–MAX 作用于**视觉**
+   *  倍率(相对 fit 尺寸):已烘焙时 st.scale 语义基准是烘焙后布局,换算回来 */
   function zoomTarget(px, py, next) {
-    var s = Math.min(MAX, Math.max(MIN, next));
+    var lo = MIN / bakedScale;
+    var hi = MAX / bakedScale;
+    var s = Math.min(hi, Math.max(lo, next));
     var k = s / st.scale;
     var cx = window.innerWidth / 2 + st.tx;
     var cy = window.innerHeight / 2 + st.ty;
@@ -447,9 +472,10 @@
     apply();
   }
 
-  /** 缩放按钮/双击/键盘缩放:像素模式走补间(手感与抗锯齿一致),其余即时应用 */
+  /** 缩放按钮/双击/键盘缩放:像素模式走补间(手感与抗锯齿一致),其余即时应用。
+   *  缩放直接从当前语义继续(已烘焙时 st.scale=1 为基准):布局不再随手势
+   *  反复突变/重栅格化 —— 这是此前缩放时闪烁与位置乱变动的根源 */
   function zoomAnimated(px, py, next) {
-    unbakeNow(); // 新缩放手势从原语义开始(视觉连续),静止后重新烘焙
     if (pixel && !reduced) {
       setMode(null); // img 已隐,CSS 过渡无对象 —— 动画由画布补间承担
       animatePixel(zoomTarget(px, py, next), 380, EASE_SPRING);
@@ -543,6 +569,18 @@
         img.getBoundingClientRect();
         setMode(null);
         img.style.boxShadow = ""; // 阴影随升空逐渐浮现
+        // 打开归位动画:时长与曲线来自插件配置(预设覆盖,自定义用时长+曲线);
+        // 内联 transition 覆盖基础类,动画结束后移除避免影响后续手势过渡
+        if (!reduced) {
+          var openAnim = openAnimOf();
+          var openBez = CLOSE_EASES[openAnim.ease] || CLOSE_EASES["平滑"];
+          img.style.transition =
+            "transform " + openAnim.dur + "ms cubic-bezier(" + openBez.join(",") + ")" +
+            ", box-shadow " + openAnim.dur + "ms cubic-bezier(" + openBez.join(",") + ")";
+          window.setTimeout(function () {
+            if (opened && !closing && !pixel) img.style.transition = "";
+          }, openAnim.dur + 80);
+        }
         st.scale = 1;
         st.tx = 0;
         st.ty = 0;
@@ -764,7 +802,8 @@
     e.preventDefault();
     if (closing) return;
     cancelPixelAnim();
-    unbakeNow(); // 滚轮缩放从原语义开始,静止后重新烘焙
+    // 已烘焙时 st.scale=1 为基准继续缩放:布局不变,只动 transform(合成器
+    // 过渡),无重栅格化 —— 静止后按需烘焙刷新分辨率
     setMode("ps-lb-spring");
     var k = Math.exp(-e.deltaY * (e.deltaMode === 1 ? 0.05 : 0.0016));
     zoomAt(e.clientX, e.clientY, st.scale * k);
@@ -801,7 +840,7 @@
       overlay.addEventListener("pointercancel", onUp);
     } else if (pointers.size === 2 && drag) {
       var pts = [...pointers.values()];
-      unbakeNow(); // 双指捏合从原语义开始,松手静止后重新烘焙
+      // 已烘焙时 st.scale=1 为基准捏合(布局不变,无重栅格化)
       drag.pinch0 = st.scale;
       drag.pinchDist0 = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
     }
@@ -872,10 +911,12 @@
 
     if (!d.locked && e.timeStamp - d.downT < 400) {
       // 未移动的点击:双击图片切换 100% ↔ 250%(以点击处为中心);背景单击由 mousedown 关闭
+      // 判断用视觉倍率(st.scale × 已烘焙倍率):烘焙后 st.scale 归一为 1,
+      // 但视觉可能已是 250%
       if (d.downTarget === img) {
         var now2 = e.timeStamp;
         if (now2 - lastTap < 320) {
-          unbakeNow(); // 双击切换倍率从原语义开始
+          unbakeNow(); // 双击的两条分支都回到「fit 布局 + 原语义」,此后缩放数学一致
           if (pixel && !reduced) {
             // 像素渲染:双击动画与抗锯齿一致(250%),由画布补间承担过渡
             setMode(null);
