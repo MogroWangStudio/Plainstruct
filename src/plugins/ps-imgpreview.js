@@ -39,7 +39,8 @@
 
   /* ---------- 行为配置:构建产物经 script data 属性,内联预览经 window.__psImgCfg ---------- */
   // sharpDelay:放大静止后自动刷新分辨率的延迟(ms),0 = 关闭,缺省 500
-  // closeDur/closeEase:关闭归位动画时长与曲线;closePreset 预设覆盖两者(自定义除外)
+  // closePreset/closeDur/closeEase:关闭归位动画 —— 预设(标准/轻快/柔和/回弹)覆盖
+  // 时长与曲线,「自定义」时用下方两项(配置面板改时长/曲线会自动切到自定义)
   var cfg = { sharpDelay: 500, closeDur: 580, closeEase: "平滑", closePreset: "标准" };
   (function () {
     var me = document.currentScript;
@@ -50,6 +51,8 @@
       if (Number.isFinite(d) && d >= 240) cfg.closeDur = d;
       var e = me.getAttribute("data-close-ease");
       if (e) cfg.closeEase = e;
+      var pr = me.getAttribute("data-close-preset");
+      if (pr) cfg.closePreset = pr;
     }
     var inline = window.__psImgCfg || {};
     if (typeof inline.mark === "string") window.__psImgRequireMark = inline.mark;
@@ -60,14 +63,16 @@
     if (inline.closeEase) cfg.closeEase = inline.closeEase;
     if (inline.closePreset) cfg.closePreset = inline.closePreset;
   })();
-  // 预设档位:非「自定义」时覆盖时长与曲线
+  // 预设档位:「自定义」(或未知值)回落到配置的时长与曲线
   var CLOSE_PRESETS = {
     标准: { dur: 580, ease: "平滑" },
     轻快: { dur: 380, ease: "缓出" },
     柔和: { dur: 860, ease: "平滑" },
     回弹: { dur: 680, ease: "弹性" },
   };
-  var closeAnim = CLOSE_PRESETS[cfg.closePreset] || { dur: cfg.closeDur, ease: cfg.closeEase };
+  function closeAnimOf() {
+    return CLOSE_PRESETS[cfg.closePreset] || { dur: cfg.closeDur, ease: cfg.closeEase };
+  }
   var CLOSE_EASES = {
     平滑: [0.32, 0.72, 0, 1],
     缓出: [0.16, 1, 0.3, 1],
@@ -170,12 +175,34 @@
   var bakedScale = 1; // 已烘进布局尺寸的累计缩放
   var sharpTimer = 0;
 
+  /** 当前视觉缩放(计算后的变换矩阵;进场/缩放 CSS 过渡进行中时为中间帧) */
+  function visualScale() {
+    var t = getComputedStyle(img).transform;
+    if (!t || t === "none") return st.scale;
+    try {
+      var m = new DOMMatrix(t);
+      return Math.hypot(m.a, m.b);
+    } catch (e) {
+      return st.scale;
+    }
+  }
+
   function bakeNow() {
     if (sharpTimer) {
       window.clearTimeout(sharpTimer);
       sharpTimer = 0;
     }
-    if (pixel || !opened || closing || reduced || st.scale <= 1.001) return;
+    if (pixel || !opened || closing || reduced) return;
+    // CSS 过渡进行中(视觉缩放 ≠ 逻辑缩放)时推迟:把中间帧烘进布局会造成跳动;
+    // 只在变换完全静止后刷新 —— 刷新本身不带任何动画,仅重栅格化图像
+    if (Math.abs(visualScale() - st.scale) > 0.004) {
+      sharpTimer = window.setTimeout(function () {
+        sharpTimer = 0;
+        bakeNow();
+      }, 120);
+      return;
+    }
+    if (st.scale <= 1.001) return;
     var w = img.offsetWidth;
     var h = img.offsetHeight;
     img.style.maxWidth = "none";
@@ -184,10 +211,14 @@
     img.style.height = h * st.scale + "px";
     bakedScale *= st.scale;
     st.scale = 1;
-    // 布局尺寸变化与 transform 归一同帧无过渡完成,视觉无跳变
+    // 刷新帧禁用一切过渡:布局尺寸与 transform 归一同帧无动画完成,视觉零跳动
+    var prevTransition = img.style.transition;
+    img.style.transition = "none";
     setMode("ps-lb-dragging");
     apply();
+    void img.getBoundingClientRect();
     requestAnimationFrame(function () {
+      img.style.transition = prevTransition;
       if (opened && !pixel) setMode("ps-lb-spring");
     });
   }
@@ -552,6 +583,7 @@
       // transform 影响;getBoundingClientRect 会带上 scale 导致二次缩放跳变),
       // 旋转在返回途中收正到最近的整圈,落地时与源图朝向一致。
       // 归位动画时长与曲线来自插件配置(预设覆盖,自定义用时长+曲线)
+      var closeAnim = closeAnimOf();
       var closeDur = reduced ? 200 : closeAnim.dur;
       var bez = CLOSE_EASES[closeAnim.ease] || CLOSE_EASES["平滑"];
       var cubic = "cubic-bezier(" + bez.join(",") + ")";

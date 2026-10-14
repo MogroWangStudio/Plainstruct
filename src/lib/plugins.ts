@@ -122,9 +122,10 @@ export function pluginTags(prefix: string, site: SiteConfig): string[] {
   }
   if (p.imgPreview) {
     const mark = p.imgPreviewRequireMark ? ` data-require-mark="${p.imgPreviewRequireMark.replace(/"/g, "&quot;")}"` : "";
-    // 图片预览行为配置:分辨率刷新延迟与归位动画(时长/曲线),经 data 属性下发
+    // 图片预览行为配置:分辨率刷新延迟与归位动画(预设/时长/曲线),经 data 属性下发
     const sharp = p.imgPreviewSharpDelay !== undefined ? ` data-sharp-delay="${p.imgPreviewSharpDelay}"` : "";
     const closeCfg =
+      (p.imgPreviewClosePreset ? ` data-close-preset="${p.imgPreviewClosePreset}"` : "") +
       (p.imgPreviewCloseDur !== undefined ? ` data-close-dur="${p.imgPreviewCloseDur}"` : "") +
       (p.imgPreviewCloseEase ? ` data-close-ease="${p.imgPreviewCloseEase}"` : "");
     tags.push(pluginScript(prefix, "assets/ps-plugins/ps-imgpreview.js", mark + sharp + closeCfg));
@@ -232,7 +233,7 @@ export function inlinePreviewPlugins(site: SiteConfig, contents: SitePluginFiles
   const p = normalizePlugins(site);
   const tags: string[] = [];
   const style = (css: string) => `<style>\n${css}\n</style>`;
-  const script = (js: string) => `<script>\n${js}\n</script>`;
+  const script = (js: string, attrs = "") => `<script${attrs}>\n${js}\n</script>`;
   if (p.imgPreview) tags.push(style(imgPreviewCss));
   if (p.search) tags.push(style(searchCss));
   for (const entry of p.custom) {
@@ -248,6 +249,7 @@ export function inlinePreviewPlugins(site: SiteConfig, contents: SitePluginFiles
     const cfg = {
       mark: p.imgPreviewRequireMark,
       sharpDelay: p.imgPreviewSharpDelay,
+      closePreset: p.imgPreviewClosePreset,
       closeDur: p.imgPreviewCloseDur,
       closeEase: p.imgPreviewCloseEase,
     };
@@ -258,7 +260,8 @@ export function inlinePreviewPlugins(site: SiteConfig, contents: SitePluginFiles
     tags.push(`<script>window.__psSearchCfg=${cfg};</script>`);
     // 演示预览:入口仅展示形态,点击不展开结果面板,提示前往构建页查看完整站点
     if (demo) tags.push(`<script>window.__psSearchDemo=true;</script>`);
-    tags.push(script(searchJs));
+    // data-demo 双保险:即使 __psSearchDemo 因脚本顺序未被读到,脚本标签属性仍可判定
+    tags.push(script(searchJs, demo ? ' data-demo="1"' : ""));
   }
   return tags;
 }

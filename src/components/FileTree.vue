@@ -1094,7 +1094,7 @@ async function onTreeDrop(e: DragEvent) {
   top: 0;
   right: 0;
   bottom: 0;
-  width: 44px;
+  width: 38px; /* 单个快捷按钮:24px 按钮 + 右侧边距 */
   border-radius: inherit;
   background: linear-gradient(to right, transparent, var(--row-bg, var(--color-surface)));
   opacity: 0;

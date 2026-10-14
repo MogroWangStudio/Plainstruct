@@ -433,9 +433,17 @@ async function refreshAll() {
   await loadDocs();
 }
 
-const refCounts = computed(() =>
-  countImageRefs(images.value.map((n) => n.path), Object.keys(docs.value), docs.value),
-);
+const refCounts = computed(() => {
+  const counts = countImageRefs(images.value.map((n) => n.path), Object.keys(docs.value), docs.value);
+  // 页脚引用计入计数:主题配置友情链接图标引用的图片,删除确认与徽标同样可见
+  const footerLinks = site.config?.theme?.config?.footerLinks;
+  if (footerLinks) {
+    for (const n of images.value) {
+      if (footerIconRef(n.path, footerLinks)) counts.set(n.path, (counts.get(n.path) ?? 0) + 1);
+    }
+  }
+  return counts;
+});
 
 /* ---------- 详情窗宽度可拖拽(右侧面板;拖动中才跟踪,避免误触) ---------- */
 const splitHost = ref<HTMLElement>();

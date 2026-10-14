@@ -248,7 +248,6 @@ pub fn run() {
             commands::open_data_dir,
             commands::open_external,
             commands::reload_webview,
-            commands::system_notify,
         ])
         .on_window_event(|window, event| {
             // macOS 关窗惯例:主窗口隐藏而非销毁 —— 保留 WebView,单实例

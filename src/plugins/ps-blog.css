@@ -389,17 +389,8 @@ body.ps-home .blog-main {
   color: var(--ps-accent);
 }
 
-/* 文章目录层级缩进:副标题(##)以下逐级收进;主题自身的层级规则(如 is-l3)在之后加载,
-   同权重时仍可覆盖;深层级配合目录容器的 overflow 裁剪,不出现横向滚动条 */
-.blog-toc-item.is-l4 a {
-  padding-left: 38px;
-}
-.blog-toc-item.is-l5 a {
-  padding-left: 50px;
-}
-.blog-toc-item.is-l6 a {
-  padding-left: 62px;
-}
+/* 目录层级缩进由各博客主题自身的 is-l2..is-l6 规则定义(基准与步长随主题);
+   目录容器 overflow 横向裁剪,深层级不出现横向滚动条 */
 
 /* 页脚:说明文字 / 友情链接 / 构建信息(footer 全空时不占位、不显示边框) */
 .blog-footer:not(:has(*)) {

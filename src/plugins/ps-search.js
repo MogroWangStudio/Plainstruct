@@ -124,8 +124,10 @@
     requestAnimationFrame(function () { entry.classList.add("ps-ready"); });
   }
 
-  /* ---------- 演示预览(内容页/主题页):入口仅展示,点击提示前往构建 ---------- */
-  var demo = window.__psSearchDemo === true;
+  /* ---------- 演示预览(内容页/主题页):入口仅展示,点击提示前往构建 ----------
+     标志在 start() 时读取(脚本标签 data-demo 属性或 window.__psSearchDemo),
+     避免脚本求值顺序导致标志丢失 */
+  var demo = false;
   var demoToastTimer = 0;
   function demoToast() {
     var tip = document.getElementById("ps-search-demo-tip");
@@ -398,6 +400,8 @@
       var cfgBarWM = Number(window.__psSearchCfg.barWidthM);
       if (Number.isFinite(cfgBarWM) && cfgBarWM > 0) searchBarWidthM = Math.min(420, Math.max(160, cfgBarWM));
     }
+    // 演示预览(内容页/主题页):脚本标签 data-demo 或 window.__psSearchDemo 任一命中即生效
+    demo = (me && me.getAttribute("data-demo") === "1") || window.__psSearchDemo === true;
     // 供置顶按钮等同位元素协调避让
     window.__psSearchCorner = entryPosition === "top" ? null : entryPosition;
     build();

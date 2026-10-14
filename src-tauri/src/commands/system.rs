@@ -52,17 +52,3 @@ pub fn reload_webview(app: AppHandle, window: tauri::WebviewWindow, label: Strin
         .ok_or_else(|| format!("webview not found: {label}"))?;
     win.eval("window.location.reload()").map_err(|e| e.to_string())
 }
-
-/// 系统通知(发布成功 / Pages 构建完成):标题与正文由前端给定,内容不含不可信数据。
-/// 点击通知的行为交由系统;通知开关与档位由应用设置控制,后端只负责投递。
-#[tauri::command]
-pub fn system_notify(app: AppHandle, window: tauri::WebviewWindow, title: String, body: String) -> Result<(), String> {
-    ensure_main(&window)?;
-    use tauri_plugin_notification::NotificationExt;
-    app.notification()
-        .builder()
-        .title(title)
-        .body(body)
-        .show()
-        .map_err(|e| format!("发送系统通知失败: {e}"))
-}

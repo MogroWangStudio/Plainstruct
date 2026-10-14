@@ -58,6 +58,22 @@ const isActive = computed(
 );
 const isCollapsed = computed(() => collapsed.value.has(props.node.path));
 const isSelected = computed(() => props.selectedPaths.has(props.node.path));
+
+/* 悬停遮罩宽度按快捷按钮个数计算:按钮不占行宽后,名称文字与按钮重叠的
+   范围随按钮数变化 —— 逐按钮累加宽度,遮罩刚好盖住按钮区 */
+const actionCount = computed(() => {
+  if (props.selectMode) return 0;
+  if (isDir.value) return 6; // 导入/新建/文件夹页/配置头/重命名/删除
+  if (props.node.name.toLowerCase().endsWith(".md")) return 3; // 配置头/重命名/删除
+  return 2; // 图片:重命名/删除
+});
+const maskWidth = computed(() => (actionCount.value ? actionCount.value * 25 + 12 : 0));
+
+/** 行内样式:层级缩进 + 遮罩宽度(按钮数驱动;无按钮时不出遮罩) */
+const rowStyle = computed(() => ({
+  paddingLeft: props.depth * 14 + 4 + "px",
+  ...(actionCount.value ? { "--row-mask-w": `${maskWidth.value}px` } : {}),
+}));
 /** 本行在拖动集合中(多选拖拽 = 全部选中项一起淡化) */
 const isDragging = computed(() => !!draggingPaths.value?.has(props.node.path));
 const markBefore = computed(
@@ -178,7 +194,7 @@ function onDrop(e: DragEvent) {
         'bg-surface-2': isSelected,
         'opacity-40': isDragging,
       }"
-      :style="{ paddingLeft: depth * 14 + 4 + 'px' }"
+      :style="rowStyle"
       :draggable="!locked"
       :data-path="node.path"
       :title="node.name"
@@ -344,7 +360,8 @@ function onDrop(e: DragEvent) {
   top: 0;
   right: 0;
   bottom: 0;
-  width: 92px;
+  /* 宽度随快捷按钮个数变化(--row-mask-w,行内样式按按钮数给出) */
+  width: var(--row-mask-w, 92px);
   border-radius: inherit;
   background: linear-gradient(to right, transparent, var(--row-bg, var(--color-surface)));
   opacity: 0;

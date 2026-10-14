@@ -165,32 +165,37 @@
   /* ---------- 顶栏滚动态 ---------- */
   var tb = doc.querySelector(".blog-topbar");
   if (tb) {
-    /* 顶栏变形(药丸/圆角矩形)单次触发:首次滚过阈值后永久保持变形态。
-       此前随滚动阈值反复切换,过渡在中间帧被重启动画,观感上卡在某一处;
-       单次触发后变形动画只播一次,不再重启。页面加载时已处于滚动位置
-       (浏览器恢复阅读位置/刷新)的话,直接无过渡落位,不重播变形 */
+    /* 顶栏变形(药丸/圆角矩形)双向单次触发:滚动到达设定阈值时切换形态一次
+       (过渡完整播放,不被中间帧重启 —— 此前逐事件重评估,阈值附近抖动会让
+       过渡反复打断,观感即「卡在某一处」);回落到回程阈值(带滞回)时还原一次。
+       页面加载时已处于滚动位置(刷新/恢复阅读位置)的话,直接无过渡落位,
+       不重播变形(避免刷新时页面莫名下移) */
     var at = parseInt(body.getAttribute("data-topbar-scroll-at") || "24", 10);
     if (!isFinite(at) || at < 0) at = 24;
+    var backAt = Math.max(2, at - Math.max(8, Math.round(at / 2))); // 回程滞回阈值
+    var morphed = false;
+    var syncBar = function () {
+      var y = window.scrollY || doc.documentElement.scrollTop || 0;
+      if (!morphed && y > at) {
+        morphed = true;
+        tb.classList.add("is-scrolled");
+      } else if (morphed && y < backAt) {
+        morphed = false;
+        tb.classList.remove("is-scrolled");
+      }
+    };
     var y0 = window.scrollY || doc.documentElement.scrollTop || 0;
     if (y0 > at) {
+      morphed = true;
       tb.style.transition = "none";
       tb.classList.add("is-scrolled");
       void tb.getBoundingClientRect();
       requestAnimationFrame(function () {
         tb.style.transition = "";
       });
-    } else {
-      var tbMorphed = false;
-      var syncBar = function () {
-        if (tbMorphed) return;
-        if ((window.scrollY || doc.documentElement.scrollTop || 0) > at) {
-          tbMorphed = true;
-          tb.classList.add("is-scrolled");
-        }
-      };
-      window.addEventListener("scroll", syncBar, { passive: true });
-      syncBar();
     }
+    window.addEventListener("scroll", syncBar, { passive: true });
+    syncBar();
   }
   /* 文档主题顶栏:同一套滚动态标记,下拉变形形态由主题配置(data-topbar-shape)驱动 */
   var ptb = doc.querySelector(".ps-topbar");

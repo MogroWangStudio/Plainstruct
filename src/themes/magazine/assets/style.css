@@ -421,20 +421,24 @@ a.blog-page-step:active {
   transition: color 140ms ease, border-color 140ms ease;
 }
 
-.blog-toc-item.is-l3 a {
+.blog-toc-item.is-l2 a {
   padding-left: 26px;
 }
 
-.blog-toc-item.is-l4 a {
+.blog-toc-item.is-l3 a {
   padding-left: 38px;
 }
 
-.blog-toc-item.is-l5 a {
+.blog-toc-item.is-l4 a {
   padding-left: 50px;
 }
 
-.blog-toc-item.is-l6 a {
+.blog-toc-item.is-l5 a {
   padding-left: 62px;
+}
+
+.blog-toc-item.is-l6 a {
+  padding-left: 74px;
 }
 
 .blog-toc-item a:hover {
@@ -1317,16 +1321,24 @@ body[data-toc-style="树形分支"] .blog-toc-item {
   position: relative;
 }
 
-body[data-toc-style="树形分支"] .blog-toc-item.is-l3 {
+body[data-toc-style="树形分支"] .blog-toc-item.is-l2 {
   --toc-branch-x: 18px;
 }
 
-body[data-toc-style="树形分支"] .blog-toc-item.is-l4 {
+body[data-toc-style="树形分支"] .blog-toc-item.is-l3 {
   --toc-branch-x: 32px;
 }
 
-body[data-toc-style="树形分支"] .blog-toc-item.is-l5 {
+body[data-toc-style="树形分支"] .blog-toc-item.is-l4 {
   --toc-branch-x: 46px;
+}
+
+body[data-toc-style="树形分支"] .blog-toc-item.is-l5 {
+  --toc-branch-x: 60px;
+}
+
+body[data-toc-style="树形分支"] .blog-toc-item.is-l6 {
+  --toc-branch-x: 74px;
 }
 
 body[data-toc-style="树形分支"] .blog-toc-item a {
@@ -1373,12 +1385,24 @@ body[data-toc-style="极简"] .blog-toc-item a {
   border-left: none;
 }
 
-body[data-toc-style="极简"] .blog-toc-item.is-l3 a {
+body[data-toc-style="极简"] .blog-toc-item.is-l2 a {
   padding-left: 16px;
 }
 
-body[data-toc-style="极简"] .blog-toc-item.is-l4 a {
+body[data-toc-style="极简"] .blog-toc-item.is-l3 a {
   padding-left: 32px;
+}
+
+body[data-toc-style="极简"] .blog-toc-item.is-l4 a {
+  padding-left: 48px;
+}
+
+body[data-toc-style="极简"] .blog-toc-item.is-l5 a {
+  padding-left: 64px;
+}
+
+body[data-toc-style="极简"] .blog-toc-item.is-l6 a {
+  padding-left: 80px;
 }
 
 body[data-toc-style="极简"] .blog-toc-item a.current {
