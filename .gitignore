@@ -6,3 +6,4 @@ src-tauri/gen
 .zcode
 *.log
 .DS_Store
+.workbuddy/memory/2026-10-14.md
