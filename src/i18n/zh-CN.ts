@@ -710,6 +710,7 @@ export default {
   settings: {
     title: "软件设置",
     subtitle: "应用全局偏好，与站点无关。",
+    sectionGeneral: "常规",
     sectionLanguage: "语言",
     sectionEditor: "编辑器",
     sectionPersonalization: "个性化",

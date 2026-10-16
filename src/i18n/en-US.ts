@@ -710,6 +710,7 @@ export default {
   settings: {
     title: "Settings",
     subtitle: "App-wide preferences, independent of any site.",
+    sectionGeneral: "General",
     sectionLanguage: "Language",
     sectionEditor: "Editor",
     sectionPersonalization: "Personalization",

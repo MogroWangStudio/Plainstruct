@@ -1249,12 +1249,20 @@ body[data-loading="进度条"] .ps-loader-spin {
 }
 
 @media (max-width: 900px) {
+  :root {
+    /* 两行顶栏:菜单/品牌行 + 当前文档标题行 */
+    --vp-nav-h: 74px;
+  }
+
   .vp-shell {
     display: block;
     padding-top: var(--vp-nav-h);
   }
 
   .vp-navbar-in {
+    flex-wrap: wrap;
+    align-content: center;
+    row-gap: 4px;
     padding: 0 16px;
   }
 
@@ -1264,6 +1272,23 @@ body[data-loading="进度条"] .ps-loader-spin {
 
   .vp-brand {
     margin-left: 2px;
+  }
+
+  /* 当前文档标题:第二行,位置由 data-crumbs-align 配置(缺省右对齐) */
+  .vp-crumbs {
+    display: flex;
+    order: 3;
+    flex-basis: 100%;
+    margin-left: 0;
+    justify-content: flex-end;
+  }
+
+  body[data-crumbs-align="居中"] .vp-crumbs {
+    justify-content: center;
+  }
+
+  body[data-crumbs-align="左对齐"] .vp-crumbs {
+    justify-content: flex-start;
   }
 
   /* 侧栏变抽屉:整体盖住顶栏,自带头部与关闭按钮 */

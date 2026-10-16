@@ -299,6 +299,7 @@ async function repairWebview() {
 /* ---------- 类别分页:一次只显示一个类别,按导航次序决定滑入方向 ---------- */
 
 const sections = computed(() => [
+  { id: "general", label: t("settings.sectionGeneral") },
   { id: "language", label: t("settings.sectionLanguage") },
   { id: "editor", label: t("settings.sectionEditor") },
   { id: "personalization", label: t("settings.sectionPersonalization") },
@@ -306,7 +307,7 @@ const sections = computed(() => [
   { id: "about", label: t("settings.sectionAbout") },
 ]);
 
-const active = ref("language");
+const active = ref("general");
 /** 切换方向:向下切换 = 新页自下方滑入,向上切换反之 */
 const direction = ref<"up" | "down">("down");
 
@@ -431,8 +432,34 @@ function openRelease(url: string) {
       <Transition name="settings-page" mode="out-in">
         <div :key="active" class="absolute inset-0 overflow-y-auto" :data-dir="direction">
           <div class="mx-auto w-full max-w-[640px] px-8 pb-10 pt-8">
+            <!-- 常规 -->
+            <template v-if="active === 'general'">
+              <h3 class="settings-heading" style="--i: 0">
+                {{ t("settings.sectionGeneral") }}
+              </h3>
+              <div class="settings-card">
+                <!-- 发布系统通知:发布成功与 Pages 构建完成的系统级通知 -->
+                <div class="settings-row" style="--i: 0">
+                  <div class="min-w-0">
+                    <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.publishNotify") }}</p>
+                    <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.publishNotifyHint") }}</p>
+                  </div>
+                  <SelectMenu v-model="publishNotifyModel" :options="publishNotifyOptions" align="right" class="shrink-0" />
+                </div>
+
+                <!-- 空白区域点击关窗:弹窗外模糊区域的点击如何关窗 -->
+                <div class="settings-row" style="--i: 1">
+                  <div class="min-w-0">
+                    <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.backdropClose") }}</p>
+                    <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.backdropCloseHint") }}</p>
+                  </div>
+                  <SelectMenu v-model="backdropCloseModel" :options="backdropCloseOptions" align="right" class="shrink-0" />
+                </div>
+              </div>
+            </template>
+
             <!-- 语言 -->
-            <template v-if="active === 'language'">
+            <template v-else-if="active === 'language'">
               <h3 class="settings-heading" style="--i: 0">
                 {{ t("settings.sectionLanguage") }}
               </h3>
@@ -699,17 +726,8 @@ function openRelease(url: string) {
                   </div>
                 </div>
 
-                <!-- 发布系统通知:发布成功与 Pages 构建完成的系统级通知 -->
-                <div class="settings-row" style="--i: 7">
-                  <div class="min-w-0">
-                    <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.publishNotify") }}</p>
-                    <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.publishNotifyHint") }}</p>
-                  </div>
-                  <SelectMenu v-model="publishNotifyModel" :options="publishNotifyOptions" align="right" class="shrink-0" />
-                </div>
-
                 <!-- 弹窗背景模糊 -->
-                <div class="settings-row" style="--i: 8">
+                <div class="settings-row" style="--i: 7">
                   <div class="min-w-0">
                     <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.modalBlur") }}</p>
                     <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.modalBlurHint") }}</p>
@@ -723,15 +741,6 @@ function openRelease(url: string) {
                     />
                     <span class="text-[calc(12px*var(--ui-font-scale))] text-ink-2">{{ t("settings.modalBlurOn") }}</span>
                   </label>
-                </div>
-
-                <!-- 空白区域点击关窗:弹窗外模糊区域的点击如何关窗 -->
-                <div class="settings-row" style="--i: 8">
-                  <div class="min-w-0">
-                    <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.backdropClose") }}</p>
-                    <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.backdropCloseHint") }}</p>
-                  </div>
-                  <SelectMenu v-model="backdropCloseModel" :options="backdropCloseOptions" align="right" class="shrink-0" />
                 </div>
               </div>
             </template>

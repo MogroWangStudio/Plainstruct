@@ -169,7 +169,20 @@
       "type": "boolean",
       "default": true,
       "category": "顶栏",
-      "hint": "桌面端顶栏右侧；窗口宽度 ≤1100px 时自动隐藏"
+      "hint": "桌面端顶栏右侧；移动端为顶栏第二行的当前文档标题；窗口宽度 901–1100px 时自动隐藏"
+    },
+    {
+      "key": "topbarTitleAlignM",
+      "label": "当前文档标题位置",
+      "type": "select",
+      "default": "右对齐",
+      "options": [
+        "右对齐",
+        "居中",
+        "左对齐"
+      ],
+      "category": "顶栏",
+      "hint": "窗口宽度 ≤900px 时生效：移动端顶栏第二行的当前文档标题对齐方式"
     },
     {
       "key": "asideShow",
