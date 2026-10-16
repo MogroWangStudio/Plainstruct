@@ -184,6 +184,19 @@
       "hint": "窗口宽度 ≤900px 时生效：嵌入顶栏 = 标题与菜单、站点标识同一行；独立一行 = 标题单独占一行（缺省）"
     },
     {
+      "key": "topbarLogoPosM",
+      "label": "站点标识位置",
+      "type": "select",
+      "default": "左对齐",
+      "options": [
+        "右对齐",
+        "居中",
+        "左对齐"
+      ],
+      "category": "顶栏",
+      "hint": "窗口宽度 ≤900px 时生效：移动端顶栏站点标识（Logo 与站点名）的水平位置"
+    },
+    {
       "key": "topbarTitleAlignM",
       "label": "当前文档标题对齐",
       "type": "select",

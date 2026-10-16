@@ -1576,6 +1576,34 @@ body.ps-sidebar-collapsed .ps-sidebar-toggle svg {
     padding-right: 0;
   }
 
+  /* 站点标识位置:左对齐 = 紧跟菜单按钮;嵌入顶栏时标题排到标识之后 */
+  body[data-topbar-logo-pos="左对齐"] .ps-topbar .ps-topbar-brand {
+    margin-left: 8px;
+  }
+
+  body[data-topbar-logo-pos="左对齐"][data-crumbs-pos="嵌入顶栏"] .ps-topbar .ps-topbar-brand {
+    order: 1;
+  }
+
+  body[data-topbar-logo-pos="左对齐"][data-crumbs-pos="嵌入顶栏"] .ps-crumbs {
+    order: 2;
+  }
+
+  /* 站点标识居中:绝对定位于顶栏中心;嵌入顶栏时保持原位,避免与标题重叠 */
+  body[data-topbar-logo-pos="居中"] .ps-topbar .ps-topbar-brand {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    margin-left: 0;
+    transform: translate(-50%, -50%);
+  }
+
+  body[data-topbar-logo-pos="居中"][data-crumbs-pos="嵌入顶栏"] .ps-topbar .ps-topbar-brand {
+    position: static;
+    transform: none;
+    margin-left: auto;
+  }
+
   /* 当前文档标题(第二行)对齐:右对齐为缺省,可居中或左对齐 */
   body[data-crumbs-align="居中"] .ps-crumbs {
     justify-content: center;
