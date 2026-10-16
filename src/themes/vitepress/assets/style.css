@@ -1,0 +1,1402 @@
+/* VitePress -- 现代文档风:靛蓝强调,玻璃顶栏,分组侧栏,页内大纲,深色代码块。
+   视觉参照 VitePress 默认主题;全部层级来自字号/字重/留白与一条品牌竖线。 */
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+  line-height: 1.7;
+  color: var(--vp-c-text-1);
+  background: var(--vp-c-bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+body.font-serif {
+  font-family: Georgia, "Times New Roman", "Songti SC", "SimSun", serif;
+}
+
+body.font-system {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+}
+
+body.font-mono {
+  font-family: var(--ps-font-mono);
+}
+
+/* 自定义字体:layout 在 body 上注入 --ps-font-body(font-family 栈) */
+body.font-custom {
+  font-family: var(--ps-font-body, system-ui, sans-serif);
+}
+
+:root {
+  --vp-c-bg: #ffffff;
+  --vp-c-bg-soft: #f6f6f7;
+  --vp-c-divider: rgba(60, 60, 67, 0.12);
+  --vp-c-divider-strong: rgba(60, 60, 67, 0.22);
+  --vp-c-text-1: #213547;
+  --vp-c-text-2: rgba(60, 60, 67, 0.78);
+  --vp-c-text-3: rgba(60, 60, 67, 0.56);
+  --vp-code-bg: rgba(101, 117, 139, 0.14);
+  --vp-code-color: #476582;
+  --vp-code-block-bg: #1b1b1f;
+  --vp-nav-h: 64px;
+  --ps-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  --ps-ease: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* ---------- 布局 ---------- */
+
+.vp-shell {
+  display: flex;
+  align-items: flex-start;
+  min-height: calc(100vh - var(--vp-nav-h));
+  max-width: 1440px;
+  margin: 0 auto;
+  padding-top: var(--vp-nav-h);
+}
+
+.vp-sidebar {
+  width: var(--ps-sidebar-w, 272px);
+  flex-shrink: 0;
+  position: sticky;
+  top: var(--vp-nav-h);
+  height: calc(100vh - var(--vp-nav-h));
+  overflow-y: auto;
+  padding: 20px 12px 48px;
+  background: var(--vp-c-bg);
+  border-right: 1px solid var(--vp-c-divider);
+}
+
+.vp-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.vp-doc {
+  max-width: var(--ps-doc-w, 688px);
+  margin: 0 auto;
+  padding: 44px 32px 88px;
+}
+
+.vp-home {
+  max-width: calc(var(--ps-doc-w, 688px) + 240px);
+  margin: 0 auto;
+  padding: 0 32px 88px;
+}
+
+/* ---------- 顶栏 ---------- */
+
+.vp-navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 70;
+  height: var(--vp-nav-h);
+  background: color-mix(in srgb, var(--vp-c-bg) var(--vp-nav-fill, 80%), transparent);
+  /* 毛玻璃顶栏是 VitePress 默认主题的标志形态,内容从顶栏下滚过(19 = glassmorphism 误报) */
+  -webkit-backdrop-filter: blur(var(--vp-nav-blur, 10px)) saturate(1.8); /* deslop-ignore 19 */
+  backdrop-filter: blur(var(--vp-nav-blur, 10px)) saturate(1.8); /* deslop-ignore 19 */
+}
+
+/* 减弱透明度:顶栏回实底、去模糊 */
+@media (prefers-reduced-transparency: reduce) {
+  .vp-navbar {
+    background: var(--vp-c-bg);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+/* 底缘分割线两端渐隐:只在滚离顶部后出现,提示顶栏与内容分层 */
+.vp-navbar::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  /* deslop-ignore-next-line 06: 分割线两端渐隐是分层信号,非氛围渐变 */
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--vp-c-divider-strong) 20%,
+    var(--vp-c-divider-strong) 80%,
+    transparent
+  );
+  opacity: 0;
+  transition: opacity 240ms var(--ps-ease);
+}
+
+.vp-navbar.is-scrolled::after {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vp-navbar::after {
+    transition: none;
+  }
+}
+
+.vp-navbar-in {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.vp-menu-btn {
+  display: none;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--vp-c-text-1);
+  cursor: pointer;
+  transition: background-color 160ms var(--ps-ease);
+}
+
+.vp-menu-btn:hover {
+  background: var(--vp-c-bg-soft);
+}
+
+.vp-menu-btn:active {
+  transform: scale(0.94);
+}
+
+.vp-menu-btn:focus-visible {
+  outline: 2px solid var(--ps-accent);
+  outline-offset: 1px;
+}
+
+.vp-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  color: var(--vp-c-text-1);
+  text-decoration: none;
+  transition: opacity 160ms var(--ps-ease);
+}
+
+.vp-brand:hover {
+  opacity: 0.75;
+}
+
+.vp-logo {
+  width: var(--ps-logo-w, 24px);
+  height: auto;
+  object-fit: contain;
+}
+
+.vp-brand-name {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+/* 当前页路径:顶栏右侧,低调小字 */
+.vp-crumbs {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 6px;
+  margin-left: auto;
+  overflow: hidden;
+  font-size: 12.5px;
+  line-height: 1.4;
+  white-space: nowrap;
+  color: var(--vp-c-text-3);
+}
+
+.vp-crumb-item {
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vp-crumb-item.is-current {
+  flex-shrink: 0;
+  color: var(--vp-c-text-2);
+  font-weight: 550;
+}
+
+.vp-crumb-sep {
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+
+/* ---------- 侧栏导航 ---------- */
+
+.vp-nav {
+  margin-top: 8px;
+}
+
+.vp-nav-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.vp-nav-list .vp-nav-list {
+  margin: 2px 0 0;
+  padding: 0;
+}
+
+.vp-nav-item {
+  margin: 1px 0;
+}
+
+/* 组标题行:标题居左,折叠箭头贴右(VitePress 的组形态) */
+.vp-nav-group-wrap {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  padding: 6px 8px 4px;
+}
+
+.vp-nav-group-wrap .vp-nav-group {
+  flex: 1;
+  min-width: 0;
+}
+
+.vp-nav-group {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--vp-c-text-1);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+a.vp-nav-group:hover {
+  color: var(--ps-accent);
+}
+
+a.vp-nav-group.current {
+  color: var(--ps-accent);
+}
+
+/* 分组内的文档项:圆角浅底,当前项品牌色 */
+.vp-nav-link {
+  display: block;
+  padding: 5px 10px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--vp-c-text-2);
+  text-decoration: none;
+  transition: background-color 120ms var(--ps-ease), color 120ms var(--ps-ease);
+}
+
+.vp-nav-link:hover {
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-text-1);
+}
+
+.vp-nav-link.current {
+  background: var(--vp-c-bg-soft);
+  color: var(--ps-accent);
+  font-weight: 500;
+}
+
+.vp-nav-link:focus-visible,
+a.vp-nav-group:focus-visible {
+  outline: 2px solid var(--ps-accent);
+  outline-offset: 1px;
+  border-radius: 8px;
+}
+
+/* 抽屉头部与关闭按钮:仅移动端抽屉内显示 */
+.vp-sidebar-head {
+  display: none;
+}
+
+.vp-drawer-close {
+  display: none;
+}
+
+/* 子目录标题:层级渐浅渐小 */
+.vp-nav-list .vp-nav-list .vp-nav-group {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--vp-c-text-2);
+}
+
+.vp-nav-list .vp-nav-list .vp-nav-link {
+  font-size: 13px;
+}
+
+/* 折叠箭头:贴组标题右侧,展开时带轻微过冲转向 */
+.vp-nav-caret {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--vp-c-text-3);
+  cursor: pointer;
+  transition: background-color 120ms var(--ps-ease), color 120ms var(--ps-ease);
+}
+
+.vp-nav-caret:hover {
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-text-1);
+}
+
+.vp-nav-caret:focus-visible {
+  outline: 2px solid var(--ps-accent);
+  outline-offset: 1px;
+}
+
+.vp-nav-caret svg {
+  transition: transform 300ms cubic-bezier(0.34, 1.45, 0.64, 1);
+}
+
+.vp-nav-item.open > .vp-nav-group-wrap .vp-nav-caret svg {
+  transform: rotate(90deg);
+}
+
+/* 子目录折叠展开:grid-rows 非线性过渡 */
+.vp-nav-sub {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 320ms cubic-bezier(0.3, 1.06, 0.4, 1);
+}
+
+.vp-nav-item.open > .vp-nav-sub {
+  grid-template-rows: 1fr;
+}
+
+.vp-nav-sub-in {
+  overflow: hidden;
+  min-height: 0;
+  /* 子目录在组标题下方整体缩进,与项文字对齐 */
+  padding-left: 10px;
+}
+
+/* ---------- 正文排版 ---------- */
+
+.vp-doc-title {
+  margin: 0 0 12px;
+  font-size: 32px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.015em;
+}
+
+.vp-doc-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  margin: 0 0 16px;
+}
+
+.vp-doc-meta:empty {
+  display: none;
+}
+
+.vp-doc-date {
+  font-size: 13px;
+  color: var(--vp-c-text-3);
+}
+
+.vp-doc-author {
+  font-size: 13px;
+  color: var(--vp-c-text-2);
+}
+
+.vp-aigc {
+  padding: 1px 10px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 999px;
+  font-size: 11.5px;
+  color: var(--vp-c-text-3);
+}
+
+.vp-aigc[data-aigc="present"] {
+  color: var(--vp-c-text-2);
+}
+
+.vp-doc-desc {
+  margin: 0 0 32px;
+  font-size: 17px;
+  color: var(--vp-c-text-2);
+}
+
+.vp-doc-body h1,
+.vp-doc-body h2,
+.vp-doc-body h3,
+.vp-doc-body h4,
+.vp-doc-body h5,
+.vp-doc-body h6 {
+  margin: 1.8em 0 0.75em;
+  line-height: 1.35;
+  font-weight: 600;
+}
+
+.vp-doc-body > h1:first-child,
+.vp-doc-body > h2:first-child {
+  margin-top: 0;
+}
+
+.vp-doc-body h1 {
+  font-size: 26px;
+  letter-spacing: -0.015em;
+}
+
+/* 二级标题上缘分割线:章节的自然分节(VitePress 的章节形态) */
+.vp-doc-body h2 {
+  margin-top: 2.6em;
+  padding-top: 24px;
+  border-top: 1px solid var(--vp-c-divider);
+  font-size: 23px;
+}
+
+.vp-doc-body h3 {
+  font-size: 19px;
+}
+
+.vp-doc-body h4,
+.vp-doc-body h5,
+.vp-doc-body h6 {
+  font-size: 16.5px;
+}
+
+.vp-doc-body p {
+  margin: 0 0 16px;
+}
+
+.vp-doc-body a {
+  color: var(--ps-accent);
+  text-decoration: none;
+}
+
+.vp-doc-body a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.vp-doc-body code {
+  padding: 0.15em 0.45em;
+  border-radius: 4px;
+  background: var(--vp-code-bg);
+  color: var(--vp-code-color);
+  font-family: var(--ps-font-mono);
+  font-size: 0.875em;
+}
+
+/* 深色代码块:浅色页面上的深色窗口是本主题的辨识点之一 */
+.vp-doc-body pre {
+  margin: 0 0 18px;
+  padding: 20px 22px;
+  border-radius: 10px;
+  background: var(--vp-code-block-bg);
+  overflow-x: auto;
+  line-height: 1.65;
+}
+
+.vp-doc-body pre code {
+  padding: 0;
+  background: transparent;
+  color: #d4d4d4;
+  font-size: 13.5px;
+}
+
+/* 语言角标:JS 把 code 的 language-xxx 提取到 pre[data-lang],此处大写小字显示 */
+.vp-doc-body pre[data-lang] {
+  position: relative;
+}
+
+.vp-doc-body pre[data-lang]::after {
+  content: attr(data-lang);
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  font-size: 11px;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(235, 235, 245, 0.38);
+  pointer-events: none;
+}
+
+.vp-doc-body blockquote {
+  margin: 0 0 16px;
+  padding: 2px 0 2px 18px;
+  border-left: 3px solid var(--vp-c-divider-strong);
+  color: var(--vp-c-text-2);
+}
+
+.vp-doc-body ul,
+.vp-doc-body ol {
+  margin: 0 0 16px;
+  padding-left: 1.6em;
+}
+
+.vp-doc-body li {
+  margin: 6px 0;
+}
+
+.vp-doc-body li.task-list-item {
+  list-style: none;
+  margin-left: -1.4em;
+}
+
+.vp-doc-body li.task-list-item input {
+  margin-right: 8px;
+  vertical-align: -2px;
+}
+
+.vp-doc-body table {
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  margin: 0 0 18px;
+  border-collapse: collapse;
+  overflow-x: auto;
+  font-size: 14.5px;
+  line-height: 1.6;
+}
+
+.vp-doc-body th,
+.vp-doc-body td {
+  padding: 9px 16px;
+  border-bottom: 1px solid var(--vp-c-divider);
+  text-align: left;
+}
+
+.vp-doc-body th {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.vp-doc-body img {
+  max-width: 100%;
+  border-radius: 8px;
+}
+
+.vp-doc-body hr {
+  margin: 2em 0;
+  border: none;
+  border-top: 1px solid var(--vp-c-divider);
+}
+
+/* ---------- 代码高亮(深色底上的语义色,参照 GitHub Dark) ---------- */
+
+.vp-doc-body pre .hljs-comment,
+.vp-doc-body pre .hljs-quote {
+  color: #8b949e;
+  font-style: italic;
+}
+
+.vp-doc-body pre .hljs-keyword,
+.vp-doc-body pre .hljs-selector-tag {
+  color: #ff7b72;
+}
+
+.vp-doc-body pre .hljs-string,
+.vp-doc-body pre .hljs-regexp {
+  color: #a5d6ff;
+}
+
+.vp-doc-body pre .hljs-number,
+.vp-doc-body pre .hljs-literal,
+.vp-doc-body pre .hljs-symbol {
+  color: #79c0ff;
+}
+
+.vp-doc-body pre .hljs-title,
+.vp-doc-body pre .hljs-function .hljs-title {
+  color: #d2a8ff;
+}
+
+.vp-doc-body pre .hljs-built_in,
+.vp-doc-body pre .hljs-type,
+.vp-doc-body pre .hljs-class .hljs-title {
+  color: #ffa657;
+}
+
+.vp-doc-body pre .hljs-attr,
+.vp-doc-body pre .hljs-attribute {
+  color: #79c0ff;
+}
+
+.vp-doc-body pre .hljs-variable,
+.vp-doc-body pre .hljs-template-variable {
+  color: #ffd8a3;
+}
+
+.vp-doc-body pre .hljs-tag,
+.vp-doc-body pre .hljs-name,
+.vp-doc-body pre .hljs-selector-id,
+.vp-doc-body pre .hljs-selector-class {
+  color: #7ee787;
+}
+
+.vp-doc-body pre .hljs-section {
+  color: #79c0ff;
+}
+
+.vp-doc-body pre .hljs-addition {
+  color: #7ee787;
+}
+
+.vp-doc-body pre .hljs-deletion {
+  color: #ff7b72;
+}
+
+/* ---------- 页内大纲 ---------- */
+
+.vp-aside {
+  width: 224px;
+  flex-shrink: 0;
+  /* 吸顶放在列本身:shell 的 flex-start 让列只有内容高,内部 sticky 无活动空间 */
+  position: sticky;
+  top: var(--vp-nav-h);
+  height: calc(100vh - var(--vp-nav-h));
+  overflow-y: auto;
+  padding: 44px 24px 48px 8px;
+}
+
+.vp-aside-sticky {
+  min-height: 0;
+}
+
+.vp-aside-title {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--vp-c-text-1);
+}
+
+.vp-aside-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-left: 1px solid var(--vp-c-divider);
+}
+
+.vp-aside-item {
+  position: relative;
+}
+
+.vp-aside-item a {
+  display: block;
+  padding: 4px 0 4px 14px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--vp-c-text-2);
+  text-decoration: none;
+  transition: color 120ms var(--ps-ease);
+}
+
+.vp-aside-item a:hover {
+  color: var(--vp-c-text-1);
+}
+
+.vp-aside-item a:focus-visible {
+  outline: 2px solid var(--ps-accent);
+  outline-offset: 1px;
+  border-radius: 4px;
+}
+
+.vp-aside-item.is-l3 a {
+  padding-left: 28px;
+}
+
+.vp-aside-item.is-l4 a {
+  padding-left: 42px;
+}
+
+.vp-aside-item.is-l5 a {
+  padding-left: 56px;
+}
+
+.vp-aside-item.is-l6 a {
+  padding-left: 70px;
+}
+
+/* 当前小节:品牌色文字 + 左缘 2px 竖线段 */
+.vp-aside-item.is-current a {
+  color: var(--ps-accent);
+}
+
+.vp-aside-item.is-current::before {
+  content: "";
+  position: absolute;
+  left: -1px;
+  top: 5px;
+  bottom: 5px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--ps-accent);
+}
+
+/* ---------- 首页 Hero ---------- */
+
+.vp-home .vp-doc-title {
+  margin: 44px 0 16px;
+}
+
+.vp-hero {
+  padding: 84px 0 8px;
+  text-align: center;
+}
+
+.vp-hero-name {
+  margin: 0;
+  font-size: clamp(36px, 5.5vw, 54px);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  color: var(--vp-c-text-1);
+}
+
+.vp-hero-text {
+  max-width: 560px;
+  margin: 16px auto 0;
+  font-size: 19px;
+  line-height: 1.6;
+  color: var(--vp-c-text-2);
+}
+
+.vp-hero-actions {
+  margin-top: 32px;
+}
+
+.vp-hero-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 48px;
+  padding: 0 24px;
+  /* deslop-ignore-next-line 19 21: 胶囊按钮是 VitePress 主按钮形态,内部无嵌套圆角 */
+  border-radius: 24px;
+  background: var(--ps-accent);
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background-color 160ms var(--ps-ease), transform 100ms ease-out;
+}
+
+.vp-hero-btn:hover {
+  background: color-mix(in srgb, var(--ps-accent) 85%, #ffffff);
+}
+
+.vp-hero-btn:active {
+  transform: scale(0.97);
+}
+
+.vp-hero-btn:focus-visible {
+  outline: 2px solid var(--ps-accent);
+  outline-offset: 3px;
+}
+
+/* ---------- 首页目录卡片(构建端目录列表的卡片化) ---------- */
+
+.vp-doc-body.is-home {
+  margin-top: 40px;
+}
+
+.vp-doc-body.is-home > .ps-home-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.vp-doc-body.is-home > .ps-home-list > .ps-home-item {
+  margin: 0;
+  padding: 20px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 12px;
+  background: var(--vp-c-bg-soft);
+  transition: border-color 200ms var(--ps-ease);
+}
+
+.vp-doc-body.is-home > .ps-home-list > .ps-home-item:hover {
+  border-color: color-mix(in srgb, var(--ps-accent) 36%, transparent);
+}
+
+/* 嵌套层级还原为卡片内的普通链接列表 */
+.ps-home-list .ps-home-list {
+  display: block;
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+}
+
+.ps-home-item {
+  margin: 0;
+}
+
+/* 优先级压过 .vp-doc-body a:目录列表的链接不跟随正文强调色 */
+.vp-doc-body .ps-home-link {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--vp-c-text-1);
+  text-decoration: none;
+  transition: color 120ms var(--ps-ease);
+}
+
+.vp-doc-body a.ps-home-link:hover {
+  color: var(--ps-accent);
+}
+
+.ps-home-list .ps-home-list .ps-home-link {
+  padding: 3px 0;
+  font-size: 13.5px;
+  font-weight: 400;
+  color: var(--vp-c-text-2);
+}
+
+.ps-home-list .ps-home-list a.ps-home-link:hover {
+  color: var(--ps-accent);
+}
+
+/* 非首页的目录列表(文件夹落地页):普通文档流列表,纵向排列,层级左缘线缩进 */
+.vp-doc-body:not(.is-home) > .ps-home-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.vp-doc-body:not(.is-home) > .ps-home-list > .ps-home-item {
+  margin: 0 0 4px;
+  padding: 4px 0;
+}
+
+.vp-doc-body:not(.is-home) .ps-home-list .ps-home-list {
+  margin: 2px 0 8px;
+  padding: 0 0 0 14px;
+  border-left: 1px solid var(--vp-c-divider);
+}
+
+/* ---------- 上下页 ---------- */
+
+.vp-pager {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px 24px;
+  margin-top: 56px;
+  padding-top: 24px;
+  border-top: 1px solid var(--vp-c-divider);
+}
+
+.vp-pager-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 48%;
+  text-decoration: none;
+}
+
+.vp-pager-item.is-next {
+  margin-left: auto;
+  align-items: flex-end;
+  text-align: right;
+}
+
+.vp-pager-tag {
+  font-size: 12px;
+  color: var(--vp-c-text-3);
+}
+
+.vp-pager-title {
+  overflow: hidden;
+  font-size: 14.5px;
+  font-weight: 500;
+  color: var(--vp-c-text-1);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  transition: color 120ms var(--ps-ease);
+}
+
+.vp-pager-item:hover .vp-pager-title {
+  color: var(--ps-accent);
+}
+
+.vp-pager-item:focus-visible {
+  outline: 2px solid var(--ps-accent);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+
+/* ---------- 页脚 ---------- */
+
+.vp-footer {
+  max-width: var(--ps-doc-w, 688px);
+  margin: 0 auto;
+  padding: 0 32px 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+  color: var(--vp-c-text-3);
+  text-align: center;
+}
+
+.vp-footer-note {
+  margin: 0;
+}
+
+.vp-footer-build {
+  margin: 0;
+  font-size: 11.5px;
+}
+
+.vp-footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+
+.vp-footer-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--vp-c-text-2);
+  text-decoration: none;
+  transition: color 160ms var(--ps-ease);
+}
+
+.vp-footer-link:hover {
+  color: var(--ps-accent);
+}
+
+.vp-footer-link-icon {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  object-fit: cover;
+}
+
+.vp-footer-credit {
+  color: inherit;
+  text-decoration: none;
+  transition: color 160ms var(--ps-ease);
+}
+
+.vp-footer-credit:hover {
+  color: var(--vp-c-text-1);
+}
+
+/* ---------- 页面加载动画(主题配置 data-loading 驱动;渲染管线在 html 根注入 ps-js,JS 可用时才显示) ---------- */
+
+.ps-loader {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 99;
+  align-items: center;
+  justify-content: center;
+  background: var(--vp-c-bg);
+  transition: opacity 360ms ease;
+}
+
+.ps-js .ps-loader {
+  display: flex;
+}
+
+.ps-loader.is-done {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ps-loader-spin {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2.5px solid var(--vp-c-divider);
+  border-top-color: var(--ps-accent);
+}
+
+body[data-loading="转圈"] .ps-loader-spin {
+  animation: ps-loader-spin 900ms cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+
+@keyframes ps-loader-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+body[data-loading="点点"] .ps-loader-spin {
+  position: relative;
+  width: 9px;
+  height: 9px;
+  border: none;
+  border-radius: 50%;
+  background: var(--ps-accent);
+  color: var(--ps-accent);
+  animation: ps-loader-dot 1100ms ease-in-out infinite;
+}
+
+body[data-loading="点点"] .ps-loader-spin::before,
+body[data-loading="点点"] .ps-loader-spin::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+body[data-loading="点点"] .ps-loader-spin::before {
+  left: -15px;
+  animation: ps-loader-dot 1100ms ease-in-out infinite;
+  animation-delay: -180ms;
+}
+
+body[data-loading="点点"] .ps-loader-spin::after {
+  left: 15px;
+  animation: ps-loader-dot 1100ms ease-in-out infinite;
+  animation-delay: 180ms;
+}
+
+@keyframes ps-loader-dot {
+  0%,
+  70%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.8);
+  }
+  35% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+body[data-loading="进度条"] .ps-loader {
+  background: transparent;
+  align-items: stretch;
+  pointer-events: none;
+}
+
+body[data-loading="进度条"] .ps-loader-spin {
+  width: 100%;
+  height: 3px;
+  border: none;
+  border-radius: 0;
+  /* deslop-ignore-next-line 06: 进度条填充是功能图形,非氛围渐变 */
+  background: linear-gradient(90deg, transparent, var(--ps-accent));
+  transform-origin: left;
+  animation: ps-loader-bar 1100ms cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+
+@keyframes ps-loader-bar {
+  0% {
+    transform: scaleX(0);
+    transform-origin: left;
+  }
+  49% {
+    transform: scaleX(1);
+    transform-origin: left;
+  }
+  51% {
+    transform: scaleX(1);
+    transform-origin: right;
+  }
+  100% {
+    transform: scaleX(0);
+    transform-origin: right;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ps-loader-spin {
+    animation: none;
+  }
+}
+
+/* ---------- 页面过渡动画(只动内容区,transform/opacity,非线性缓出) ---------- */
+
+@keyframes ps-page-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes ps-page-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes ps-page-zoom {
+  from { opacity: 0; transform: scale(0.985); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes ps-page-slide {
+  from { opacity: 0; transform: translateX(28px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes ps-page-spring {
+  0% { opacity: 0; transform: scale(0.92); }
+  55% { opacity: 1; transform: scale(1.015); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes ps-page-blur {
+  from { opacity: 0; transform: translateY(8px); filter: blur(10px); }
+  to { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
+
+@keyframes ps-page-flip {
+  from { opacity: 0; transform: perspective(1200px) rotateX(-8deg) translateY(16px); }
+  to { opacity: 1; transform: perspective(1200px) rotateX(0deg) translateY(0); }
+}
+
+@keyframes ps-page-wipe {
+  from { opacity: 0.35; transform: translateY(6px); clip-path: inset(0 0 100% 0); }
+  to { opacity: 1; transform: translateY(0); clip-path: inset(0 0 -2% 0); }
+}
+
+.ps-anim-fade .vp-main {
+  animation: ps-page-fade 380ms var(--ps-ease) both;
+}
+
+.ps-anim-rise .vp-main {
+  animation: ps-page-rise 480ms var(--ps-ease) both;
+}
+
+.ps-anim-zoom .vp-main {
+  animation: ps-page-zoom 440ms var(--ps-ease) both;
+}
+
+.ps-anim-slide .vp-main {
+  animation: ps-page-slide 460ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.ps-anim-spring .vp-main {
+  animation: ps-page-spring 620ms cubic-bezier(0.34, 1.3, 0.64, 1) both;
+}
+
+.ps-anim-blur .vp-main {
+  animation: ps-page-blur 560ms var(--ps-ease) both;
+}
+
+.ps-anim-flip .vp-main {
+  transform-origin: 50% 0;
+  animation: ps-page-flip 560ms var(--ps-ease) both;
+}
+
+.ps-anim-wipe .vp-main {
+  animation: ps-page-wipe 640ms cubic-bezier(0.33, 1, 0.68, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ps-anim-fade .vp-main,
+  .ps-anim-rise .vp-main,
+  .ps-anim-zoom .vp-main,
+  .ps-anim-slide .vp-main,
+  .ps-anim-spring .vp-main,
+  .ps-anim-blur .vp-main,
+  .ps-anim-flip .vp-main,
+  .ps-anim-wipe .vp-main {
+    animation: none;
+  }
+}
+
+/* ---------- 响应式:先收大纲,再收侧栏为抽屉 ---------- */
+
+@media (max-width: 1100px) {
+  .vp-aside {
+    display: none;
+  }
+
+  .vp-crumbs {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .vp-shell {
+    display: block;
+    padding-top: var(--vp-nav-h);
+  }
+
+  .vp-navbar-in {
+    padding: 0 16px;
+  }
+
+  .vp-menu-btn {
+    display: flex;
+  }
+
+  .vp-brand {
+    margin-left: 2px;
+  }
+
+  /* 侧栏变抽屉:整体盖住顶栏,自带头部与关闭按钮 */
+  .vp-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 80;
+    width: min(var(--ps-drawer-w, 84vw), 320px);
+    height: auto;
+    max-height: none;
+    padding: 12px 12px 48px;
+    transform: translateX(-104%);
+    transition: transform 280ms var(--ps-ease);
+    border-right: 1px solid var(--vp-c-divider);
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.14);
+  }
+
+  .vp-sidebar.open {
+    transform: translateX(0);
+  }
+
+  .vp-sidebar-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 2px 2px 10px;
+  }
+
+  .vp-drawer-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    margin-left: auto;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--vp-c-text-2);
+    cursor: pointer;
+    transition: background-color 160ms var(--ps-ease);
+  }
+
+  .vp-drawer-close:hover {
+    background: var(--vp-c-bg-soft);
+    color: var(--vp-c-text-1);
+  }
+
+  .vp-drawer-close:active {
+    transform: scale(0.94);
+  }
+
+  .vp-drawer-close:focus-visible {
+    outline: 2px solid var(--ps-accent);
+    outline-offset: 1px;
+  }
+
+  .vp-sidebar-head .vp-brand-name {
+    font-size: 14.5px;
+  }
+
+  /* 抽屉打开时锁定背景滚动 */
+  body.vp-drawer-open {
+    overflow: hidden;
+  }
+
+  .vp-mask {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    background: rgba(0, 0, 0, 0.4);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 200ms var(--ps-ease);
+  }
+
+  .vp-mask.show {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .vp-doc {
+    padding: 32px 20px 64px;
+  }
+
+  .vp-home {
+    padding: 0 20px 64px;
+  }
+
+  .vp-hero {
+    padding: 56px 0 8px;
+  }
+
+  .vp-footer {
+    padding: 0 20px 32px;
+  }
+
+  .vp-pager-item {
+    max-width: 100%;
+    flex: 1 1 40%;
+  }
+}
+
+@media (max-width: 640px) {
+  .vp-hero-name {
+    font-size: 32px;
+  }
+
+  .vp-hero-text {
+    font-size: 17px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vp-sidebar,
+  .vp-mask,
+  .vp-nav-sub,
+  .vp-nav-caret svg,
+  .vp-brand,
+  .vp-menu-btn,
+  .vp-drawer-close,
+  .vp-hero-btn,
+  .vp-pager-title,
+  .vp-nav-link,
+  .vp-aside-item a,
+  .vp-footer-link,
+  .vp-footer-credit,
+  .ps-home-link {
+    transition: none;
+  }
+}

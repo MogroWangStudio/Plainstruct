@@ -1,0 +1,21 @@
+<ul class="vp-nav-list">
+  {{#each nav}}
+    <li class="vp-nav-item{{#if this.children}} open{{/if}}" data-nav-id="{{this.url}}">
+      {{#if this.children}}
+        <div class="vp-nav-group-wrap">
+          {{#if this.url}}
+            <a class="vp-nav-group{{#if this.current}} current{{/if}}" href="{{this.url}}">{{this.title}}</a>
+          {{else}}
+            <div class="vp-nav-group">{{this.title}}</div>
+          {{/if}}
+          <button class="vp-nav-caret" type="button" aria-expanded="true" aria-label="{{this.title}}">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 2.5 8 6l-4 3.5"/></svg>
+          </button>
+        </div>
+        <div class="vp-nav-sub"><div class="vp-nav-sub-in">{{> nav nav=this.children}}</div></div>
+      {{else if this.url}}
+        <a class="vp-nav-link{{#if this.current}} current{{/if}}" href="{{this.url}}">{{this.title}}</a>
+      {{/if}}
+    </li>
+  {{/each}}
+</ul>

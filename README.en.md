@@ -27,7 +27,7 @@
 
 - **One-click build** — output is plain static HTML with fully relative links and assets, so the site works on GitHub Pages subpaths, custom domains, or opened straight from disk; a full link check runs at build time and broken links are listed in the report.
 - **Standalone preview window** — browser-style back / forward / reload and an in-site address bar; switch between desktop and mobile simulation at any time (device presets for iPhone, Galaxy, Pixel and more, with taps delivered as real touch events) plus an Android edge-swipe back gesture.
-- **Ten built-in themes** — five each for docs and blogs, spanning minimal, serif, terminal and magazine styles; a visual settings panel puts colors, font sizes, shadows and motion under your control; blog themes cover tag colors, an archive page, footer links and a custom top-bar nav.
+- **Eleven built-in themes** — six for docs sites and five for blogs, spanning minimal, serif, terminal, magazine and a VitePress-style look; a visual settings panel puts colors, font sizes, shadows and motion under your control; blog themes cover tag colors, an archive page, footer links and a custom top-bar nav.
 - **Theme maker** — duplicate any built-in theme, edit templates and styles with a live preview, then export as a ZIP to share.
 - **Site plugins** — two built-ins: **site search** (a site-wide index generated at build time, type-to-search with highlighted snippets) and **image preview** (click an image to open a lightbox with zoom, rotation and pixel-perfect rendering; resolution auto-refreshes after zooming so enlarged images stay sharp); import custom JS/CSS plugins, or duplicate a built-in one to build on top of it.
 
@@ -185,7 +185,7 @@ npm run tauri -- build                 # platform artifacts (dmg / app)
 ├── src/                   # frontend source
 │   ├── ipc/               # Tauri IPC wrapper + browser mock
 │   ├── lib/               # path mapping / Markdown / theme engine / build pipeline
-│   ├── themes/            # built-in themes (plain-light / plain-dark / ink / terminal / gallery / blog-light / blog-dark)
+│   ├── themes/            # built-in themes (plain-light / plain-dark / ink / terminal / gallery / vitepress / blog-light / blog-dark)
 │   ├── stores/  components/  views/  i18n/
 └── src-tauri/             # Rust desktop layer (commands / protocol / GitHub sync)
 ```

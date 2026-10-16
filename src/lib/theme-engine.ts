@@ -102,7 +102,7 @@ export interface PageContext {
     aigc?: string;
     /** 当前页是否站点根 index(博客主题据此渲染文章流) */
     isHome?: boolean;
-    /** 页内标题大纲(博客主题文章页的 TOC 侧栏) */
+    /** 页内标题大纲(博客文章页与文档主题的 TOC 侧栏) */
     toc?: TocEntry[];
     /** 文章流分页(仅博客首页系列页存在) */
     pagination?: PaginationInfo;

@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="{{#if site.locale}}{{site.locale}}{{else}}zh-CN{{/if}}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{#if page.fullTitle}}{{page.fullTitle}}{{else}}{{site.name}}{{/if}}</title>
+  {{#if site.description}}<meta name="description" content="{{site.description}}">{{/if}}
+  {{#if site.favicon}}<link rel="icon" href="{{site.favicon}}">{{else}}{{#if site.logo}}<link rel="icon" href="{{site.logo}}">{{/if}}{{/if}}
+  <style>
+    :root {
+      --ps-accent: {{config.accentColor}};
+      --ps-sidebar-w: {{config.sidebarWidth}}px;
+      --ps-doc-w: {{config.contentWidth}}px;
+      --ps-drawer-w: {{config.sidebarWidthM}}vw;
+      --ps-logo-w: {{config.logoSizePc}}px;
+      --vp-nav-fill: {{config.topbarFill}}%;
+      --vp-nav-blur: {{config.topbarBlur}}px;
+    }
+  </style>
+
+  <link rel="stylesheet" href="{{asset "assets/style.css"}}">
+  <!-- 4.0.0 正文字号双端独立:置于主题样式之后,桌面/移动(≤900px)分别生效 -->
+  <style>
+    body {
+      font-size: {{config.fontSizePc}}px;
+    }
+
+    @media (max-width: 900px) {
+      :root {
+        --ps-logo-w: {{config.logoSizeM}}px;
+      }
+
+      body {
+        font-size: {{config.fontSizeM}}px;
+      }
+    }
+  </style>
+</head>
+  <body class="font-{{config.bodyFont}}{{#if (eq config.pageTransition "淡入")}} ps-anim-fade{{/if}}{{#if (eq config.pageTransition "淡入上浮")}} ps-anim-rise{{/if}}{{#if (eq config.pageTransition "缩放浮现")}} ps-anim-zoom{{/if}}{{#if (eq config.pageTransition "滑入")}} ps-anim-slide{{/if}}{{#if (eq config.pageTransition "弹性浮现")}} ps-anim-spring{{/if}}{{#if (eq config.pageTransition "模糊聚焦")}} ps-anim-blur{{/if}}{{#if (eq config.pageTransition "翻页")}} ps-anim-flip{{/if}}{{#if (eq config.pageTransition "揭开")}} ps-anim-wipe{{/if}}"{{#if (eq config.bodyFont "custom")}} style="--ps-font-body: {{config.customFont}}"{{/if}} data-loading="{{config.loadingAnim}}">
+  {{#unless (eq config.loadingAnim "关闭")}}<div class="ps-loader" aria-hidden="true"><span class="ps-loader-spin"></span></div>{{/unless}}
+  <header class="vp-navbar" id="vp-navbar">
+    <div class="vp-navbar-in">
+      <button class="vp-menu-btn" type="button" aria-label="文档列表" aria-expanded="false" aria-controls="vp-sidebar">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+          <path d="M2.5 4.5h13M2.5 9h13M2.5 13.5h13" />
+        </svg>
+      </button>
+      <a class="vp-brand" href="{{asset "index.html"}}">
+        {{#if config.showLogoPc}}{{#if site.logo}}<img class="vp-logo" src="{{site.logo}}" alt="{{site.name}}">{{/if}}{{/if}}
+        {{#if config.showTitlePc}}<span class="vp-brand-name">{{site.name}}</span>{{/if}}
+      </a>
+      {{#if config.showCrumbs}}
+      <nav class="vp-crumbs" aria-label="当前页路径">
+        {{#each page.crumbs}}<span class="vp-crumb-item">{{this}}</span><span class="vp-crumb-sep">/</span>{{/each}}
+        <span class="vp-crumb-item is-current">{{page.title}}</span>
+      </nav>
+      {{/if}}
+    </div>
+  </header>
+  <div class="vp-mask" aria-hidden="true"></div>
+  <div class="vp-shell">
+    <aside class="vp-sidebar" id="vp-sidebar">
+      <div class="vp-sidebar-head">
+        <a class="vp-brand" href="{{asset "index.html"}}">
+          {{#if config.showLogoM}}{{#if site.logo}}<img class="vp-logo" src="{{site.logo}}" alt="{{site.name}}">{{/if}}{{/if}}
+          {{#if config.showTitleM}}<span class="vp-brand-name">{{site.name}}</span>{{/if}}
+        </a>
+        <button class="vp-drawer-close" type="button" aria-label="关闭文档列表">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M2 2l10 10M12 2L2 12" /></svg>
+        </button>
+      </div>
+      <nav class="vp-nav">{{> nav}}</nav>
+    </aside>
+    <main class="vp-main">
+      {{> page}}
+      {{#if (or config.footerNote config.footerBuild config.showFooterCredit page.footerLinks.length)}}
+        <footer class="vp-footer">
+          {{#if config.footerNote}}<p class="vp-footer-note">{{config.footerNote}}</p>{{/if}}
+          {{#if page.footerLinks.length}}<nav class="vp-footer-links" aria-label="友情链接">{{#each page.footerLinks}}<a class="vp-footer-link" href="{{this.url}}" target="_blank" rel="noopener">{{#if this.icon}}<img class="vp-footer-link-icon" src="{{this.icon}}" alt="" loading="lazy">{{/if}}{{#if this.name}}<span>{{this.name}}</span>{{/if}}</a>{{/each}}</nav>{{/if}}
+          {{#if config.footerBuild}}{{#if page.build}}<p class="vp-footer-build">{{page.build.text}}</p>{{/if}}{{/if}}
+          {{#if config.showFooterCredit}}<a class="vp-footer-credit" href="https://github.com/MogroWang/Plainstruct" target="_blank" rel="noopener">由 Plainstruct 创建</a>{{/if}}
+        </footer>
+      {{/if}}
+    </main>
+    {{#if config.asideShow}}{{#if page.toc}}
+    <aside class="vp-aside">
+      <div class="vp-aside-sticky">
+        <p class="vp-aside-title">本页目录</p>
+        <ul class="vp-aside-list">
+          {{#each page.toc}}<li class="vp-aside-item is-l{{this.level}}"><a href="#{{this.id}}">{{this.text}}</a></li>{{/each}}
+        </ul>
+      </div>
+    </aside>
+    {{/if}}{{/if}}
+  </div>
+  <script>
+    (function () {
+      /* 抽屉:移动端菜单按钮开关,遮罩/关闭按钮/Esc/点链接关闭,打开时锁定背景滚动 */
+      var btn = document.querySelector(".vp-menu-btn");
+      var closeBtn = document.querySelector(".vp-drawer-close");
+      var sidebar = document.querySelector(".vp-sidebar");
+      var mask = document.querySelector(".vp-mask");
+      if (!btn || !sidebar || !mask) return;
+      function setDrawer(open) {
+        sidebar.classList.toggle("open", open);
+        mask.classList.toggle("show", open);
+        btn.setAttribute("aria-expanded", open ? "true" : "false");
+        document.body.classList.toggle("vp-drawer-open", open);
+      }
+      btn.addEventListener("click", function () {
+        setDrawer(!sidebar.classList.contains("open"));
+      });
+      mask.addEventListener("click", function () {
+        setDrawer(false);
+      });
+      if (closeBtn) closeBtn.addEventListener("click", function () {
+        setDrawer(false);
+      });
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape") setDrawer(false);
+      });
+      sidebar.addEventListener("click", function (e) {
+        if (e.target instanceof Element && e.target.closest("a")) setDrawer(false);
+      });
+    })();
+    (function () {
+      /* 侧栏分组折叠:默认全部展开,收起状态记忆在 sessionStorage */
+      var navEl = document.querySelector(".vp-nav");
+      if (!navEl) return;
+      var NAV_KEY = "ps-nav-closed";
+      var closedSet;
+      try {
+        var raw = JSON.parse(sessionStorage.getItem(NAV_KEY) || "[]");
+        closedSet = new Set(Array.isArray(raw) ? raw : []);
+      } catch (err) {
+        closedSet = new Set();
+      }
+      var saveClosed = function () {
+        try { sessionStorage.setItem(NAV_KEY, JSON.stringify(Array.from(closedSet))); } catch (err) {}
+      };
+      var items = navEl.querySelectorAll(".vp-nav-item[data-nav-id]");
+      Array.prototype.forEach.call(items, function (li) {
+        var id = li.getAttribute("data-nav-id");
+        if (id && closedSet.has(id)) {
+          li.classList.remove("open");
+          var caret = li.querySelector(".vp-nav-caret");
+          if (caret) caret.setAttribute("aria-expanded", "false");
+        }
+      });
+      navEl.addEventListener("click", function (e) {
+        if (!(e.target instanceof Element)) return;
+        var caret = e.target.closest(".vp-nav-caret");
+        if (!caret) return;
+        var li = caret.closest(".vp-nav-item");
+        if (!li) return;
+        var open = !li.classList.contains("open");
+        li.classList.toggle("open", open);
+        caret.setAttribute("aria-expanded", open ? "true" : "false");
+        var id = li.getAttribute("data-nav-id");
+        if (id) { if (open) closedSet.delete(id); else closedSet.add(id); saveClosed(); }
+      });
+    })();
+    (function () {
+      /* 顶栏滚动态:滚离顶部后显示底缘渐隐分割线 */
+      var bar = document.querySelector(".vp-navbar");
+      if (!bar) return;
+      var ticking = false;
+      var update = function () {
+        ticking = false;
+        bar.classList.toggle("is-scrolled", (window.scrollY || 0) > 4);
+      };
+      window.addEventListener("scroll", function () {
+        if (ticking) return;
+        ticking = true;
+        requestAnimationFrame(update);
+      }, { passive: true });
+      update();
+    })();
+    (function () {
+      /* 页内大纲高亮:滚动位置落在哪个标题区间,对应项点亮(预览禁脚本时保持无高亮) */
+      var list = document.querySelector(".vp-aside-list");
+      var body = document.querySelector(".vp-doc-body");
+      if (!list || !body) return;
+      var map = {};
+      Array.prototype.forEach.call(list.querySelectorAll("a[href^='#']"), function (a) {
+        try {
+          map[decodeURIComponent(a.getAttribute("href").slice(1))] = a.parentElement;
+        } catch (err) {}
+      });
+      var heads = Array.prototype.filter.call(
+        body.querySelectorAll("h1[id],h2[id],h3[id],h4[id],h5[id],h6[id]"),
+        function (h) { return map[h.id]; }
+      );
+      if (!heads.length) return;
+      var current = null;
+      var compute = function () {
+        /* 视口判定线在顶栏下方一档,取线之上最后一个标题 */
+        var line = 96;
+        var active = null;
+        for (var i = 0; i < heads.length; i++) {
+          if (heads[i].getBoundingClientRect().top <= line) active = map[heads[i].id];
+          else break;
+        }
+        if (active === current) return;
+        if (current) current.classList.remove("is-current");
+        current = active;
+        if (current) current.classList.add("is-current");
+      };
+      var ticking = false;
+      window.addEventListener("scroll", function () {
+        if (ticking) return;
+        ticking = true;
+        requestAnimationFrame(function () { ticking = false; compute(); });
+      }, { passive: true });
+      compute();
+    })();
+    (function () {
+      /* 代码块语言角标:渲染器输出的语言类提取到 pre 的 data-lang,由样式显示 */
+      var codes = document.querySelectorAll(".vp-doc-body pre > code[class*='language-']");
+      Array.prototype.forEach.call(codes, function (code) {
+        var m = /language-([\w+#.-]+)/.exec(code.className || "");
+        if (m && m[1]) code.parentElement.setAttribute("data-lang", m[1]);
+      });
+    })();
+  </script>
+</body>
+</html>

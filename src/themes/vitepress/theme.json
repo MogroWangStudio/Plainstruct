@@ -1,0 +1,304 @@
+{
+  "id": "vitepress",
+  "name": "VitePress",
+  "version": "4.0.0",
+  "type": "docs",
+  "author": "MogroWang Studio",
+  "description": "现代文档风：靛蓝强调，玻璃顶栏，分组侧栏，页内大纲，深色代码块。",
+  "config": [
+    {
+      "key": "showLogoPc",
+      "label": "显示站点 Logo",
+      "type": "boolean",
+      "default": true,
+      "category": "站点标识"
+    },
+    {
+      "key": "showLogoM",
+      "label": "显示站点 Logo",
+      "type": "boolean",
+      "default": true,
+      "category": "站点标识",
+      "hint": "窗口宽度 ≤900px 时生效"
+    },
+    {
+      "key": "showTitlePc",
+      "label": "显示站点标题",
+      "type": "boolean",
+      "default": true,
+      "category": "站点标识"
+    },
+    {
+      "key": "showTitleM",
+      "label": "显示站点标题",
+      "type": "boolean",
+      "default": true,
+      "category": "站点标识",
+      "hint": "窗口宽度 ≤900px 时生效"
+    },
+    {
+      "key": "logoSizePc",
+      "label": "Logo 大小",
+      "type": "number",
+      "default": 24,
+      "min": 16,
+      "max": 48,
+      "step": 1,
+      "category": "站点标识"
+    },
+    {
+      "key": "logoSizeM",
+      "label": "Logo 大小",
+      "type": "number",
+      "default": 22,
+      "min": 16,
+      "max": 40,
+      "step": 1,
+      "category": "站点标识",
+      "hint": "窗口宽度 ≤900px 时生效"
+    },
+    {
+      "key": "accentColor",
+      "label": "强调色",
+      "type": "color",
+      "default": "#646cff",
+      "category": "颜色与字体"
+    },
+    {
+      "key": "bodyFont",
+      "label": "正文字体",
+      "type": "select",
+      "default": "system",
+      "options": [
+        "system",
+        "serif",
+        "mono",
+        "custom"
+      ],
+      "category": "颜色与字体"
+    },
+    {
+      "key": "customFont",
+      "label": "自定义字体",
+      "type": "text",
+      "default": "",
+      "visibleIf": {
+        "key": "bodyFont",
+        "equals": "custom"
+      },
+      "category": "颜色与字体"
+    },
+    {
+      "key": "fontSizePc",
+      "label": "正文字号",
+      "type": "number",
+      "default": 16,
+      "min": 12,
+      "max": 22,
+      "step": 0.5,
+      "category": "颜色与字体"
+    },
+    {
+      "key": "fontSizeM",
+      "label": "正文字号",
+      "type": "number",
+      "default": 16,
+      "min": 12,
+      "max": 20,
+      "step": 0.5,
+      "category": "颜色与字体",
+      "hint": "窗口宽度 ≤900px 时生效"
+    },
+    {
+      "key": "sidebarWidth",
+      "label": "侧栏宽度",
+      "type": "number",
+      "default": 272,
+      "min": 200,
+      "max": 360,
+      "step": 4,
+      "category": "布局"
+    },
+    {
+      "key": "sidebarWidthM",
+      "label": "抽屉宽度",
+      "type": "number",
+      "default": 84,
+      "min": 60,
+      "max": 100,
+      "step": 2,
+      "category": "布局",
+      "hint": "窗口宽度 ≤900px 时侧栏抽屉按视口百分比显示"
+    },
+    {
+      "key": "contentWidth",
+      "label": "正文宽度",
+      "type": "number",
+      "default": 688,
+      "min": 560,
+      "max": 960,
+      "step": 4,
+      "category": "布局",
+      "hint": "单位：px"
+    },
+    {
+      "key": "topbarFill",
+      "label": "顶栏填充不透明度",
+      "type": "number",
+      "default": 80,
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "category": "顶栏",
+      "hint": "单位：%；100 为不透明顶栏"
+    },
+    {
+      "key": "topbarBlur",
+      "label": "顶栏背景模糊",
+      "type": "number",
+      "default": 10,
+      "min": 0,
+      "max": 30,
+      "step": 1,
+      "category": "顶栏",
+      "hint": "单位：px；0 为关闭毛玻璃"
+    },
+    {
+      "key": "showCrumbs",
+      "label": "顶栏显示当前页路径",
+      "type": "boolean",
+      "default": true,
+      "category": "顶栏",
+      "hint": "桌面端顶栏右侧；窗口宽度 ≤1100px 时自动隐藏"
+    },
+    {
+      "key": "asideShow",
+      "label": "显示页内大纲",
+      "type": "boolean",
+      "default": true,
+      "category": "布局",
+      "hint": "正文有标题时右侧显示「本页目录」，滚动时高亮当前小节；窗口宽度 ≤1100px 时自动隐藏"
+    },
+    {
+      "key": "showHero",
+      "label": "首页显示 Hero 区",
+      "type": "boolean",
+      "default": true,
+      "category": "首页",
+      "hint": "站点根首页：大标题 + 站点描述 + 开始阅读按钮，下方为目录卡片"
+    },
+    {
+      "key": "heroReadLabel",
+      "label": "开始阅读按钮文字",
+      "type": "text",
+      "default": "开始阅读",
+      "visibleIf": {
+        "key": "showHero",
+        "equals": true
+      },
+      "category": "首页",
+      "hint": "留空则不显示按钮；按钮指向侧栏第一个页面"
+    },
+    {
+      "key": "pageTransition",
+      "label": "页面过渡动画",
+      "type": "select",
+      "default": "淡入上浮",
+      "options": [
+        "关闭",
+        "淡入",
+        "淡入上浮",
+        "缩放浮现",
+        "滑入",
+        "弹性浮现",
+        "模糊聚焦",
+        "翻页",
+        "揭开"
+      ],
+      "category": "动效"
+    },
+    {
+      "key": "loadingAnim",
+      "label": "页面加载动画",
+      "type": "select",
+      "default": "关闭",
+      "options": [
+        "关闭",
+        "转圈",
+        "点点",
+        "进度条"
+      ],
+      "category": "动效"
+    },
+    {
+      "key": "showDate",
+      "label": "显示文档日期",
+      "type": "boolean",
+      "default": false,
+      "category": "内容显示"
+    },
+    {
+      "key": "showAuthor",
+      "label": "显示作者署名",
+      "type": "boolean",
+      "default": true,
+      "category": "内容显示",
+      "hint": "文档配置头填写了 author 时显示"
+    },
+    {
+      "key": "showAigc",
+      "label": "显示 AIGC 声明",
+      "type": "boolean",
+      "default": true,
+      "category": "内容显示",
+      "hint": "文档配置头选择了 AIGC 声明时显示"
+    },
+    {
+      "key": "showFooterCredit",
+      "label": "在底部显示由 Plainstruct 创建",
+      "type": "boolean",
+      "default": true,
+      "category": "内容显示"
+    },
+    {
+      "key": "footerNote",
+      "label": "页脚说明",
+      "type": "text",
+      "default": "",
+      "category": "页脚",
+      "hint": "显示在每页底部的一行文字，留空不显示"
+    },
+    {
+      "key": "footerBuild",
+      "label": "显示构建版本与日期",
+      "type": "boolean",
+      "default": false,
+      "category": "页脚"
+    },
+    {
+      "key": "footerBuildFormat",
+      "label": "构建信息格式",
+      "type": "text",
+      "default": "构建于 {date} {time}",
+      "tokens": [
+        "{version}",
+        "{date}",
+        "{time}"
+      ],
+      "visibleIf": {
+        "key": "footerBuild",
+        "equals": true
+      },
+      "category": "页脚",
+      "hint": "点击令牌按钮插入占位符，构建时自动替换为实际值"
+    },
+    {
+      "key": "footerLinks",
+      "label": "友情链接",
+      "type": "links",
+      "default": "",
+      "category": "页脚",
+      "hint": "逐条添加名称、链接与图标（图标可选）"
+    }
+  ]
+}

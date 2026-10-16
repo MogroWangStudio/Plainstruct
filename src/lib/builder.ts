@@ -694,12 +694,13 @@ function renderOnePage(
       aigc: doc.aigc,
       // 博客首页系列(含 page/N)由模板渲染文章流
       isHome: htmlPath === "index.html" || !!pagination || undefined,
-      // 博客文章页的页内目录;标题 id 与渲染管线同源(extractHeadings 复用 slugify),锚点一致。
+      // 页内目录;标题 id 与渲染管线同源(extractHeadings 复用 slugify),锚点一致。
+      // 博客文章页与文档主题的 TOC 侧栏共用(文档站旧主题不引用,模板不渲染即无影响)。
       // 显隐由配置头 toc 三态与主题 tocEnabled 共同决定:true/false 强制覆盖,缺省跟随主题;
       // 模板仅判 page.toc(不再看 config.tocEnabled),旧主题升级后行为一致。
       // 正文无标题时同样不落字段(空数组在 Handlebars 中为真值,会让目录栏与占位列残留)
       toc: (() => {
-        if (!isBlog || pagination || !(doc.toc === true || (doc.toc === undefined && config.tocEnabled !== false))) return undefined;
+        if (pagination || !(doc.toc === true || (doc.toc === undefined && config.tocEnabled !== false))) return undefined;
         const headings = extractHeadings(doc.body);
         return headings.length ? headings : undefined;
       })(),

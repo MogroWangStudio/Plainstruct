@@ -26,6 +26,11 @@ import galleryLayout from "./gallery/templates/layout.hbs?raw";
 import galleryPage from "./gallery/templates/page.hbs?raw";
 import galleryNav from "./gallery/partials/nav.hbs?raw";
 import galleryCss from "./gallery/assets/style.css?raw";
+import vitepressMeta from "./vitepress/theme.json";
+import vitepressLayout from "./vitepress/templates/layout.hbs?raw";
+import vitepressPage from "./vitepress/templates/page.hbs?raw";
+import vitepressNav from "./vitepress/partials/nav.hbs?raw";
+import vitepressCss from "./vitepress/assets/style.css?raw";
 import blogLightMeta from "./blog-light/theme.json";
 import blogLightLayout from "./blog-light/templates/layout.hbs?raw";
 import blogLightPage from "./blog-light/templates/page.hbs?raw";
@@ -111,6 +116,16 @@ export const builtinThemes: ThemeBundle[] = [
       "templates/page.hbs": galleryPage,
       "partials/nav.hbs": galleryNav,
       "assets/style.css": galleryCss,
+    },
+  },
+  {
+    meta: toMeta(vitepressMeta),
+    files: {
+      "theme.json": JSON.stringify(vitepressMeta, null, 2),
+      "templates/layout.hbs": vitepressLayout,
+      "templates/page.hbs": vitepressPage,
+      "partials/nav.hbs": vitepressNav,
+      "assets/style.css": vitepressCss,
     },
   },
   {
