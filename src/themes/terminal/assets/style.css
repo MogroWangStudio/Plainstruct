@@ -1567,6 +1567,24 @@ body.ps-sidebar-collapsed .ps-sidebar-toggle svg {
 }
 
 @media (max-width: 900px) {
+  /* 嵌入顶栏:标题回到第一行(菜单与站点标识之间)占中间弹性空间,顶栏回落单行高度 */
+  body[data-crumbs-pos="嵌入顶栏"] {
+    --ps-topbar-h: 52px;
+  }
+
+  body[data-crumbs-pos="嵌入顶栏"] .ps-topbar {
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+
+  body[data-crumbs-pos="嵌入顶栏"] .ps-crumbs {
+    order: 0;
+    flex: 1 1 auto;
+    flex-basis: auto;
+    min-width: 0;
+    padding-right: 0;
+  }
+
   /* 当前文档标题(第二行)对齐:右对齐为缺省,可居中或左对齐 */
   body[data-crumbs-align="居中"] .ps-crumbs {
     justify-content: center;

@@ -1291,6 +1291,17 @@ body[data-loading="进度条"] .ps-loader-spin {
     justify-content: flex-start;
   }
 
+  /* 嵌入顶栏:标题回到第一行(站点标识右侧),顶栏回落单行高度 */
+  body[data-crumbs-pos="嵌入顶栏"] {
+    --vp-nav-h: 64px;
+  }
+
+  body[data-crumbs-pos="嵌入顶栏"] .vp-crumbs {
+    order: 0;
+    flex-basis: auto;
+    margin-left: auto;
+  }
+
   /* 侧栏变抽屉:整体盖住顶栏,自带头部与关闭按钮 */
   .vp-sidebar {
     position: fixed;

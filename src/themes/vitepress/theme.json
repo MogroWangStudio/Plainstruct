@@ -172,8 +172,20 @@
       "hint": "桌面端顶栏右侧；移动端为顶栏第二行的当前文档标题；窗口宽度 901–1100px 时自动隐藏"
     },
     {
-      "key": "topbarTitleAlignM",
+      "key": "topbarTitlePosM",
       "label": "当前文档标题位置",
+      "type": "select",
+      "default": "独立一行",
+      "options": [
+        "独立一行",
+        "嵌入顶栏"
+      ],
+      "category": "顶栏",
+      "hint": "窗口宽度 ≤900px 时生效：嵌入顶栏 = 标题与菜单、站点标识同一行；独立一行 = 标题单独占一行（缺省）"
+    },
+    {
+      "key": "topbarTitleAlignM",
+      "label": "当前文档标题对齐",
       "type": "select",
       "default": "右对齐",
       "options": [
@@ -182,7 +194,7 @@
         "左对齐"
       ],
       "category": "顶栏",
-      "hint": "窗口宽度 ≤900px 时生效：移动端顶栏第二行的当前文档标题对齐方式"
+      "hint": "移动端顶栏的当前文档标题对齐方式"
     },
     {
       "key": "asideShow",
