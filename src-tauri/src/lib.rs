@@ -297,6 +297,9 @@ pub fn run() {
             commands::github_verify,
             commands::github_preflight,
             commands::github_pages_status,
+            commands::github_publish_begin,
+            commands::github_publish_end,
+            commands::github_publish_cancel,
             commands::github_sync,
             // 系统
             commands::open_path,

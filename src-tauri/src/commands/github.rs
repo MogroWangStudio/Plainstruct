@@ -3,6 +3,7 @@ use base64::Engine;
 use base64::engine::general_purpose::STANDARD as B64;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use std::path::PathBuf;
 use tauri::{AppHandle, Emitter, State};
 
 use crate::commands::app::now_millis;
@@ -503,6 +504,50 @@ fn emit_log(app: &AppHandle, level: &str, message: impl Into<String>) {
     );
 }
 
+/// 前端约定的取消错误码:发布被用户取消(引用未变更或已回退)
+pub const ERR_PUBLISH_CANCELLED: &str = "publish-cancelled";
+
+fn publish_cancelled(state: &AppState) -> bool {
+    state.publish_cancel.load(std::sync::atomic::Ordering::SeqCst)
+}
+
+/// 登记后台发布任务:发布占用的站点根 —— 期间切站/关站,构建落盘与产物收集
+/// 仍指向发起站点(github_sync 据此取产物,不读当前站点);同时复位取消标志。
+/// 发布结束(成败皆然)由前端调 github_publish_end 解除占用
+#[tauri::command]
+pub fn github_publish_begin(
+    window: tauri::WebviewWindow,
+    state: State<'_, AppState>,
+    root: String,
+) -> Result<(), String> {
+    ensure_main(&window)?;
+    let path = PathBuf::from(&root);
+    if !path.is_dir() {
+        return Err("site-not-found".into());
+    }
+    *state.publish_root.lock().map_err(|e| e.to_string())? = Some(path);
+    state
+        .publish_cancel
+        .store(false, std::sync::atomic::Ordering::SeqCst);
+    Ok(())
+}
+
+/// 解除发布任务对站点根的占用(发布完成/失败/取消后调用)
+#[tauri::command]
+pub fn github_publish_end(window: tauri::WebviewWindow, state: State<'_, AppState>) -> Result<(), String> {
+    ensure_main(&window)?;
+    *state.publish_root.lock().map_err(|e| e.to_string())? = None;
+    Ok(())
+}
+
+/// 请求取消发布:上传循环与各步骤间轮询该标志;站点引用已更新后的取消会回退引用
+#[tauri::command]
+pub fn github_publish_cancel(window: tauri::WebviewWindow, state: State<'_, AppState>) -> Result<(), String> {
+    ensure_main(&window)?;
+    state.publish_cancel.store(true, std::sync::atomic::Ordering::SeqCst);
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn github_sync(
     window: tauri::WebviewWindow,
@@ -517,6 +562,7 @@ pub async fn github_sync(
             let sha = r.commit_sha.get(..7).unwrap_or(&r.commit_sha).to_string();
             emit_log(&app, "success", format!("发布完成:提交 {sha} 已推送,站点地址 {}", r.pages_url));
         }
+        Err(e) if e == ERR_PUBLISH_CANCELLED => emit_log(&app, "info", "已取消发布"),
         Err(e) => emit_log(&app, "error", format!("发布失败:{e}")),
     }
     result
@@ -526,10 +572,14 @@ async fn github_sync_inner(app: &AppHandle, state: &AppState, cfg: GithubConfig)
     if cfg.token.is_empty() || cfg.owner.is_empty() || cfg.repo.is_empty() {
         return Err("请先填写用户名(或组织名)、仓库名与访问令牌".into());
     }
-    let root = state.site_root()?;
+    // 产物取自发布任务占用的站点根(而非当前站点):发布期间切站后仍上传发起站点的产物
+    let root = state.publish_root().ok_or("no-publish-task")?;
     let files = collect_build_files(&root)?;
     if files.is_empty() {
         return Err("构建目录为空,请先构建站点".into());
+    }
+    if publish_cancelled(state) {
+        return Err(ERR_PUBLISH_CANCELLED.into());
     }
     let http = cfg.http_client()?;
     let total = files.len() as u32;
@@ -707,6 +757,10 @@ async fn github_sync_inner(app: &AppHandle, state: &AppState, cfg: GithubConfig)
     let mut tree_items = Vec::with_capacity(files.len());
     let mut reused: usize = 0;
     for (i, (path, bytes)) in files.iter().enumerate() {
+        // 协作式取消点:blob 为悬空对象,此处中止不影响线上站点
+        if publish_cancelled(state) {
+            return Err(ERR_PUBLISH_CANCELLED.into());
+        }
         let local_sha = git_blob_sha(bytes);
         let sha = if remote_shas.get(path).map(|s| s.as_str()) == Some(local_sha.as_str()) {
             reused += 1;
@@ -817,6 +871,10 @@ async fn github_sync_inner(app: &AppHandle, state: &AppState, cfg: GithubConfig)
         },
     );
     emit_log(app, "info", "创建目录树与提交…");
+    // 引用未更新前的取消点:tree/commit 同为悬空对象,中止不影响线上站点
+    if publish_cancelled(state) {
+        return Err(ERR_PUBLISH_CANCELLED.into());
+    }
     let tree_body = json!({ "tree": tree_items });
     let (tree_status, new_tree) = request(
         &http,
@@ -862,6 +920,10 @@ async fn github_sync_inner(app: &AppHandle, state: &AppState, cfg: GithubConfig)
     let patch_body = json!({ "sha": commit_sha, "force": true });
     let mut ref_updated = false;
     if branch_exists {
+        // 引用更新前的最后一个取消点:此刻中止,线上站点仍停留在原版本
+        if publish_cancelled(state) {
+            return Err(ERR_PUBLISH_CANCELLED.into());
+        }
         let (ref_status, _ref_body) = request(
             &http,
             reqwest::Method::PATCH,
@@ -905,6 +967,43 @@ async fn github_sync_inner(app: &AppHandle, state: &AppState, cfg: GithubConfig)
             }
             emit_log(app, "info", "发布分支已更新(经创建兜底收敛)");
         }
+    }
+
+    // 6.5 取消检查点:引用已指向本次提交,取消必须回退 —— 发布分支指回原基准
+    //     提交;首次发布(无基准)则移除本次创建的发布分支,站点回到未发布状态。
+    //     此前的 blob/tree/commit 均为悬空对象,无需清理,由 GitHub 自行回收
+    if publish_cancelled(state) {
+        emit_log(app, "info", "收到取消请求,正在回退已发布的更改…");
+        if let Some(base) = &base_commit {
+            let (rb_status, rb_body) = request(
+                &http,
+                reqwest::Method::PATCH,
+                &ref_update_url,
+                &cfg.token,
+                Some(json!({ "sha": base, "force": true })),
+            )
+            .await?;
+            if rb_status == 200 {
+                emit_log(app, "info", "已回退到原版本,站点内容未变更");
+                return Err(ERR_PUBLISH_CANCELLED.into());
+            }
+            let msg = rb_body["message"].as_str().unwrap_or("");
+            return Err(format!("取消发布失败:回退到原版本时出错({rb_status}): {msg}"));
+        }
+        let (del_status, del_body) = request(
+            &http,
+            reqwest::Method::DELETE,
+            &ref_update_url,
+            &cfg.token,
+            None,
+        )
+        .await?;
+        if del_status == 204 {
+            emit_log(app, "info", "已移除本次创建的发布分支,站点回到未发布状态");
+            return Err(ERR_PUBLISH_CANCELLED.into());
+        }
+        let msg = del_body["message"].as_str().unwrap_or("");
+        return Err(format!("取消发布失败:移除发布分支时出错({del_status}): {msg}"));
     }
 
     // 7. 尽力开启 Pages(失败不影响发布结果,但失败原因写入日志便于定位:

@@ -2,7 +2,6 @@
 import { computed, nextTick, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { usePublishStore } from "@/stores/publish";
-import { useBuilderStore } from "@/stores/builder";
 import { useAppStore } from "@/stores/app";
 import { useUiStore } from "@/stores/ui";
 import { fireConfetti } from "@/lib/confetti";
@@ -12,7 +11,6 @@ import type { GithubAccountType } from "@/ipc/types";
 
 const { t } = useI18n();
 const publish = usePublishStore();
-const builder = useBuilderStore();
 const app = useAppStore();
 const ui = useUiStore();
 
@@ -136,7 +134,9 @@ watch(
   },
 );
 
-const canPublish = computed(() => Boolean(publish.config.owner && publish.config.repo && publish.config.token && builder.report));
+const canPublish = computed(
+  () => Boolean(publish.config.owner && publish.config.repo && publish.config.token),
+);
 
 /** 发布成功且不在发布中:主按钮转绿色打勾,浮现「重新发布」 */
 const publishDone = computed(() => Boolean(publish.result && !publish.syncing));
@@ -323,7 +323,13 @@ async function republish() {
               <AppIcon name="refresh" :size="16" />
             </button>
           </Transition>
-          <span v-if="!builder.report && !publish.syncing" class="text-[calc(12.5px*var(--ui-font-scale))] text-ink-3">{{ t("publish.buildFirst") }}</span>
+          <!-- 发布中:取消发布(已上传的部分由后端回退,站点内容不变) -->
+          <Transition name="pop">
+            <button v-if="publish.syncing" class="orb-republish" :title="t('publish.cancel')" @click="publish.cancel()">
+              <AppIcon name="x" :size="16" />
+            </button>
+          </Transition>
+          <span v-if="!publish.result && !publish.syncing" class="text-[calc(12.5px*var(--ui-font-scale))] text-ink-3">{{ t("publish.autoBuildHint") }}</span>
         </div>
 
         <!-- 进度 -->

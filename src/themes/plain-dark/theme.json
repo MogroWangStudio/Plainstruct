@@ -254,6 +254,17 @@
       "hint": "单位：px"
     },
     {
+      "key": "contentWidthM",
+      "label": "正文宽度",
+      "type": "number",
+      "default": 760,
+      "min": 560,
+      "max": 960,
+      "step": 20,
+      "category": "布局",
+      "hint": "窗口宽度 ≤900px 时生效；单位：px"
+    },
+    {
       "key": "pageTransition",
       "label": "页面过渡动画",
       "type": "select",

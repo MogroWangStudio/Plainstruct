@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 import { useAppStore } from "@/stores/app";
 import { useBuilderStore } from "@/stores/builder";
 import { usePublishStore } from "@/stores/publish";
+import { usePublishTaskStore } from "@/stores/publishTask";
 import { useSiteStore } from "@/stores/site";
 import AppIcon from "./AppIcon.vue";
 import BrandLogo from "./BrandLogo.vue";
@@ -14,6 +15,7 @@ const app = useAppStore();
 const site = useSiteStore();
 const publish = usePublishStore();
 const builder = useBuilderStore();
+const task = usePublishTaskStore();
 
 const maximized = ref(false);
 
@@ -24,11 +26,12 @@ const onMac = computed(() => app.platform === "macos");
 const canGoBack = computed(() => site.open && app.view !== "settings");
 /** 「预览站点」悬停入口:站点构建完毕(已有产物)后出现,点击打开/切到独立预览窗口 */
 const showPreviewEntry = computed(() => canGoBack.value && builder.report !== null);
-/** 「查看发布状态」悬停入口:存在发布上下文(进行中/已完成/失败)时出现 */
+/** 「查看发布状态」悬停入口:存在发布上下文(进行中/已完成/失败,含后台任务)时出现 */
 const showPublishEntry = computed(
   () =>
     canGoBack.value &&
     (publish.syncing ||
+      task.running ||
       publish.checkingDeploy ||
       publish.deployState !== "idle" ||
       publish.result !== null ||
@@ -54,7 +57,11 @@ async function goToStart() {
   }
 }
 
-function goPublish() {
+/** 查看发布状态:后台发布时先切回发起站点,再打开发布页(任务状态就地恢复) */
+async function goPublish() {
+  if (task.active && site.root !== task.siteRoot) {
+    await site.openDir(task.siteRoot);
+  }
   app.setView("publish");
 }
 

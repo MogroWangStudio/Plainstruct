@@ -332,6 +332,18 @@ export const ipc = {
   githubPagesStatus(cfg: GithubConfig, commit: string): Promise<PagesBuildStatus> {
     return inTauri ? invoke<PagesBuildStatus>("github_pages_status", { cfg, commit }) : mock.githubPagesStatus(cfg, commit);
   },
+  /** 登记后台发布任务占用的站点根(切站后构建落盘与上传仍指向发起站点),并复位取消标志 */
+  githubPublishBegin(root: string): Promise<void> {
+    return inTauri ? invoke<void>("github_publish_begin", { root }) : mock.githubPublishBegin(root);
+  },
+  /** 解除发布任务对站点根的占用(发布完成/失败/取消后调用) */
+  githubPublishEnd(): Promise<void> {
+    return inTauri ? invoke<void>("github_publish_end") : mock.githubPublishEnd();
+  },
+  /** 请求取消发布:上传任务中止,已更新的站点引用回退到原版本 */
+  githubPublishCancel(): Promise<void> {
+    return inTauri ? invoke<void>("github_publish_cancel") : mock.githubPublishCancel();
+  },
   async githubSync(cfg: GithubConfig, onProgress: (p: SyncProgress) => void): Promise<SyncResult> {
     if (!inTauri) return mock.githubSync(cfg, onProgress);
     const stop = await listen<SyncProgress>(Events.SyncProgress, (p) => onProgress(p));

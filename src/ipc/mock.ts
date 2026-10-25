@@ -886,6 +886,17 @@ async readSiteConfig(): Promise<SiteConfig> {
     return { ready: true, errored: false, status: "built" };
   },
 
+  /** 浏览器 mock:后台发布任务的站点根登记/解除与取消标志(取消经 mock 标志轮询生效) */
+  async githubPublishBegin(_root: string): Promise<void> {
+    mockPublish.cancelled = false;
+  },
+
+  async githubPublishEnd(): Promise<void> {},
+
+  async githubPublishCancel(): Promise<void> {
+    mockPublish.cancelled = true;
+  },
+
   async githubSync(
     cfg: GithubConfig,
     onProgress: (p: SyncProgress) => void,
@@ -893,6 +904,7 @@ async readSiteConfig(): Promise<SiteConfig> {
     const total = 12;
     for (let i = 1; i <= total; i++) {
       await delay(120);
+      if (mockPublish.cancelled) throw "publish-cancelled";
       onProgress({ done: i, total, message: `upload ${i}/${total}` });
     }
     return {
@@ -965,6 +977,9 @@ async readSiteConfig(): Promise<SiteConfig> {
 
 /** mock 下载模拟器的共享状态(断点/暂停/取消) */
 const mockDownload = { paused: false, cancelled: false, received: 0, running: false };
+
+/** mock 发布模拟器的取消标志(githubSync 循环轮询) */
+const mockPublish = { cancelled: false };
 
 /** mock 模拟的「最新版本」:始终比当前应用版本新一个补丁位,版本升级后无需手动同步 */
 const MOCK_LATEST_VERSION = (() => {

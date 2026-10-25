@@ -5,6 +5,8 @@ import type { GithubConfig, NotifyAction, PublishNotifyMode, SyncLogEntry, SyncP
 import { i18n } from "@/i18n";
 import { useAppStore } from "./app";
 import { useBuilderStore } from "./builder";
+import { useSiteStore } from "./site";
+import { usePublishTaskStore } from "./publishTask";
 import { useUiStore } from "./ui";
 
 /** Pages 构建监听状态:building = 自动轮询中,ready = 本次提交已构建完成 */
@@ -27,14 +29,18 @@ interface State {
   logs: SyncLogEntry[];
 }
 
-/** 发布日志事件监听:模块级仅注册一次,浏览器环境为空操作 */
+/** 发布日志事件监听:模块级仅注册一次,浏览器环境为空操作。
+ *  后台发布期间(任务站点 ≠ 当前站点)日志只进后台任务,不串入别的站点 */
 let logListening = false;
 function ensureLogListener() {
   if (logListening) return;
   logListening = true;
   void listen<{ level: string; message: string; time: number }>(Events.PublishLog, (p) => {
     const level = p.level === "error" || p.level === "success" ? p.level : "info";
-    usePublishStore().appendLog(level, p.message, p.time);
+    const task = usePublishTaskStore();
+    const site = useSiteStore();
+    if (!task.active || task.siteRoot === site.root) usePublishStore().appendLog(level, p.message, p.time);
+    if (task.active) task.appendLog(level, p.message, p.time);
   });
 }
 
@@ -79,8 +85,9 @@ export const usePublishStore = defineStore("publish", {
 
     /** 发布系统通知:档位由设置决定(两次/合并一次/关闭)。后端直接投递
      *  (macOS 现代通知中心/Windows AUMID 兕底),失败信息落入发布日志,
-     *  浏览器 mock 为空操作 */
-    notifyOf(kind: "published" | "deployed") {
+     *  浏览器 mock 为空操作;站点地址由调用方传入(后台完成时发布页不在场) */
+    notifyOf(kind: "published" | "deployed", siteUrl?: string) {
+      const url = siteUrl ?? this.siteUrl;
       const app = useAppStore();
       if (app.platform === "browser") return;
       const mode: PublishNotifyMode = app.settings.publishNotify ?? "twice";
@@ -104,8 +111,7 @@ export const usePublishStore = defineStore("publish", {
         return;
       }
       // Pages 构建完成(或合并通知):按钮直达站点(有自定义域名时为域名)
-      const site = this.siteUrl;
-      const actions: NotifyAction[] = site ? [{ label: t("publish.notifyActionViewSite"), arg: site }] : [];
+      const actions: NotifyAction[] = url ? [{ label: t("publish.notifyActionViewSite"), arg: url }] : [];
       if (mode === "twice") {
         void send(t("publish.notifyDeployedTitle"), t("publish.notifyDeployedBody"), actions);
       } else {
@@ -114,6 +120,19 @@ export const usePublishStore = defineStore("publish", {
     },
 
     async load() {
+      // 回到发起后台发布的站点:接回任务(进行中或已完成的结果都恢复),
+      // 药丸栏随之消失 —— 用户已在发布页,状态就地可见
+      const task = usePublishTaskStore();
+      const site = useSiteStore();
+      if (task.active && task.siteRoot === site.root) {
+        this.syncing = task.phase === "building" || task.phase === "uploading";
+        this.progress = task.progress;
+        this.logs = [...task.logs];
+        this.result = task.result;
+        this.error = task.error;
+        this.deployState = task.deployState;
+        task.dismissPill();
+      }
       const cfg = await ipc.githubReadConfig();
       // 旧配置没有账户类型字段时按个人账号处理(与后端反序列化默认值一致);
       // 代理字段同理:缺省跟随系统,地址为空
@@ -141,64 +160,154 @@ export const usePublishStore = defineStore("publish", {
       }
     },
 
+    /** 请求取消发布:构建阶段跳过上传,上传阶段由后端中止并回退站点引用 */
+    cancel() {
+      const task = usePublishTaskStore();
+      const site = useSiteStore();
+      if (!task.running || task.cancelRequested) return;
+      task.requestCancel();
+      void ipc.githubPublishCancel();
+      const msg = i18n.global.t("publish.cancelRequestedLog");
+      if (!task.active || task.siteRoot === site.root) this.appendLog("info", msg);
+      task.appendLog("info", msg);
+    },
+
     async sync() {
       const builder = useBuilderStore();
       const ui = useUiStore();
+      const site = useSiteStore();
+      const task = usePublishTaskStore();
       const t = i18n.global.t;
+      // 同一时间只允许一个发布任务(后台任务运行中时禁止再次发起)
+      if (task.running) {
+        ui.toast(t("publish.taskBusy", { name: task.siteName }), "error");
+        return;
+      }
       // 分支名不能为空:发布分支是站点内容在仓库中的落点
       if (!this.config.branch.trim()) {
         ui.toast(t("publish.branchEmpty"), "error");
         return;
       }
+      // 配置立即落盘:此后切站会重载本 store,必须先把发起站点的配置写回其目录
+      await this.save();
       ensureLogListener();
       this.logs = [];
-      this.appendLog("info", t("publish.logStart", { repo: `${this.config.owner}/${this.config.repo}` }));
+      // 配置快照:切站会重载 store(配置变成别的站点的),后续一律用快照
+      const cfg: GithubConfig = { ...this.config };
+      const taskRoot = site.root;
 
-      // 发布前自动构建:产物始终与站点内容一致(修改与删除一并生效)
-      this.appendLog("info", t("publish.autoBuild"));
+      task.begin(site.config?.name ?? "", taskRoot);
+      /** 当前站点是否已不是发起站点(发布已转后台) */
+      const detached = () => site.root !== taskRoot;
+      /** 任务是否仍属于本次发布(未被新的发布覆盖) */
+      const mine = () => task.active && task.siteRoot === taskRoot;
+      /** 发布日志:发布页在场时同步进页面日志,始终进后台任务 */
+      const log = (level: SyncLogEntry["level"], msg: string) => {
+        if (!mine()) return;
+        if (detached()) task.appendLog(level, msg);
+        else {
+          this.appendLog(level, msg);
+          task.appendLog(level, msg);
+        }
+      };
+      log("info", t("publish.logStart", { repo: `${cfg.owner}/${cfg.repo}` }));
+
+      // 登记后台任务占用的站点根:期间切站/关站,构建落盘与上传仍指向发起站点
+      try {
+        await ipc.githubPublishBegin(site.root);
+      } catch (e) {
+        task.error = ipc.errText(e);
+        log("error", task.error);
+        task.finish("failed");
+        return;
+      }
+
+      // 发布前自动构建:产物始终与站点内容一致(修改与删除一并生效)。
+      // 构建期间切站时产物照常写入发起站点(后端按登记的根放行),发布继续
+      log("info", t("publish.autoBuild"));
       await builder.build();
       if (builder.error) {
-        this.error = builder.error;
-        this.appendLog("error", t("publish.autoBuildFailed", { msg: builder.error }));
+        task.error = builder.error;
+        log("error", t("publish.autoBuildFailed", { msg: builder.error }));
+        task.finish("failed");
+        void ipc.githubPublishEnd();
         ui.toast(t("publish.autoBuildFailed", { msg: builder.error }), "error");
         return;
       }
-      this.appendLog("success", t("publish.autoBuildDone"));
+      log("success", t("publish.autoBuildDone"));
+      if (task.cancelRequested) {
+        // 构建阶段收到取消:不再开始上传,站点无任何变更
+        log("info", t("publish.cancelledLog"));
+        task.finish("cancelled");
+        void ipc.githubPublishEnd();
+        return;
+      }
 
       // 预检提醒(网络异常时忽略,不阻断发布):
-      // 云端被其他设备更新 → 提示将覆盖
+      // 云端被其他设备更新 → 提示将覆盖(后台接回时不再询问,按当前配置继续)
       try {
-        const pre = await ipc.githubPreflight(this.config);
-        if (pre.remoteDirty) {
+        const pre = await ipc.githubPreflight(cfg);
+        if (pre.remoteDirty && !detached()) {
           const go = await ui.confirmDialog({
             title: t("publish.remoteTitle"),
             body: t("publish.remoteBody"),
             confirmText: t("publish.remoteConfirm"),
           });
-          if (!go) return;
+          if (!go) {
+            log("info", t("publish.cancelledLog"));
+            task.finish("cancelled");
+            void ipc.githubPublishEnd();
+            return;
+          }
         }
       } catch {
         /* 预检失败不阻断发布 */
       }
+
       this.syncing = true;
       this.progress = null;
       this.result = null;
       this.error = null;
       this.deployState = "idle";
+      task.startUploading();
       try {
-        await this.save();
-        this.result = await ipc.githubSync(this.config, (p) => {
-          this.progress = p;
+        const result = await ipc.githubSync(cfg, (p) => {
+          if (!mine()) return;
+          if (detached()) task.updateProgress(p);
+          else {
+            this.progress = p;
+            task.updateProgress(p);
+          }
         });
+        if (!mine()) return;
+        // 后台完成:结果只进任务(不写入当前打开的另一个站点),药丸栏转为完成态
+        task.result = result;
+        task.finish("done");
+        if (!detached()) this.result = result;
         // 发布成功:系统通知(按设置档位),并自动监听 Pages 构建
         this.notifyOf("published");
-        void this.watchDeploy();
+        void this.watchDeploy(cfg, result);
       } catch (e) {
-        this.error = ipc.errText(e);
-        // 错误同步落入运行日志,便于用户定位失败环节
-        this.appendLog("error", this.error);
+        const msg = ipc.errText(e);
+        if (!mine()) return;
+        if (msg === "publish-cancelled") {
+          // 用户取消:不是错误。站点引用要么未变更,要么已由后端回退
+          log("info", t("publish.cancelledLog"));
+          task.finish("cancelled");
+          if (!detached()) ui.toast(t("publish.cancelledToast"), "info");
+        } else {
+          task.error = msg;
+          log("error", msg);
+          task.finish("failed");
+          if (!detached()) {
+            this.error = msg;
+            ui.toast(msg, "error");
+          }
+        }
       } finally {
+        void ipc.githubPublishEnd();
         this.syncing = false;
+        this.progress = null;
       }
     },
 
@@ -206,38 +315,52 @@ export const usePublishStore = defineStore("publish", {
      * 自动监听 Pages 构建(轮询 pages/builds/latest,上限 3 分钟):
      * 完成 → 亮起「查看站点」并弹出提示;失败/超时 → 相应提示;
      * 查询异常(网络等)→ 回到待检测,点击按钮时仍会检测。
+     * 后台发布切走后状态只进任务,回到发起站点时由 load 恢复。
      */
-    async watchDeploy() {
+    async watchDeploy(cfg: GithubConfig, result: SyncResult) {
       const ui = useUiStore();
+      const site = useSiteStore();
+      const task = usePublishTaskStore();
       const t = i18n.global.t;
-      if (!this.result || this.deployState === "building") return;
-      this.deployState = "building";
-      this.appendLog("info", t("publish.logWatchDeploy"));
+      // 发起监听时的任务归属快照:期间用户发起新的发布(任务被覆盖)则停止监听
+      const taskRoot = task.siteRoot;
+      const mine = () => task.active && task.siteRoot === taskRoot;
+      const detached = () => site.root !== taskRoot;
+      if (task.deployState === "building") return;
+      task.setDeployState("building");
+      if (!detached()) this.deployState = "building";
+      task.appendLog("info", t("publish.logWatchDeploy"));
+      const url = result.customDomain ? `https://${result.customDomain}` : result.pagesUrl;
       const deadline = Date.now() + 180_000;
       try {
         while (Date.now() < deadline) {
-          const st = await ipc.githubPagesStatus(this.config, this.result.commitSha);
+          const st = await ipc.githubPagesStatus(cfg, result.commitSha);
+          if (!mine()) return;
           if (st.ready) {
-            this.deployState = "ready";
-            this.appendLog("success", t("publish.deployReadyToast"));
-            ui.toast(t("publish.deployReadyToast"), "success");
-            this.notifyOf("deployed");
+            task.setDeployState("ready");
+            if (!detached()) this.deployState = "ready";
+            task.appendLog("success", t("publish.deployReadyToast"));
+            if (!detached()) ui.toast(t("publish.deployReadyToast"), "success");
+            this.notifyOf("deployed", url);
             return;
           }
           if (st.errored) {
-            this.deployState = "errored";
-            this.appendLog("error", t("publish.deployErrored"));
-            ui.toast(t("publish.deployErrored"), "error");
+            task.setDeployState("errored");
+            if (!detached()) this.deployState = "errored";
+            task.appendLog("error", t("publish.deployErrored"));
+            if (!detached()) ui.toast(t("publish.deployErrored"), "error");
             return;
           }
           await new Promise((r) => setTimeout(r, 5000));
         }
-        this.deployState = "timeout";
-        this.appendLog("info", t("publish.deployTimeout"));
-        ui.toast(t("publish.deployTimeout"), "info");
+        task.setDeployState("timeout");
+        if (!detached()) this.deployState = "timeout";
+        task.appendLog("info", t("publish.deployTimeout"));
+        if (!detached()) ui.toast(t("publish.deployTimeout"), "info");
       } catch {
-        this.deployState = "idle";
-        this.appendLog("info", t("publish.deployWatchFailed"));
+        task.setDeployState("idle");
+        if (!detached()) this.deployState = "idle";
+        task.appendLog("info", t("publish.deployWatchFailed"));
       }
     },
 

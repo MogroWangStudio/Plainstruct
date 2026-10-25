@@ -2,7 +2,7 @@
 import { computed, inject, ref, type Ref } from "vue";
 import type { TreeNode } from "@/ipc/types";
 import { useEditorStore } from "@/stores/editor";
-import { isImageFile } from "@/lib/paths";
+import { isImageFile, DOC_MIME } from "@/lib/paths";
 import AppIcon from "./AppIcon.vue";
 
 export interface SelectClick {
@@ -107,7 +107,11 @@ function onDragStart(e: DragEvent) {
     return;
   }
   e.dataTransfer?.setData("text/plain", props.node.path);
-  if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
+  // 文档与目录额外携带专用载荷:拖入编辑器时插入指向该页的站内链接(图片走资产栏通道)
+  if (e.dataTransfer && (isDir.value || /\.md$/i.test(props.node.name))) {
+    e.dataTransfer.setData(DOC_MIME, props.node.path);
+  }
+  if (e.dataTransfer) e.dataTransfer.effectAllowed = "copyMove";
   setDragging(props.node.path);
   dropMark.value = null;
 }

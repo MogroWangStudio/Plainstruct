@@ -29,6 +29,9 @@ export const ASSET_DIR = "asset";
 /** 资产拖拽数据类型:拖入编辑器时按此取图片路径 */
 export const ASSET_MIME = "application/x-plainstruct-asset";
 
+/** 文档拖拽数据类型:文件树文档/目录拖入编辑器时按此取路径,插入站内链接 */
+export const DOC_MIME = "application/x-plainstruct-doc";
+
 /** 目录名是否为站点资产目录(asset 与旧版 images 均算) */
 export function isAssetDirName(name: string): boolean {
   const n = name.toLowerCase();

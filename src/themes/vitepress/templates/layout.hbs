@@ -28,6 +28,7 @@
     @media (max-width: 900px) {
       :root {
         --ps-logo-w: {{config.logoSizeM}}px;
+        --ps-doc-w: {{config.contentWidthM}}px;
       }
 
       body {
@@ -36,7 +37,7 @@
     }
   </style>
 </head>
-  <body class="font-{{config.bodyFont}}{{#if (eq config.pageTransition "淡入")}} ps-anim-fade{{/if}}{{#if (eq config.pageTransition "淡入上浮")}} ps-anim-rise{{/if}}{{#if (eq config.pageTransition "缩放浮现")}} ps-anim-zoom{{/if}}{{#if (eq config.pageTransition "滑入")}} ps-anim-slide{{/if}}{{#if (eq config.pageTransition "弹性浮现")}} ps-anim-spring{{/if}}{{#if (eq config.pageTransition "模糊聚焦")}} ps-anim-blur{{/if}}{{#if (eq config.pageTransition "翻页")}} ps-anim-flip{{/if}}{{#if (eq config.pageTransition "揭开")}} ps-anim-wipe{{/if}}"{{#if (eq config.bodyFont "custom")}} style="--ps-font-body: {{config.customFont}}"{{/if}} data-loading="{{config.loadingAnim}}" data-crumbs-align="{{config.topbarTitleAlignM}}" data-crumbs-pos="{{config.topbarTitlePosM}}" data-topbar-logo-pos="{{config.topbarLogoPosM}}">
+  <body class="font-{{config.bodyFont}}{{#if (eq config.pageTransition "淡入")}} ps-anim-fade{{/if}}{{#if (eq config.pageTransition "淡入上浮")}} ps-anim-rise{{/if}}{{#if (eq config.pageTransition "缩放浮现")}} ps-anim-zoom{{/if}}{{#if (eq config.pageTransition "滑入")}} ps-anim-slide{{/if}}{{#if (eq config.pageTransition "弹性浮现")}} ps-anim-spring{{/if}}{{#if (eq config.pageTransition "模糊聚焦")}} ps-anim-blur{{/if}}{{#if (eq config.pageTransition "翻页")}} ps-anim-flip{{/if}}{{#if (eq config.pageTransition "揭开")}} ps-anim-wipe{{/if}}"{{#if (eq config.bodyFont "custom")}} style="--ps-font-body: {{config.customFont}}"{{/if}} data-loading="{{config.loadingAnim}}" data-show-logo-pc="{{config.showLogoPc}}" data-show-logo-m="{{config.showLogoM}}" data-show-title-pc="{{config.showTitlePc}}" data-show-title-m="{{config.showTitleM}}" data-crumbs-align="{{config.topbarTitleAlignM}}" data-crumbs-pos="{{config.topbarTitlePosM}}" data-topbar-logo-pos="{{config.topbarLogoPosM}}">
   {{#unless (eq config.loadingAnim "关闭")}}<div class="ps-loader" aria-hidden="true"><span class="ps-loader-spin"></span></div>{{/unless}}
   <header class="vp-navbar" id="vp-navbar">
     <div class="vp-navbar-in">
@@ -46,8 +47,8 @@
         </svg>
       </button>
       <a class="vp-brand" href="{{asset "index.html"}}">
-        {{#if config.showLogoPc}}{{#if site.logo}}<img class="vp-logo" src="{{site.logo}}" alt="{{site.name}}">{{/if}}{{/if}}
-        {{#if config.showTitlePc}}<span class="vp-brand-name">{{site.name}}</span>{{/if}}
+        {{#if site.logo}}<img class="vp-logo" src="{{site.logo}}" alt="{{site.name}}">{{/if}}
+        <span class="vp-brand-name">{{site.name}}</span>
       </a>
       {{#if config.showCrumbs}}
       <nav class="vp-crumbs" aria-label="当前页路径">
@@ -62,8 +63,8 @@
     <aside class="vp-sidebar" id="vp-sidebar">
       <div class="vp-sidebar-head">
         <a class="vp-brand" href="{{asset "index.html"}}">
-          {{#if config.showLogoM}}{{#if site.logo}}<img class="vp-logo" src="{{site.logo}}" alt="{{site.name}}">{{/if}}{{/if}}
-          {{#if config.showTitleM}}<span class="vp-brand-name">{{site.name}}</span>{{/if}}
+          {{#if site.logo}}<img class="vp-logo" src="{{site.logo}}" alt="{{site.name}}">{{/if}}
+          <span class="vp-brand-name">{{site.name}}</span>
         </a>
         <button class="vp-drawer-close" type="button" aria-label="关闭文档列表">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M2 2l10 10M12 2L2 12" /></svg>

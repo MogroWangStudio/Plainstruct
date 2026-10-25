@@ -18,6 +18,7 @@
 
 - **Two site types** — pick **Documentation** (sidebar navigation, great for wikis and product manuals) or **Blog** (the home page is a date-sorted post stream) when creating a site; you can switch the type later in site settings.
 - **File tree** — manage folders and Markdown documents in one tree: create, rename, delete (to the system trash) and import; drag a document onto a row's top/bottom edge to reorder it manually — the order drives the whole site (navigation, directory pages and prev/next links), and multi-select with batch moves is supported.
+- **Drag-in internal links** — drag a document or folder from the file tree into the editor to insert an internal link pointing to that page (front-matter title is preferred as the link text); builds and previews resolve it to the live page address, so visitors can click through.
 - **Writing experience** — a side-by-side editor and live preview with autosave; a formatting toolbar plus full keyboard shortcuts (headings, bold, lists, tables, links, code blocks and more); `⌘/Ctrl+F` find & replace with regex and case-sensitivity toggles.
 - **Visual front-matter** — set the title, description, date, cover, author, AIGC declaration and tags through a form instead of hand-writing front-matter; the new-document dialog fills it all in one go.
 - **Article tags** — add `tags` in the front-matter and they appear as pills under each post card, with per-tag colors in the theme settings; blog folder pages automatically get a tag filter bar — one click to filter.
@@ -33,7 +34,8 @@
 
 ### Publishing & maintenance
 
-- **GitHub Pages publishing** — push with a personal access token in one click; the repo, branch and Pages are created automatically, no Git needed; works with personal and organization accounts and custom domains, and a proxy can be configured to speed up uploads; on Windows the success notification carries "View publish status / View site" action buttons.
+- **GitHub Pages publishing** — push with a personal access token in one click; site content is rebuilt automatically on publish (no manual build needed first), the repo, branch and Pages are created automatically, no Git needed; works with personal and organization accounts and custom domains, and a proxy can be configured to speed up uploads; on Windows the success notification carries "View publish status / View site" action buttons.
+- **Background publishing & cancel** — switch to another site while publishing and the task keeps running in the background, with a status pill in the bottom-right corner: click it for progress and logs, quick actions to view the published site, jump back to the publish page, or cancel; cancelling stops the upload and reverts the site reference to the previous version, leaving the live site unchanged.
 - **Update check** — check for the latest GitHub release from Settings, download with one click (pause and resume supported), and an update wizard installs the new version automatically.
 - **Self-healing startup** — startup failures recover in steps (reload → clear cache → show diagnostics); white screens caused by corrupted UI-layer data mostly fix themselves.
 - **Local-first** — all data lives inside the folder you choose; backup = copy; no backend, no telemetry.

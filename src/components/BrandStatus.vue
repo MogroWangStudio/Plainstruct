@@ -5,10 +5,12 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useEditorStore } from "@/stores/editor";
 import { usePublishStore } from "@/stores/publish";
+import { usePublishTaskStore } from "@/stores/publishTask";
 
 const { t } = useI18n();
 const editor = useEditorStore();
 const publish = usePublishStore();
+const task = usePublishTaskStore();
 
 /* ---------- 问候语:随机起句,周期轮换(仅空闲态可见,轮换在后台持续) ---------- */
 const GREETING_KEYS = Array.from({ length: 14 }, (_, i) => `titlebar.greeting${i}`);
@@ -56,10 +58,10 @@ watch(
 
 type StatusKind = "greet" | "bless" | "saving" | "countdown" | "dirty" | "saved" | "publish" | "deploy" | "fail";
 
-/** 单一状态源:发布流程优先(全局动作),其次保存,最后问候;kind 驱动切换动画 */
+/** 单一状态源:发布流程优先(全局动作,含后台任务),其次保存,最后问候;kind 驱动切换动画 */
 const status = computed<{ kind: StatusKind; text: string }>(() => {
-  if (publish.syncing) {
-    const p = publish.progress;
+  if (task.running) {
+    const p = task.progress;
     return { kind: "publish", text: p ? t("titlebar.statusPublishProgress", { done: p.done, total: p.total }) : t("titlebar.statusPublishing") };
   }
   if (publish.checkingDeploy || publish.deployState === "building") return { kind: "deploy", text: t("titlebar.statusDeploying") };

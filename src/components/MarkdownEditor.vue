@@ -16,7 +16,7 @@ import { useSiteStore } from "@/stores/site";
 import { useUiStore } from "@/stores/ui";
 import { ipc } from "@/ipc/ipc";
 import { applyFrontMatter, parseFrontMatter } from "@/lib/frontmatter";
-import { encodePath, stripExt, ASSET_MIME, assetRefPrefix, relPosix } from "@/lib/paths";
+import { encodePath, stripExt, dirname, relPosix, ASSET_MIME, DOC_MIME, assetRefPrefix } from "@/lib/paths";
 import { registerCmView, registerCmFind, unregisterCmView, unregisterCmFind } from "@/lib/contextMenu";
 import AppIcon from "@/components/AppIcon.vue";
 import FrontMatterModal, { type FrontMatterForm } from "@/components/FrontMatterModal.vue";
@@ -947,6 +947,67 @@ const assetDrop = EditorView.domEventHandlers({
   },
 });
 
+/* ---------- 文档拖入:文件树文档/目录拖到正文,插入指向该页的站内链接 ---------- */
+
+/** 文档链接文本:配置头 title 优先,回退文件名(与文件树显示一致) */
+function docLinkLabel(path: string): string {
+  const raw = site.docsCache[path];
+  if (raw) {
+    const { data } = parseFrontMatter(raw);
+    if (data.title) return data.title;
+  }
+  return stripExt(path.split("/").pop() ?? path);
+}
+
+/**
+ * 从文件树拖来的文档或目录(DOC_MIME 载荷为 content/ 相对路径):
+ * 在落点插入 [标题](相对路径) 站内链接 —— 构建与预览把 .md 链接解析为
+ * 站点页面地址,目录链接以 / 结尾指向目录落点页,站点里点击即跳转。
+ * 落点行空白时就地插入,否则另起一段;落点在 front-matter 内时移到其后。
+ */
+const docDrop = EditorView.domEventHandlers({
+  dragover(e) {
+    if (!e.dataTransfer?.types.includes(DOC_MIME)) return false;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+    return true;
+  },
+  drop(e, v) {
+    const target = e.dataTransfer?.getData(DOC_MIME);
+    if (!target || !editor.activePath) return false;
+    e.preventDefault();
+    let pos = v.posAtCoords({ x: e.clientX, y: e.clientY }) ?? v.state.selection.main.head;
+    const fmEnd = frontMatterEnd(v.state.doc);
+    let at: number;
+    let lead: string;
+    if (fmEnd !== null && pos < fmEnd) {
+      at = fmEnd;
+      lead = "\n\n";
+    } else {
+      const line = v.state.doc.lineAt(pos);
+      if (line.text.trim() === "") {
+        at = pos;
+        lead = "";
+      } else {
+        at = line.to;
+        lead = "\n\n";
+      }
+    }
+    const isDir = !/\.[^/]+$/.test(target);
+    const rel = relPosix(dirname(editor.activePath), target) + (isDir ? "/" : "");
+    const label = isDir ? (target.split("/").pop() ?? target) : docLinkLabel(target);
+    const snippet = `[${label}](${encodePath(rel)})`;
+    const start = at + lead.length;
+    v.dispatch({
+      changes: { from: at, to: at, insert: lead + snippet },
+      selection: { anchor: start + snippet.length },
+      scrollIntoView: true,
+    });
+    v.focus();
+    return true;
+  },
+});
+
 /* ---------- 初始化 ---------- */
 
 onMounted(() => {
@@ -1004,6 +1065,7 @@ onMounted(() => {
         markdown({ base: markdownLanguage }),
         syntaxHighlighting(plainHighlight),
         assetDrop,
+        docDrop,
         EditorView.lineWrapping,
         EditorView.updateListener.of((u) => {
           if (u.docChanged) editor.onInput(u.state.doc.toString());

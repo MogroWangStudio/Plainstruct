@@ -214,6 +214,21 @@ body.font-custom {
   white-space: nowrap;
 }
 
+/* 站点标识显隐:桌面(≥901px)顶栏由 Pc 开关控制,移动(≤900px)顶栏与抽屉由 M 开关控制,两端互不越界 */
+@media (min-width: 901px) {
+  body[data-show-logo-pc="false"] .vp-navbar .vp-logo {
+    display: none;
+  }
+
+  body[data-show-title-pc="false"] .vp-navbar .vp-brand-name {
+    display: none;
+  }
+
+  body[data-show-logo-pc="false"][data-show-title-pc="false"] .vp-navbar .vp-brand {
+    display: none;
+  }
+}
+
 /* 当前页路径:顶栏右侧,低调小字 */
 .vp-crumbs {
   display: flex;
@@ -1272,6 +1287,18 @@ body[data-loading="进度条"] .ps-loader-spin {
 
   .vp-brand {
     margin-left: 2px;
+  }
+
+  body[data-show-logo-m="false"] .vp-logo {
+    display: none;
+  }
+
+  body[data-show-title-m="false"] .vp-brand-name {
+    display: none;
+  }
+
+  body[data-show-logo-m="false"][data-show-title-m="false"] .vp-brand {
+    display: none;
   }
 
   /* 当前文档标题:第二行,位置由 data-crumbs-align 配置(缺省右对齐) */

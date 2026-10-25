@@ -16,6 +16,11 @@ pub struct AppState {
     pub update_cancel: AtomicBool,
     /// 进行中的更新包文件名(取消时据此删除半成品,任务文件在完成后才落盘)
     pub update_asset: Mutex<Option<String>>,
+    /// 后台发布任务占用的站点根:发布期间切站/关站后,构建落盘与产物收集
+    /// 仍指向发起站点;发布结束(或取消)后清空
+    pub publish_root: Mutex<Option<PathBuf>>,
+    /// 发布取消标志:上传循环与各步骤间轮询,ref 更新后的取消会回退站点引用
+    pub publish_cancel: AtomicBool,
 }
 
 impl Default for AppState {
@@ -34,6 +39,8 @@ impl Default for AppState {
             update_pause: AtomicBool::new(false),
             update_cancel: AtomicBool::new(false),
             update_asset: Mutex::new(None),
+            publish_root: Mutex::new(None),
+            publish_cancel: AtomicBool::new(false),
         }
     }
 }
@@ -55,6 +62,11 @@ impl AppState {
             .map_err(|e| e.to_string())?
             .clone()
             .ok_or_else(|| "no-site-open".to_string())
+    }
+
+    /// 后台发布任务占用的站点根(无任务时 None)
+    pub fn publish_root(&self) -> Option<PathBuf> {
+        self.publish_root.lock().map(|p| p.clone()).unwrap_or(None)
     }
 
     pub fn app_data(&self) -> PathBuf {

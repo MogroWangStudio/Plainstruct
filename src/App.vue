@@ -12,6 +12,7 @@ import TitleBar from "@/components/TitleBar.vue";
 import ActivityBar from "@/components/ActivityBar.vue";
 import ContextMenu from "@/components/ContextMenu.vue";
 import FeedbackHost from "@/components/FeedbackHost.vue";
+import PublishPill from "@/components/PublishPill.vue";
 import Modal from "@/components/Modal.vue";
 import StartView from "@/views/StartView.vue";
 import EditorView from "@/views/EditorView.vue";
@@ -130,6 +131,7 @@ onMounted(() => {
     </div>
 
     <FeedbackHost />
+    <PublishPill />
     <ContextMenu />
 
     <!-- 关窗守卫:有未保存修改时的三选确认 -->

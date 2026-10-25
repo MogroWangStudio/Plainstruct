@@ -24,11 +24,19 @@ fn build_root(root: &PathBuf) -> PathBuf {
 }
 
 /// 构建调用必须钉死发起时的站点根:请求中的 root 与当前站点根不一致说明
-/// 构建期间已切换/关闭站点,拒绝执行,避免旧站点的构建产物写入新站点目录
+/// 构建期间已切换/关闭站点,拒绝执行,避免旧站点的构建产物写入新站点目录。
+/// 后台发布任务占用的站点根例外:发布期间切站,产物仍需写入发起站点的
+/// build/ 目录供上传(占用由 github_publish_begin 登记、github_publish_end 解除)
 fn pinned_root(state: &AppState, root: &str) -> Result<PathBuf, String> {
-    let current = state.site_root()?;
-    if PathBuf::from(root) == current {
-        Ok(current)
+    let path = PathBuf::from(root);
+    if let Ok(current) = state.site_root() {
+        if path == current {
+            return Ok(current);
+        }
+    }
+    let busy = state.publish_root.lock().map_err(|e| e.to_string())?;
+    if busy.as_ref() == Some(&path) {
+        Ok(path)
     } else {
         Err("site-changed".into())
     }

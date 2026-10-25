@@ -1500,13 +1500,19 @@ body.ps-sidebar-collapsed .ps-sidebar-toggle svg {
 
 /* ---------- 4.0 站点标识配置:Logo 与站点标题的大小、显隐、位置(data 属性驱动) ---------- */
 
-/* 桌面端(≥901px):侧栏头部站点标识的显隐与 Logo 位置 */
+/* 桌面端(≥901px):侧栏头部与桌面顶栏站点标识的显隐与 Logo 位置 */
 @media (min-width: 901px) {
-  body[data-show-logo-pc="false"] .ps-sidebar .ps-logo {
+  body[data-show-logo-pc="false"] .ps-sidebar .ps-logo,
+  body[data-show-logo-pc="false"] .ps-topbar .ps-logo {
     display: none;
   }
 
-  body[data-show-title-pc="false"] .ps-sidebar .ps-site-name {
+  body[data-show-title-pc="false"] .ps-sidebar .ps-site-name,
+  body[data-show-title-pc="false"] .ps-topbar .ps-site-name {
+    display: none;
+  }
+
+  body[data-show-logo-pc="false"][data-show-title-pc="false"] .ps-topbar-brand {
     display: none;
   }
 
