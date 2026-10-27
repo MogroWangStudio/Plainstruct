@@ -29,6 +29,7 @@ import { getBuiltinTheme } from "@/themes/manifest";
 
 const LS_SETTINGS = "plainstruct.settings";
 const LS_RECENT = "plainstruct.recent";
+const LS_PINNED = "plainstruct.pinnedSites";
 
 export const DEMO_ROOT = "C:/Sites/Plainstruct 演示站点";
 
@@ -44,6 +45,8 @@ function touchFile(abs: string) {
 const customThemes = new Map<string, Record<string, string>>();
 let settings: AppSettings = { locale: "zh-CN", autosave: true, autosaveDelay: 900, disableRefreshAnim: false, theme: "system", uiFont: "system", uiFontSize: 1, uiFontWeight: 400, editorFont: "default", editorWhitespace: true, editorBreakKey: "enter", editorIndentKey: "tab", editorIndentWidth: 2 };
 let recent: RecentSite[] = [];
+/** 固定的站点路径(mock 与真实端同样按路径记录) */
+let pinnedSites: string[] = lsGet<string[]>(LS_PINNED, []);
 let currentRoot: string | null = null;
 let siteCounter = 0;
 let buildFiles = new Map<string, string>();
@@ -308,6 +311,7 @@ export const mock = {
       customDataDir: null,
       settings,
       recentSites: recent,
+      pinnedSites,
       pendingUpdate: null,
     };
   },
@@ -321,6 +325,12 @@ export const mock = {
 
   /** 浏览器预览无数据目录概念:保持 no-op */
   async setDataDir(_path: string | null): Promise<void> {},
+
+  async pinSite(path: string, pinned: boolean): Promise<void> {
+    if (pinned && !pinnedSites.includes(path)) pinnedSites.unshift(path);
+    if (!pinned) pinnedSites = pinnedSites.filter((p) => p !== path);
+    lsSet(LS_PINNED, pinnedSites);
+  },
 
   async openDataDir(): Promise<void> {},
 

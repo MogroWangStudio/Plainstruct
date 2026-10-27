@@ -19,6 +19,7 @@
   - **直接拉取**：可从对方设备列表逐个取回站点;对方需开启「信任此局域网」
   - **安全边界**：站点包只含内容与主题／插件配置（文本直传、二进制 base64）,`build/` 产物与含 Token 的 `github.json` 绝不随同步离开设备;session 握手防误连,局域网明文传输已在界面提示
   - 桌面端活动栏新增「同步」入口;设置随应用持久化（开关／设备名／信任状态）,重启自动恢复服务
+- **主菜单固定站点**：最近打开(桌面)与本地站点(移动)列表的每一行都可以**固定 / 取消固定** —— 固定项置顶显示(图钉标记),并且不随最近列表 8 条上限被新记录淘汰;固定状态按路径存于应用数据 `app.json`,桌面与移动端共用一套(同一数据目录时互通);打开站点、新建站点后固定排序保持不变
 - **CI 安卓构建**：新增 `android-apk` job（ubuntu runner,arm64）,产物命名 `Plainstruct_版本号_android.apk`;发布签名从 secrets `ANDROID_RELEASE_KEYSTORE_B64` / `ANDROID_RELEASE_KEYSTORE_PASSWORD` 解出并写入 `gen/android/keystore.properties`（每次构建同一签名,可覆盖升级;未配置 secrets 时回退临时 debug 密钥并告警）;Android 工程提交至 `src-tauri/gen/android/`（含签名配置补丁,keystore 文件与构建产物不入库）
 
 ### 变更

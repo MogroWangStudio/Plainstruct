@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useAppStore } from "@/stores/app";
 import { useSiteStore } from "@/stores/site";
@@ -59,15 +59,62 @@ async function loadSiteInfos() {
   );
 }
 
-function siteTypeText(path: string): string {
-  const info = siteInfos.value[path];
-  if (!info) return "";
-  return info.siteType === "blog" ? t("wizard.typeBlog") : t("wizard.typeDocs");
+/** 移动端站点库路径:站点名 -> 数据目录 sites/<名称> */
+function libraryPath(name: string): string {
+  return `${app.bootstrap?.appDataDir ?? ""}/sites/${name}`;
 }
 
-/** 站点类型图标:与新建向导的类型卡片一致(文档站 = doc,博客站 = pencil) */
-function siteTypeIcon(path: string): string {
-  return siteInfos.value[path]?.siteType === "blog" ? "pencil" : "doc";
+/** 主菜单列表条目:桌面(最近打开)与移动(本地站点库)统一形态,固定状态随行 */
+interface StartItem {
+  key: string;
+  name: string;
+  path: string;
+  sizeBytes: number;
+  siteType: string;
+  openedAt: number;
+  pinned: boolean;
+  isLibrary: boolean;
+}
+
+const pinnedPaths = computed(() => new Set(app.pinnedSites));
+
+/** 桌面:最近打开(后端已按「固定在前、组内按打开时间」排好) */
+const recentItems = computed<StartItem[]>(() =>
+  app.recentSites.map((r) => ({
+    key: r.path,
+    name: r.name,
+    path: r.path,
+    sizeBytes: siteInfos.value[r.path]?.sizeBytes ?? 0,
+    siteType: siteInfos.value[r.path]?.siteType ?? "",
+    openedAt: r.openedAt,
+    pinned: pinnedPaths.value.has(r.path),
+    isLibrary: false,
+  })),
+);
+
+/** 移动端:本地站点库,固定项置顶,其余按名称排序 */
+const libraryItems = computed<StartItem[]>(() =>
+  library.value
+    .map((s) => ({
+      key: s.name,
+      name: s.name,
+      path: libraryPath(s.name),
+      sizeBytes: s.sizeBytes,
+      siteType: s.siteType,
+      openedAt: 0,
+      pinned: pinnedPaths.value.has(libraryPath(s.name)),
+      isLibrary: true,
+    }))
+    .sort((a, b) =>
+      a.pinned === b.pinned ? a.name.localeCompare(b.name, undefined, { sensitivity: "base" }) : a.pinned ? -1 : 1,
+    ),
+);
+
+const listItems = computed<StartItem[]>(() => (mobile.value ? libraryItems.value : recentItems.value));
+
+/** 固定 / 取消固定:后端持久化并重排最近列表,刷新后新顺序就地生效 */
+async function togglePin(item: StartItem) {
+  await app.togglePinned(item.path);
 }
 
 const showWizard = ref(false);
@@ -86,7 +133,7 @@ async function createSite() {
     return;
   }
   // 移动端不选目录:直接落在数据目录 sites/<名称> 下
-  const dir = mobile.value ? `${app.bootstrap?.appDataDir ?? ""}/sites/${wizard.name.trim()}` : wizard.folder;
+  const dir = mobile.value ? libraryPath(wizard.name.trim()) : wizard.folder;
   if (!dir) {
     wizardError.value = t("wizard.invalidFolder");
     return;
@@ -123,9 +170,9 @@ async function openRecent(path: string) {
   }
 }
 
-/** 移动端:打开本地站点库中的站点(路径由数据目录推导) */
-async function openLibrarySite(name: string) {
-  await openRecent(`${app.bootstrap?.appDataDir ?? ""}/sites/${name}`);
+/** 移动端:打开本地站点库中的站点 */
+function openLibrarySite(name: string) {
+  void openRecent(libraryPath(name));
 }
 </script>
 
@@ -146,47 +193,47 @@ async function openLibrarySite(name: string) {
         </button>
       </div>
 
-      <!-- 桌面:最近打开;移动端:本地站点库(无目录选择,站点来自新建与局域网接收) -->
+      <!-- 桌面:最近打开;移动端:本地站点库(无目录选择,站点来自新建与局域网接收)。
+           每行可固定 / 取消固定:固定项置顶,且不随最近列表 8 条上限被淘汰 -->
       <div class="float-in mt-12 w-full" style="--d: 90ms">
         <h2 class="field-label">{{ mobile ? t("start.library") : t("start.recent") }}</h2>
         <div
-          v-if="mobile ? !library.length : !app.recentSites.length"
+          v-if="!listItems.length"
           class="rounded-lg border border-dashed border-line px-4 py-6 text-center text-[calc(13px*var(--ui-font-scale))] text-ink-3"
         >
           {{ mobile ? t("start.libraryEmpty") : t("start.recentEmpty") }}
         </div>
         <TransitionGroup v-else name="list" tag="div" class="panel divide-y divide-line overflow-hidden">
-          <button
-            v-for="item in mobile
-              ? library.map((s) => ({ key: s.name, name: s.name, path: '', sizeBytes: s.sizeBytes, siteType: s.siteType }))
-              : app.recentSites.map((r) => ({ key: r.path, name: r.name, path: r.path, sizeBytes: 0, siteType: '' }))"
-            :key="item.key"
-            class="recent-item"
-            @click="mobile ? openLibrarySite(item.name) : openRecent(item.path)"
-          >
-            <AppIcon name="folder" :size="16" class="text-ink-3" />
-            <span class="min-w-0 flex-1 text-left">
-              <span class="block truncate text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ item.name }}</span>
-              <span v-if="!mobile" class="block truncate text-[calc(11.5px*var(--ui-font-scale))] text-ink-3">{{ item.path }}</span>
-              <span class="block pt-0.5 text-[calc(10.5px*var(--ui-font-scale))] text-ink-3">
-                <template v-if="mobile">
-                  <span class="inline-flex items-center gap-1">
-                    <AppIcon :name="item.siteType === 'blog' ? 'pencil' : 'doc'" :size="11" class="shrink-0" />
-                    {{ item.siteType === 'blog' ? t("wizard.typeBlog") : t("wizard.typeDocs") }}
-                    <template v-if="item.sizeBytes"> · {{ formatSize(item.sizeBytes) }}</template>
-                  </span>
-                </template>
-                <template v-else-if="siteTypeText(item.path)">
-                  <span class="inline-flex items-center gap-1">
-                    <AppIcon :name="siteTypeIcon(item.path)" :size="11" class="shrink-0" />
-                    {{ siteTypeText(item.path) }} · {{ formatSize(siteInfos[item.path]?.sizeBytes ?? 0) || "0 B" }}
-                  </span>
-                </template>
-                <span v-else class="inline-block h-2 w-24 rounded bg-surface-3 align-middle"></span>
+          <div v-for="item in listItems" :key="item.key" class="recent-row">
+            <button class="recent-item" @click="item.isLibrary ? openLibrarySite(item.name) : openRecent(item.path)">
+              <AppIcon name="folder" :size="16" class="text-ink-3" />
+              <span class="min-w-0 flex-1 text-left">
+                <span class="block truncate text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ item.name }}</span>
+                <span v-if="!item.isLibrary" class="block truncate text-[calc(11.5px*var(--ui-font-scale))] text-ink-3">{{ item.path }}</span>
+                <span class="block pt-0.5 text-[calc(10.5px*var(--ui-font-scale))] text-ink-3">
+                  <template v-if="item.siteType">
+                    <span class="inline-flex items-center gap-1">
+                      <AppIcon :name="item.siteType === 'blog' ? 'pencil' : 'doc'" :size="11" class="shrink-0" />
+                      {{ item.siteType === "blog" ? t("wizard.typeBlog") : t("wizard.typeDocs") }}
+                      <template v-if="item.sizeBytes"> · {{ formatSize(item.sizeBytes) }}</template>
+                    </span>
+                  </template>
+                  <span v-else-if="!item.isLibrary" class="inline-block h-2 w-24 rounded bg-surface-3 align-middle"></span>
+                </span>
               </span>
-            </span>
-            <span v-if="!mobile" class="shrink-0 text-[calc(11.5px*var(--ui-font-scale))] text-ink-3">{{ formatTime(item.path ? app.recentSites.find((r) => r.path === item.path)?.openedAt ?? 0 : 0) }}</span>
-          </button>
+              <span v-if="!item.isLibrary" class="shrink-0 text-[calc(11.5px*var(--ui-font-scale))] text-ink-3">{{ formatTime(item.openedAt) }}</span>
+            </button>
+            <button
+              class="pin-btn"
+              :class="{ pinned: item.pinned }"
+              :title="item.pinned ? t('start.unpin') : t('start.pin')"
+              :aria-label="item.pinned ? t('start.unpin') : t('start.pin')"
+              :aria-pressed="item.pinned"
+              @click="togglePin(item)"
+            >
+              <AppIcon name="pin" :size="15" />
+            </button>
+          </div>
         </TransitionGroup>
       </div>
 
@@ -327,22 +374,81 @@ async function openLibrarySite(name: string) {
   }
 }
 
+/* 列表行:打开按钮铺满 + 右缘固定按钮;悬停背景在行容器上,保证两个按钮同区高亮 */
+.recent-row {
+  display: flex;
+  align-items: stretch;
+  transition: background-color var(--duration-base) var(--ease-plain);
+}
+.recent-row:hover {
+  background: var(--color-surface-2);
+}
 .recent-item {
   display: flex;
   align-items: center;
   gap: 12px;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   padding: 12px 16px;
   border: none;
   background: transparent;
   cursor: pointer;
-  transition: background-color var(--duration-base) var(--ease-plain);
-}
-.recent-item:hover {
-  background: var(--color-surface-2);
 }
 .recent-item:active {
   opacity: 0.8;
+}
+
+/* 固定按钮:桌面悬停浮现,固定态常显(浅底墨色);触屏无悬停,始终可见 */
+.pin-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  align-self: center;
+  width: 32px;
+  height: 32px;
+  margin-right: 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-ink-3);
+  cursor: pointer;
+  opacity: 0;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    opacity var(--duration-base) var(--ease-plain),
+    background-color var(--duration-base) var(--ease-plain),
+    color var(--duration-base) var(--ease-plain),
+    transform var(--duration-fast) ease-out;
+}
+.recent-row:hover .pin-btn,
+.pin-btn:focus-visible {
+  opacity: 1;
+}
+.pin-btn:hover {
+  color: var(--color-ink);
+}
+.pin-btn:active {
+  transform: scale(0.9);
+}
+.pin-btn.pinned {
+  opacity: 1;
+  background: var(--color-surface-3);
+  color: var(--color-ink);
+}
+.pin-btn:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+@media (hover: none) {
+  .pin-btn {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pin-btn {
+    transition: none;
+  }
 }
 
 /* 站点类型选择:两枚等宽卡片,顶部各带对应站点类型的迷你界面示意(常显)。

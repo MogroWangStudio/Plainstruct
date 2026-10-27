@@ -80,6 +80,8 @@ export interface Bootstrap {
   customDataDir: string | null;
   settings: AppSettings;
   recentSites: RecentSite[];
+  /** 主菜单固定的站点路径(最近列表与移动端本地站点列表置顶展示) */
+  pinnedSites: string[];
   /** 已下载待安装的更新(存在时设置页显示「重启并更新」) */
   pendingUpdate: PendingUpdate | null;
 }

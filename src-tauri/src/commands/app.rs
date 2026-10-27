@@ -25,6 +25,9 @@ pub(crate) struct AppData {
     pub(crate) settings: Value,
     #[serde(default)]
     recent_sites: Vec<RecentSite>,
+    /// 主菜单固定站点的路径列表(固定项在最近列表置顶且不随 8 条上限淘汰)
+    #[serde(default)]
+    pinned_sites: Vec<String>,
     #[serde(default)]
     pub(crate) custom_data_dir: Option<String>,
 }
@@ -46,6 +49,8 @@ pub struct Bootstrap {
     custom_data_dir: Option<String>,
     settings: Value,
     recent_sites: Vec<RecentSite>,
+    /// 固定的站点路径(主菜单置顶展示)
+    pinned_sites: Vec<String>,
     /// 已下载待安装的更新(存在时前端显示「重启并更新」)
     pending_update: Option<PendingUpdate>,
 }
@@ -90,7 +95,7 @@ pub fn write_app_data_to(dir: &Path, data: &AppData) -> Result<(), String> {
     std::fs::write(file, json).map_err(|e| e.to_string())
 }
 
-/// 记录最近打开的站点(置顶去重,最多 8 条)
+/// 记录最近打开的站点(置顶去重,最多 8 条;固定项不参与淘汰并排在前排)
 pub fn touch_recent(state: &AppState, name: &str, path: &str) {
     let mut data = read_app_data(state);
     data.recent_sites.retain(|s| s.path != path);
@@ -102,8 +107,45 @@ pub fn touch_recent(state: &AppState, name: &str, path: &str) {
             opened_at: now_millis(),
         },
     );
-    data.recent_sites.truncate(8);
+    normalize_recent(&mut data);
     let _ = write_app_data(state, &data);
+}
+
+/// 最近列表的规范化:固定项按最近打开顺序排在前面,未固定项随后;
+/// 总条数仍以 8 条为上限,淘汰只发生在未固定项上。
+fn normalize_recent(data: &mut AppData) {
+    let is_pinned = |path: &String, pinned: &[String]| pinned.iter().any(|p| p == path);
+    let pinned: Vec<RecentSite> = data
+        .recent_sites
+        .iter()
+        .filter(|r| is_pinned(&r.path, &data.pinned_sites))
+        .cloned()
+        .collect();
+    let rest: Vec<RecentSite> = data
+        .recent_sites
+        .iter()
+        .filter(|r| !is_pinned(&r.path, &data.pinned_sites))
+        .cloned()
+        .collect();
+    let keep = 8usize.saturating_sub(pinned.len());
+    data.recent_sites = [pinned, rest.into_iter().take(keep).collect()].concat();
+}
+
+/// 固定 / 取消固定主菜单站点;返回更新后的固定路径列表
+#[tauri::command]
+pub fn pin_site(window: tauri::WebviewWindow, state: State<'_, AppState>, path: String, pinned: bool) -> Result<Vec<String>, String> {
+    ensure_main(&window)?;
+    let mut data = read_app_data(&state);
+    if pinned {
+        if !data.pinned_sites.contains(&path) {
+            data.pinned_sites.insert(0, path);
+        }
+    } else {
+        data.pinned_sites.retain(|p| p != &path);
+    }
+    normalize_recent(&mut data);
+    write_app_data(&state, &data)?;
+    Ok(data.pinned_sites)
 }
 
 /// settings 的完整默认表:历史数据可能缺字段(全新数据目录上第一次更改的
@@ -170,6 +212,7 @@ pub fn get_bootstrap(state: State<'_, AppState>, window: tauri::WebviewWindow) -
         // 缺失字段补默认:老数据 / 全新数据目录上首次保存的部分设置也能完整返回
         settings: settings_with_defaults(&data.settings),
         recent_sites: data.recent_sites,
+        pinned_sites: data.pinned_sites,
         pending_update,
     })
 }

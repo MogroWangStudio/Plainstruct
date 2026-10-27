@@ -94,6 +94,10 @@ export const ipc = {
   setDataDir(path: string | null): Promise<void> {
     return inTauri ? invoke<void>("set_data_dir", { path }) : mock.setDataDir(path);
   },
+  /** 固定 / 取消固定主菜单站点(最近列表与移动端本地站点列表共用一套固定状态) */
+  pinSite(path: string, pinned: boolean): Promise<void> {
+    return inTauri ? invoke<void>("pin_site", { path, pinned }) : mock.pinSite(path, pinned);
+  },
   openDataDir(): Promise<void> {
     return inTauri ? invoke<void>("open_data_dir") : mock.openDataDir();
   },

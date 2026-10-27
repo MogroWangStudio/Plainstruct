@@ -169,6 +169,10 @@ export const useAppStore = defineStore("app", {
     recentSites(): RecentSite[] {
       return this.bootstrap?.recentSites ?? [];
     },
+    /** 主菜单固定的站点路径(最近列表与移动端本地站点列表置顶) */
+    pinnedSites(): string[] {
+      return this.bootstrap?.pinnedSites ?? [];
+    },
     version(): string {
       return this.bootstrap?.version ?? "";
     },
@@ -451,7 +455,13 @@ export const useAppStore = defineStore("app", {
 
     async refreshRecent() {
       const boot = await ipc.getBootstrap();
-      this.bootstrap = { ...this.bootstrap!, recentSites: boot.recentSites };
+      this.bootstrap = { ...this.bootstrap!, recentSites: boot.recentSites, pinnedSites: boot.pinnedSites };
+    },
+
+    /** 固定 / 取消固定站点;后端会同步重排最近列表(固定项置顶且不参与淘汰) */
+    async togglePinned(path: string) {
+      await ipc.pinSite(path, !this.pinnedSites.includes(path));
+      await this.refreshRecent();
     },
 
     /** 更改数据存储位置(null = 恢复默认);迁移完成后以服务端状态为准刷新 */

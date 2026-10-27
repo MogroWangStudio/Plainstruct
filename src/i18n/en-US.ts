@@ -140,6 +140,8 @@ export default {
     notASite: "The selected folder is not a Plainstruct site (.plainstruct config missing).",
     library: "Local sites",
     libraryEmpty: "No sites yet. Create one, or send one over from your computer via Sync.",
+    pin: "Pin to top",
+    unpin: "Unpin",
   },
   wizard: {
     title: "New site",

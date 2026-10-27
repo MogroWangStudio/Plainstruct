@@ -142,6 +142,8 @@ export default {
     notASite: "所选文件夹不是素构站点（缺少 .plainstruct 配置）。",
     library: "本地站点",
     libraryEmpty: "还没有站点。新建一个,或从电脑经「同步」传过来。",
+    pin: "固定到列表顶部",
+    unpin: "取消固定",
   },
   wizard: {
     title: "新建站点",

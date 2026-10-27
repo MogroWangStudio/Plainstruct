@@ -239,6 +239,7 @@ pub fn run() {
             // 应用
             commands::get_bootstrap,
             commands::save_settings,
+            commands::pin_site,
             commands::log_frontend,
             commands::report_boot_failure,
             commands::report_boot_success,
