@@ -427,7 +427,15 @@ pub fn delete_item(window: tauri::WebviewWindow, state: State<'_, AppState>, pat
         return Ok(());
     }
     let is_dir = full.is_dir();
+    // 桌面移入回收站;安卓无回收站语义,直接删除
+    #[cfg(not(target_os = "android"))]
     trash::delete(&full).map_err(|e| format!("移入回收站失败: {e}"))?;
+    #[cfg(target_os = "android")]
+    if is_dir {
+        std::fs::remove_dir_all(&full).map_err(|e| format!("删除失败: {e}"))?;
+    } else {
+        std::fs::remove_file(&full).map_err(|e| format!("删除失败: {e}"))?;
+    }
 
     // 同步手动排序:从父目录的顺序中移除;目录删除时清理其子树的 order 键
     mutate_order(&root, |map| {

@@ -603,6 +603,49 @@ function openTreeMenu(e: MouseEvent) {
   ctxMenu.show(e.clientX, e.clientY, items);
 }
 
+/* ---------- 长按菜单(移动端):触点悬停 550ms 未移动即弹出行操作菜单 ---------- */
+
+let longPressTimer: ReturnType<typeof setTimeout> | null = null;
+let longPressStart: { x: number; y: number } | null = null;
+
+function onTreeTouchStart(e: TouchEvent) {
+  if (e.touches.length !== 1) return;
+  const touch = e.touches[0];
+  longPressStart = { x: touch.clientX, y: touch.clientY };
+  longPressTimer = setTimeout(() => {
+    longPressTimer = null;
+    if (!longPressStart) return;
+    // 合成菜单事件:与右键共用同一份菜单构建逻辑
+    openTreeMenu({
+      clientX: longPressStart.x,
+      clientY: longPressStart.y,
+      target: document.elementFromPoint(longPressStart.x, longPressStart.y),
+      preventDefault() {},
+      stopPropagation() {},
+    } as unknown as MouseEvent);
+    longPressStart = null;
+    // 轻震动反馈(支持时),确认菜单由长按唤起
+    navigator.vibrate?.(10);
+  }, 550);
+}
+
+function onTreeTouchMove(e: TouchEvent) {
+  if (!longPressStart || e.touches.length !== 1) return;
+  const touch = e.touches[0];
+  // 位移超过阈值视为滚动,取消长按
+  if (Math.abs(touch.clientX - longPressStart.x) > 10 || Math.abs(touch.clientY - longPressStart.y) > 10) {
+    if (longPressTimer) clearTimeout(longPressTimer);
+    longPressTimer = null;
+    longPressStart = null;
+  }
+}
+
+function onTreeTouchEnd() {
+  if (longPressTimer) clearTimeout(longPressTimer);
+  longPressTimer = null;
+  longPressStart = null;
+}
+
 /* ---------- 文件夹页面配置(博客站点落地页:卡片流 / 列表) ---------- */
 
 const folderCfgOpen = ref(false);
@@ -798,7 +841,7 @@ async function onTreeDrop(e: DragEvent) {
 </script>
 
 <template>
-  <div ref="treeHost" class="flex h-full flex-col" @contextmenu="openTreeMenu">
+  <div ref="treeHost" class="flex h-full flex-col" @contextmenu="openTreeMenu" @touchstart.passive="onTreeTouchStart" @touchmove.passive="onTreeTouchMove" @touchend.passive="onTreeTouchEnd" @touchcancel.passive="onTreeTouchEnd">
     <div class="flex items-center justify-between px-3 pb-1 pt-3">
       <span class="text-[calc(12px*var(--ui-font-scale))] font-semibold tracking-wide text-ink-3">
         {{ t("nav.editor") }} · {{ site.docCount }}

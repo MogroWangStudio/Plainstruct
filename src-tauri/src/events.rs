@@ -11,3 +11,12 @@ pub const PREVIEW_REBUILT: &str = "plainstruct://preview-rebuilt";
 /// 预览窗口请求主窗口立即重新构建(仅前端 emit/listen,Rust 侧作常量镜像)
 #[allow(dead_code)]
 pub const PREVIEW_BUILD_REQUESTED: &str = "plainstruct://preview-build-requested";
+/// 局域网同步:收到推送计划(等待用户接受/拒绝)
+#[allow(dead_code)]
+pub const LAN_INCOMING: &str = "plainstruct://lan-incoming";
+/// 局域网同步:接收进度 {direction, received, total}
+#[allow(dead_code)]
+pub const LAN_PROGRESS: &str = "plainstruct://lan-progress";
+/// 局域网同步:对方设备列表失效(session 校验失败,提示重新扫描)
+#[allow(dead_code)]
+pub const LAN_REJECTED: &str = "plainstruct://lan-rejected";

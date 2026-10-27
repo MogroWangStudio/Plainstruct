@@ -34,6 +34,8 @@
 
 ### 发布与维护
 
+- **局域网同步（电脑 ⇄ 手机）** —— 同一 Wi-Fi 下的设备自动互相发现，站点可以整包互传：电脑把站点推到手机继续编辑，手机改完再传回电脑；推送需对方确认，覆盖同名站点前自动备份（保留最近 5 份），GitHub 令牌等敏感配置不随传输离开设备；开启「信任此局域网」后推送自动接受、对方也可直接拉取。
+- **移动端（安卓）** —— 功能与桌面端一致的 Android 应用（arm64 APK）：底部导航与抽屉式文件树的专属布局、全屏编辑／预览切换、长按文件树唤出操作菜单、模态改为底部面板；手机上的站点保存在应用数据目录内，新建、编辑、构建、发布与局域网同步全部可用。
 - **GitHub Pages 发布** —— 使用访问令牌一键推送，发布时自动重新构建站点内容（无需先手动构建），自动创建仓库、分支并开启 Pages，无需安装 Git；支持个人与组织账户、自定义域名，并可配置代理加速上传；发布成功后系统通知带「查看发布情况／查看站点」动作按钮。
 - **后台发布与取消** —— 发布期间切换到其他站点，发布会在后台继续进行，右下角显示发布状态药丸栏：点开即见进度与运行日志，可快速查看已发布网页、跳回发布页或取消发布；取消会中止上传并把站点引用回退到原版本，线上内容保持不变。
 - **应用更新检查** —— 设置页一键检查 GitHub 最新版本，新版本可一键下载（支持暂停与断点续传），更新向导自动完成覆盖安装。
@@ -53,6 +55,7 @@
 
 - **Windows x64**：免安装版 zip（`Plainstruct-版本号-Windows-x64-Portable.zip`，解压后双击 `plainstruct.exe`），自动更新也以此包覆盖升级。
 - **macOS（Apple Silicon）**：dmg 磁盘镜像（拖入「应用程序」）或 zip 压缩包（解压后移入「应用程序」），两者均附「损坏修复.command」。应用为 ad-hoc 签名、未经 Apple 公证，首次打开若提示「已损坏」，双击包内的**「损坏修复.command」**并输入开机密码（仅用于移除隔离标记）即可；也可在终端手动执行 `sudo xattr -r -d com.apple.quarantine /Applications/Plainstruct.app`。本软件开源，该修复仅移除 Gatekeeper 对未公证应用的「隔离」标记，不改动应用内容。
+- **Android（arm64-v8a）**：APK 安装包（`Plainstruct-版本号-android.apk`）。安装时允许「安装未知来源应用」即可；升级直接覆盖安装（同一签名）。手机端站点保存在应用私有数据目录，卸载应用会连同站点一起删除，重要内容请先经「同步」传回电脑。
 
 首次使用：
 
@@ -171,12 +174,17 @@ cargo check          # 在 src-tauri/ 下，Rust 编译检查
 npm run icons                          # 由 icon.png 生成全套应用图标
 npm run windows:portable               # Windows x64 免安装构建 -> release/Plainstruct_版本号_Windows_x64_Portable.zip
 npm run tauri -- build                 # 平台产物（dmg / app）
+npm run android:build                  # Android arm64 APK（需 Android SDK/NDK 与 Rust android target）
 ```
+
+安卓 APK 的发布签名：CI 从 secrets `ANDROID_RELEASE_KEYSTORE_B64` / `ANDROID_RELEASE_KEYSTORE_PASSWORD` 解出 keystore 写入 `src-tauri/gen/android/keystore.properties`（git 忽略）；本地构建时按同一格式自行放置即可，缺失时回退 debug 密钥（无法覆盖安装正式版）。
 
 ### 技术架构
 
 - **前端**：Vue 3 + TypeScript + Vite + Pinia + Tailwind CSS 4（自定义素构令牌）；编辑器 CodeMirror 6；渲染 markdown-it + highlight.js；模板 Handlebars。
 - **桌面**：Tauri 2（Rust）。文件 IO、ZIP、GitHub API 在 Rust 命令层；`site://` 自定义协议直读站点文件夹，构建预览与发布产物完全一致。
+- **移动端（安卓）**：同一 Tauri 2 工程交叉编译到 Android（WebView 内核），Rust 命令层、站点模型与构建管线完全复用；移动端 UI 为独立骨架（`MobileShell` / `EditorMobile`），与桌面共享全部视图与 store。
+- **局域网同步**：UDP 广播发现（端口 44223）+ 手写 HTTP/1.1 over TCP 传输，两端同一 Rust 实现；站点打包为 JSON 包（文本直传、二进制 base64），`build/` 产物与 `github.json` 不随同步。
 - **无后端**：应用状态存于程序根目录的 `data/` 文件夹（便携式，数据随程序走；该目录不可写时自动回退系统应用数据目录），站点数据全部在站点文件夹内。
 
 ## 目录结构
@@ -189,7 +197,8 @@ npm run tauri -- build                 # 平台产物（dmg / app）
 │   ├── lib/               # 路径映射 / Markdown / 主题引擎 / 构建管线
 │   ├── themes/            # 内置主题（plain-light / plain-dark / ink / terminal / gallery / blog-light / blog-dark）
 │   ├── stores/  components/  views/  i18n/
-└── src-tauri/             # Rust 桌面层（命令 / 协议 / GitHub 同步）
+└── src-tauri/             # Rust 层（命令 / 协议 / GitHub 同步 / 局域网同步）
+    └── gen/android/       # Android 工程（提交仓库;含签名配置,keystore 本身不入库）
 ```
 
 ## 许可与署名

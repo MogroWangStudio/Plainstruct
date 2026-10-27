@@ -96,10 +96,16 @@ pub async fn system_notify(
         .await
         .map_err(|e| e.to_string())?
     }
-    #[cfg(all(not(target_os = "macos"), not(windows)))]
+    #[cfg(all(not(target_os = "macos"), not(windows), not(target_os = "android")))]
     {
         let _ = &actions;
         desktop_notify(&title, &body)
+    }
+    // 安卓:应用在前台时前端以页面提示传达,系统通知暂不投递
+    #[cfg(target_os = "android")]
+    {
+        let _ = (title, body, actions);
+        Ok(())
     }
 }
 
@@ -153,7 +159,7 @@ async fn mac_notify(title: String, body: String) -> Result<(), String> {
 }
 
 /// Windows/Linux:notify-rust(libnotify;仅非 Windows 平台 —— Windows 走上方 toast)
-#[cfg(all(not(target_os = "macos"), not(windows)))]
+#[cfg(all(not(target_os = "macos"), not(windows), not(target_os = "android")))]
 fn desktop_notify(title: &str, body: &str) -> Result<(), String> {
     let mut n = notify_rust::Notification::new();
     n.summary(title).body(body);

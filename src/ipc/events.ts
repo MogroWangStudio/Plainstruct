@@ -10,6 +10,12 @@ export const Events = {
   PreviewBuildRequested: "plainstruct://preview-build-requested",
   /** Windows 通知按钮回跳:payload = publish(打开发布页)/ site(打开发布站点) */
   Navigate: "plainstruct://navigate",
+  /** 局域网同步:收到推送计划(等待用户接受/拒绝),payload = LanPushPlan */
+  LanIncoming: "plainstruct://lan-incoming",
+  /** 局域网同步:接收进度,payload = LanProgress */
+  LanProgress: "plainstruct://lan-progress",
+  /** 局域网同步:对方设备列表失效(本机服务重启过),提示重新扫描 */
+  LanRejected: "plainstruct://lan-rejected",
 } as const;
 
 export type SyncProgressEvent = typeof Events.SyncProgress;

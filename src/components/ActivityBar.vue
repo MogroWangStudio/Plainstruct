@@ -16,6 +16,7 @@ const items: { view: AppView; icon: string; label: string }[] = [
   { view: "plugins", icon: "puzzle", label: "nav.plugins" },
   { view: "build", icon: "box", label: "nav.build" },
   { view: "publish", icon: "upload", label: "nav.publish" },
+  { view: "lan", icon: "refresh", label: "nav.lan" },
 ];
 </script>
 

@@ -105,6 +105,8 @@ export const useBuilderStore = defineStore("builder", {
       const site = useSiteStore();
       const app = useAppStore();
       if (!site.root) return;
+      // 移动平台(安卓/iOS)单窗口:独立预览窗口不可用,页面内嵌预览承担全部预览
+      if (app.platform === "android" || app.platform === "ios") return;
       bindPreviewBuildListener();
       // 浏览器 mock:以命名标签页打开壳层页面(site:// 协议不可用,壳层仅演示界面形态;
       // 命名窗口让重复打开复用同一标签,与 Tauri 侧 getByLabel 的语义一致)

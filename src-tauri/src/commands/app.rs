@@ -22,7 +22,7 @@ pub struct RecentSite {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct AppData {
     #[serde(default)]
-    settings: Value,
+    pub(crate) settings: Value,
     #[serde(default)]
     recent_sites: Vec<RecentSite>,
     #[serde(default)]
@@ -149,6 +149,10 @@ pub fn get_bootstrap(state: State<'_, AppState>, window: tauri::WebviewWindow) -
         "windows"
     } else if cfg!(target_os = "macos") {
         "macos"
+    } else if cfg!(target_os = "android") {
+        "android"
+    } else if cfg!(target_os = "ios") {
+        "ios"
     } else {
         "unknown"
     };

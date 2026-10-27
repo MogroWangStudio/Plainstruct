@@ -2,11 +2,13 @@ node_modules
 dist
 release
 src-tauri/target
-src-tauri/gen
+# Android 工程:gen/android 提交仓库(含签名配置补丁);构建产物与本机密钥
+# 由 gen/android/.gitignore 排除,这里只放行 android 子目录
+src-tauri/gen/*
+!src-tauri/gen/android
 .zcode
 *.log
 .DS_Store
 .workbuddy/memory/2026-10-14.md
 .workbuddy/memory/2026-10-19.md
-docs/主题接口文档.md
 docs/主题接口文档.md

@@ -4,6 +4,7 @@ import { useBuilderStore } from "@/stores/builder";
 import { useSiteStore } from "@/stores/site";
 import { ipc } from "@/ipc/ipc";
 import { formatSize } from "@/lib/format";
+import { isMobilePlatform } from "@/lib/platform";
 import AppIcon from "@/components/AppIcon.vue";
 import PreviewFrame from "@/components/PreviewFrame.vue";
 
@@ -100,8 +101,14 @@ function openOutput() {
 
           <!-- 输出操作:与「重新构建」同规格的大按钮 -->
           <div class="mt-auto flex flex-col gap-2 border-t border-line pt-4">
-            <!-- 独立窗口加载的是构建产物,未构建时不可用;浏览器 mock 以新标签页打开壳层 -->
-            <button class="btn btn-secondary w-full" :disabled="!builder.report" @click="builder.openOrRefreshPreviewWindow">
+            <!-- 独立窗口加载的是构建产物,未构建时不可用;浏览器 mock 以新标签页打开壳层;
+                 移动端单窗口无独立预览,隐藏该入口 -->
+            <button
+              v-if="!isMobilePlatform"
+              class="btn btn-secondary w-full"
+              :disabled="!builder.report"
+              @click="builder.openOrRefreshPreviewWindow"
+            >
               <AppIcon name="window" :size="15" />
               {{ t("build.openWindow") }}
             </button>

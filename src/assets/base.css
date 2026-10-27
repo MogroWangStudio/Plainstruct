@@ -463,3 +463,11 @@ html[data-modal-blur="off"] .modal-scrim {
     backdrop-filter: none;
   }
 }
+
+/* ---------- 移动端(安卓/iOS)触摸基础:去点按高亮、禁橡皮筋回弹 ---------- */
+@media (pointer: coarse) {
+  body {
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none;
+  }
+}

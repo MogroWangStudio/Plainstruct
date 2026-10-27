@@ -3,9 +3,11 @@ import { computed, onMounted, ref } from "vue";
 import { useAppStore } from "@/stores/app";
 import { useSiteStore } from "@/stores/site";
 import { useEditorStore } from "@/stores/editor";
+import { useLanStore } from "@/stores/lan";
 import { usePublishStore } from "@/stores/publish";
 import { ipc } from "@/ipc/ipc";
 import { Events, listen } from "@/ipc/events";
+import { isMobilePlatform } from "@/lib/platform";
 import { useI18n } from "vue-i18n";
 import { installContextMenu } from "@/lib/contextMenu";
 import TitleBar from "@/components/TitleBar.vue";
@@ -13,7 +15,9 @@ import ActivityBar from "@/components/ActivityBar.vue";
 import ContextMenu from "@/components/ContextMenu.vue";
 import FeedbackHost from "@/components/FeedbackHost.vue";
 import PublishPill from "@/components/PublishPill.vue";
+import LanIncomingDialog from "@/components/LanIncomingDialog.vue";
 import Modal from "@/components/Modal.vue";
+import MobileShell from "@/components/mobile/MobileShell.vue";
 import StartView from "@/views/StartView.vue";
 import EditorView from "@/views/EditorView.vue";
 import AssetsView from "@/views/AssetsView.vue";
@@ -24,6 +28,7 @@ import PluginsView from "@/views/PluginsView.vue";
 import PublishView from "@/views/PublishView.vue";
 import SettingsView from "@/views/SettingsView.vue";
 import AboutView from "@/views/AboutView.vue";
+import LanView from "@/views/LanView.vue";
 
 const app = useAppStore();
 const site = useSiteStore();
@@ -78,6 +83,8 @@ const viewMap = {
   plugins: PluginsView,
   publish: PublishView,
   settings: SettingsView,
+  about: AboutView,
+  lan: LanView,
 } as const;
 
 const currentView = computed(() => viewMap[app.view as keyof typeof viewMap]);
@@ -85,6 +92,7 @@ const currentView = computed(() => viewMap[app.view as keyof typeof viewMap]);
 onMounted(() => {
   void app.init();
   void installCloseGuard();
+  void useLanStore().init();
   installContextMenu();
   // Windows 通知按钮回跳:publish = 打开发布页;site = 系统浏览器打开发布站点
   void listen<string>(Events.Navigate, (payload) => {
@@ -95,44 +103,51 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="flex h-screen flex-col overflow-hidden bg-bg">
-    <TitleBar />
+  <!-- h-dvh:移动端键盘弹起/系统栏收展时视口动态变化,比 100vh 更稳 -->
+  <div class="flex h-dvh flex-col overflow-hidden bg-bg">
+    <!-- 移动端(安卓/iOS):独立骨架(顶栏 + 底部导航),不渲染桌面标题栏与活动栏 -->
+    <MobileShell v-if="isMobilePlatform" />
 
-    <div class="relative flex min-h-0 flex-1">
-      <template v-if="app.ready">
-        <Transition name="view" mode="out-in">
-          <!-- 关于页(站点打开与否均可访问) -->
-          <AboutView v-if="app.view === 'about'" key="about" class="absolute inset-0" />
+    <template v-else>
+      <TitleBar />
 
-          <!-- 设置页(站点打开与否均可访问) -->
-          <SettingsView v-else-if="app.view === 'settings'" key="settings" class="absolute inset-0" />
+      <div class="relative flex min-h-0 flex-1">
+        <template v-if="app.ready">
+          <Transition name="view" mode="out-in">
+            <!-- 关于页(站点打开与否均可访问) -->
+            <AboutView v-if="app.view === 'about'" key="about" class="absolute inset-0" />
 
-          <!-- 启动页 -->
-          <StartView v-else-if="!site.open" key="start" class="absolute inset-0" />
+            <!-- 设置页(站点打开与否均可访问) -->
+            <SettingsView v-else-if="app.view === 'settings'" key="settings" class="absolute inset-0" />
 
-          <!-- 工作区 -->
-          <div v-else key="workspace" class="flex min-h-0 w-full">
-            <ActivityBar />
-            <main class="min-w-0 flex-1">
-              <Transition name="view" mode="out-in">
-                <component :is="currentView" :key="app.view" />
-              </Transition>
-            </main>
+            <!-- 启动页 -->
+            <StartView v-else-if="!site.open" key="start" class="absolute inset-0" />
+
+            <!-- 工作区 -->
+            <div v-else key="workspace" class="flex min-h-0 w-full">
+              <ActivityBar />
+              <main class="min-w-0 flex-1">
+                <Transition name="view" mode="out-in">
+                  <component :is="currentView" :key="app.view" />
+                </Transition>
+              </main>
+            </div>
+          </Transition>
+        </template>
+
+        <!-- 启动画面:就绪后整体淡出与主界面交叉,不再阻塞 -->
+        <Transition name="boot">
+          <div v-if="!app.ready" class="absolute inset-0 z-10 flex flex-col items-center justify-center gap-5 bg-bg">
+            <img :src="app.isDark ? '/logo-dark.svg' : '/logo.svg'" alt="" class="h-10 w-10 opacity-70" />
           </div>
         </Transition>
-      </template>
-
-      <!-- 启动画面:就绪后整体淡出与主界面交叉,不再阻塞 -->
-      <Transition name="boot">
-        <div v-if="!app.ready" class="absolute inset-0 z-10 flex flex-col items-center justify-center gap-5 bg-bg">
-          <img :src="app.isDark ? '/logo-dark.svg' : '/logo.svg'" alt="" class="h-10 w-10 opacity-70" />
-        </div>
-      </Transition>
-    </div>
+      </div>
+    </template>
 
     <FeedbackHost />
     <PublishPill />
     <ContextMenu />
+    <LanIncomingDialog />
 
     <!-- 关窗守卫:有未保存修改时的三选确认 -->
     <Modal v-if="closeAskOpen" :title="t('editor.closeDirtyTitle')" :width="380" @cancel="closeCancel">

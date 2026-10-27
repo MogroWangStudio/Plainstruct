@@ -1,6 +1,6 @@
 /** 前后端共享的数据契约 -- 与 Rust 侧 serde 结构一一对应 */
 
-export type Platform = "windows" | "macos" | "browser";
+export type Platform = "windows" | "macos" | "android" | "ios" | "browser";
 export type Locale = "zh-CN" | "en-US";
 export type ThemeSource = "builtin" | "custom";
 /** 站点类型:文档站 / 博客站,决定可选主题与主页形态 */
@@ -54,6 +54,12 @@ export interface AppSettings {
   modalBlur?: boolean;
   /** 点击弹窗空白区域(模糊遮罩)的关窗方式:never=不关闭 single=一次 double=两次(默认) */
   modalBackdropClose?: ModalBackdropClose;
+  /** 局域网同步:随应用启动恢复服务 */
+  lanEnabled?: boolean;
+  /** 局域网同步:信任当前局域网(收到推送自动接受、允许对方直接拉取) */
+  lanTrusted?: boolean;
+  /** 局域网同步:对外展示的设备名(空 = 用平台默认名) */
+  lanDeviceName?: string;
 }
 
 /** 弹窗空白区域点击的关窗方式 */
@@ -82,6 +88,52 @@ export interface Bootstrap {
 export interface PendingUpdate {
   version: string;
   assetName: string;
+}
+
+/* ---------- 局域网同步(与 Rust 侧 lan.rs 结构一一对应) ---------- */
+
+/** 本机/对方设备上的站点摘要(名称即目录名,站点为数据目录 sites/ 下的文件夹) */
+export interface LanSiteBrief {
+  name: string;
+  siteType: string;
+  sizeBytes: number;
+}
+
+/** 发现到的局域网设备 */
+export interface LanPeer {
+  ip: string;
+  port: number;
+  session: string;
+  name: string;
+  platform: string;
+  trusted: boolean;
+  sites: LanSiteBrief[];
+}
+
+/** 本机同步服务状态 */
+export interface LanStatus {
+  running: boolean;
+  httpPort: number;
+  deviceName: string;
+  trusted: boolean;
+  session: string;
+}
+
+/** 收到的推送计划(等待本机接受/拒绝) */
+export interface LanPushPlan {
+  device: string;
+  devicePlatform: string;
+  siteName: string;
+  sizeBytes: number;
+  fileCount: number;
+}
+
+/** 接收进度(direction = receive;写入完成时附带落盘的站点名 site) */
+export interface LanProgress {
+  direction: "send" | "receive";
+  received: number;
+  total: number;
+  site?: string;
 }
 
 export interface UpdateInfo {

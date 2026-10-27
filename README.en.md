@@ -34,6 +34,8 @@
 
 ### Publishing & maintenance
 
+- **LAN sync (desktop ⇄ phone)** — devices on the same Wi-Fi discover each other automatically and whole sites travel both ways: push a site from your computer to keep editing on the phone, then send it back; pushes require the receiver's confirmation, same-name overwrites are backed up automatically (last 5 kept), and sensitive config such as GitHub tokens never leaves the device; with "Trust this network" on, pushes are accepted automatically and the other side may pull sites directly.
+- **Mobile (Android)** — an Android app (arm64 APK) with the same feature set as the desktop: a dedicated layout with bottom navigation and a drawer file tree, full-screen edit/preview switching, long-press menus in the file tree, and modals as bottom sheets; sites on the phone live in the app's private data directory — create, edit, build, publish and LAN-sync all work.
 - **GitHub Pages publishing** — push with a personal access token in one click; site content is rebuilt automatically on publish (no manual build needed first), the repo, branch and Pages are created automatically, no Git needed; works with personal and organization accounts and custom domains, and a proxy can be configured to speed up uploads; on Windows the success notification carries "View publish status / View site" action buttons.
 - **Background publishing & cancel** — switch to another site while publishing and the task keeps running in the background, with a status pill in the bottom-right corner: click it for progress and logs, quick actions to view the published site, jump back to the publish page, or cancel; cancelling stops the upload and reverts the site reference to the previous version, leaving the live site unchanged.
 - **Update check** — check for the latest GitHub release from Settings, download with one click (pause and resume supported), and an update wizard installs the new version automatically.
@@ -53,6 +55,7 @@ Download an installer for your platform from [GitHub Releases](https://github.co
 
 - **Windows x64** — portable zip (`Plainstruct-<version>-Windows-x64-Portable.zip`; unzip and run `plainstruct.exe`); auto-update overwrites the app with the same package.
 - **macOS (Apple Silicon)** — a dmg disk image (drag into Applications) or a zip archive (unzip and move into Applications), both bundling a repair script. The app is ad-hoc signed and not notarized; if macOS says it is "damaged", double-click **损坏修复.command (Repair Damaged)** inside the package and enter your password (only to remove the quarantine flag), or run `sudo xattr -r -d com.apple.quarantine /Applications/Plainstruct.app` in a terminal. Plainstruct is open source — this fix only clears Gatekeeper's quarantine flag on an un-notarized app and changes nothing inside it.
+- **Android (arm64-v8a)** — an APK package (`Plainstruct-<version>-android.apk`). Allow "install unknown apps" when prompted; upgrades install over the existing app (same signing key). Sites on the phone live in the app's private data directory — uninstalling removes them too, so send important sites back to your computer via Sync first.
 
 First run:
 
@@ -171,12 +174,17 @@ cargo check          # Rust compile check (in src-tauri/)
 npm run icons                          # generate app icons from icon.png
 npm run windows:portable               # Windows x64 portable build -> release/Plainstruct_<version>_Windows_x64_Portable.zip
 npm run tauri -- build                 # platform artifacts (dmg / app)
+npm run android:build                  # Android arm64 APK (needs Android SDK/NDK and the Rust android target)
 ```
+
+Release signing for the Android APK: CI decodes secrets `ANDROID_RELEASE_KEYSTORE_B64` / `ANDROID_RELEASE_KEYSTORE_PASSWORD` into `src-tauri/gen/android/keystore.properties` (git-ignored); for local builds place the file there yourself in the same format. Without it the build falls back to the debug key (such APKs cannot upgrade-install over a release).
 
 ### Architecture
 
 - **Frontend**: Vue 3 + TypeScript + Vite + Pinia + Tailwind CSS 4 (custom Plainstruct tokens); CodeMirror 6 editor; markdown-it + highlight.js rendering; Handlebars templates.
 - **Desktop**: Tauri 2 (Rust). File IO, ZIP handling and the GitHub API live in Rust commands; a `site://` custom protocol serves the site folder directly, so the build preview matches the published output exactly.
+- **Mobile (Android)**: the same Tauri 2 project cross-compiled to Android (WebView engine) — the Rust command layer, site model and build pipeline are fully shared; the mobile UI is a separate shell (`MobileShell` / `EditorMobile`) built on the same views and stores as the desktop.
+- **LAN sync**: UDP broadcast discovery (port 44223) plus a hand-written HTTP/1.1-over-TCP transfer, one Rust implementation serving both ends; a site is packed into a single JSON bundle (text inline, binary as base64) that excludes `build/` output and `github.json`.
 - **No backend**: app state lives in a `data/` folder next to the executable (portable — data travels with the app; it falls back to the system app-data directory when that location is not writable), while site data lives entirely in the site folder.
 
 ## Project layout

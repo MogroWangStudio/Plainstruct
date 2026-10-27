@@ -2,6 +2,7 @@
 mod commands;
 mod events;
 mod fsutil;
+mod lan;
 mod state;
 
 use std::borrow::Cow;
@@ -180,32 +181,36 @@ fn handle_protocol_arg(app: &tauri::AppHandle, arg: &str) {
 }
 
 pub fn run() {
-    tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
-            #[cfg(not(windows))]
-            let _ = argv;
-            // 二次启动:macOS 关窗后进程保留、Windows 退出也存在短暂窗口期,
-            // 此时旧实例的窗口可能已关闭 —— 把主窗口重新带回前台,
-            // 避免「关闭后立即重启软件看不到任何界面」。
-            // 若启动参数携带 plainstruct:// 协议(Windows 通知按钮),唤起后跳转对应页面
-            #[allow(unused_mut)]
-            let mut handled = false;
-            #[cfg(windows)]
-            for arg in &argv {
-                if arg.contains("plainstruct://") {
-                    handle_protocol_arg(app, arg);
-                    handled = true;
-                    break;
-                }
+    // 单实例插件仅桌面平台可用(安卓由系统保证单实例)
+    #[cfg(not(target_os = "android"))]
+    let builder = tauri::Builder::default().plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+        #[cfg(not(windows))]
+        let _ = argv;
+        // 二次启动:macOS 关窗后进程保留、Windows 退出也存在短暂窗口期,
+        // 此时旧实例的窗口可能已关闭 —— 把主窗口重新带回前台,
+        // 避免「关闭后立即重启软件看不到任何界面」。
+        // 若启动参数携带 plainstruct:// 协议(Windows 通知按钮),唤起后跳转对应页面
+        #[allow(unused_mut)]
+        let mut handled = false;
+        #[cfg(windows)]
+        for arg in &argv {
+            if arg.contains("plainstruct://") {
+                handle_protocol_arg(app, arg);
+                handled = true;
+                break;
             }
-            if !handled {
-                if let Some(win) = app.get_webview_window("main") {
-                    let _ = win.unminimize();
-                    let _ = win.show();
-                    let _ = win.set_focus();
-                }
+        }
+        if !handled {
+            if let Some(win) = app.get_webview_window("main") {
+                let _ = win.unminimize();
+                let _ = win.show();
+                let _ = win.set_focus();
             }
-        }))
+        }
+    }));
+    #[cfg(target_os = "android")]
+    let builder = tauri::Builder::default();
+    builder
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
@@ -307,6 +312,16 @@ pub fn run() {
             commands::open_external,
             commands::reload_webview,
             commands::system_notify,
+            // 局域网同步
+            commands::lan_start_service,
+            commands::lan_stop_service,
+            commands::lan_service_status,
+            commands::lan_update_meta,
+            commands::lan_discover,
+            commands::lan_local_sites,
+            commands::lan_push_site,
+            commands::lan_pull_site,
+            commands::lan_decide_incoming,
         ])
         .on_window_event(|window, event| {
             // macOS 关窗惯例:主窗口隐藏而非销毁 —— 保留 WebView,单实例
@@ -361,6 +376,21 @@ pub fn run() {
             if let Ok(mut guard) = state.app_data_dir.lock() {
                 *guard = data_dir;
             }
+            // 恢复局域网同步服务(上次开启时随应用启动;失败不影响主流程)
+            {
+                let boot = commands::app::read_app_data(&state);
+                let enabled = boot.settings.get("lanEnabled").and_then(|v| v.as_bool()).unwrap_or(false);
+                let trusted = boot.settings.get("lanTrusted").and_then(|v| v.as_bool()).unwrap_or(false);
+                let name = boot
+                    .settings
+                    .get("lanDeviceName")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                if enabled {
+                    let _ = lan::start_service(app.handle(), &state, name, trusted);
+                }
+            }
             // 启动自愈预防(必须在数据目录初始化之后,否则读到空路径永远失效):
             // 上一轮已连续失败 ≥2 次(自动修复档已用尽)时,本轮在页面加载前先清
             // 一次 WebView 浏览数据,给应用一个干净环境,随后重置计数重新观察;
@@ -376,9 +406,10 @@ pub fn run() {
                 commands::app::reset_boot_state(&state);
             }
             // 平台窗口装饰:macOS 保留原生圆角与红绿灯(conf 里 titleBarStyle Overlay + hiddenTitle),
-            // 其余平台维持无边框自绘标题栏;窗口初始隐藏,装饰调整完成后再显示,避免启动闪烁
+            // 其余桌面平台维持无边框自绘标题栏;移动端无窗口装饰概念,跳过。
+            // 窗口初始隐藏,装饰调整完成后再显示,避免启动闪烁
             if let Some(win) = app.get_webview_window("main") {
-                #[cfg(not(target_os = "macos"))]
+                #[cfg(all(not(target_os = "macos"), not(target_os = "android"), not(target_os = "ios")))]
                 let _ = win.set_decorations(false);
                 let _ = win.show();
             }

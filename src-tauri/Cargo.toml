@@ -1,6 +1,6 @@
 [package]
 name = "plainstruct"
-version = "4.3.0"
+version = "4.4.0"
 description = "素构 Plainstruct - 本地静态文档（wiki）网站创建器"
 authors = ["MogroWang Studio"]
 edition = "2021"
@@ -14,7 +14,6 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = ["macos-private-api"] }
-tauri-plugin-single-instance = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-clipboard-manager = "2"
@@ -23,12 +22,17 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha1 = "0.10"
 zip = { version = "2", default-features = false, features = ["deflate"] }
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "socks"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "socks", "blocking"] }
 base64 = "0.22"
 walkdir = "2"
-trash = "5"
 percent-encoding = "2"
+if-addrs = "0.13"
+
+# 回收站删除与系统通知:桌面平台;安卓无回收站语义,通知交给系统层
+[target.'cfg(not(target_os = "android"))'.dependencies]
+trash = "5"
 notify-rust = "4"
+tauri-plugin-single-instance = "2"
 
 [profile.release]
 opt-level = "s"

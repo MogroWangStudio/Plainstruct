@@ -21,7 +21,7 @@ import { i18n, type Locale as I18nLocale } from "@/i18n";
 import { appThemeDef } from "@/lib/app-themes";
 import { useUiStore } from "./ui";
 
-export type AppView = "editor" | "assets" | "site" | "build" | "theme" | "plugins" | "publish" | "settings" | "about";
+export type AppView = "editor" | "assets" | "site" | "build" | "theme" | "plugins" | "publish" | "settings" | "about" | "lan";
 
 /**
  * 自动更新阶段:idle=未开始 downloading=下载中 paused=已暂停(可续传)
@@ -384,6 +384,15 @@ export const useAppStore = defineStore("app", {
 
     /** 保存编辑器写作偏好(空白标记与键位),编辑器经响应式 watch 自行重配 */
     async setEditorPrefs(patch: EditorPrefs) {
+      this.bootstrap = {
+        ...this.bootstrap!,
+        settings: { ...this.settings, ...patch },
+      };
+      await ipc.saveSettings(patch);
+    },
+
+    /** 保存局域网同步偏好(开关/信任/设备名),服务元数据由 lan store 单独更新 */
+    async setLanPrefs(patch: { lanEnabled?: boolean; lanTrusted?: boolean; lanDeviceName?: string }) {
       this.bootstrap = {
         ...this.bootstrap!,
         settings: { ...this.settings, ...patch },

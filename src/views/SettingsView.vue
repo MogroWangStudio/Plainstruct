@@ -15,6 +15,7 @@ import type { ConfettiLevel, EditorBreakKey, EditorFontMode, EditorIndentKey, Lo
 import { APP_THEMES, type AppThemeSwatch } from "@/lib/app-themes";
 import { fireConfetti } from "@/lib/confetti";
 import { formatSize } from "@/lib/format";
+import { isMobilePlatform } from "@/lib/platform";
 import AppIcon from "@/components/AppIcon.vue";
 import SelectMenu from "@/components/SelectMenu.vue";
 
@@ -820,8 +821,8 @@ function openRelease(url: string) {
                   </button>
                 </div>
 
-                <!-- 检查更新与自动更新 -->
-                <div class="settings-row" style="--i: 1">
+                <!-- 检查更新与自动更新(移动端无应用内更新,经重新安装 APK 升级) -->
+                <div v-if="!isMobilePlatform" class="settings-row" style="--i: 1">
                   <div class="min-w-0">
                     <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.checkUpdate") }}</p>
                     <p class="mt-0.5 truncate text-[calc(12px*var(--ui-font-scale))] leading-relaxed" :class="hintTone">

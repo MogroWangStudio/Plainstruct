@@ -1,7 +1,10 @@
 <script setup lang="ts">
 /** 通用模态外壳 -- 父级用 v-if 控制出现,Transition 在此组件内;
- *  空白区域(模糊遮罩)点击按设置关窗(默认两次),表单有改动时先询问保存 */
+ *  空白区域(模糊遮罩)点击按设置关窗(默认两次),表单有改动时先询问保存。
+ *  移动端(安卓/iOS)以底部 sheet 呈现:贴底全宽,自下而上进出。 */
+import { computed } from "vue";
 import { useI18n } from "vue-i18n";
+import { useAppStore } from "@/stores/app";
 import { useUiStore } from "@/stores/ui";
 import { useBackdropClose } from "@/lib/backdrop-close";
 
@@ -24,6 +27,12 @@ const emit = defineEmits<{ cancel: [] }>();
 const { t } = useI18n();
 const ui = useUiStore();
 const { onBackdropClick: backdropClickDecision, resetBackdropClicks } = useBackdropClose();
+
+/** 移动平台:卡片变为底部 sheet(模板与过渡分支) */
+const sheet = computed(() => {
+  const platform = useAppStore().platform;
+  return platform === "android" || platform === "ios";
+});
 
 async function onBackdropClick() {
   if (props.backdropDisabled) return;
@@ -55,17 +64,19 @@ async function requestClose() {
 
 <template>
   <Teleport to="body">
-    <div class="fixed inset-0 z-50 flex items-center justify-center p-6">
+    <div class="fixed inset-0 z-50 flex p-6" :class="sheet ? 'items-end p-0' : 'items-center justify-center'">
       <Transition name="scrim" appear>
         <div class="modal-scrim absolute inset-0" @click="onBackdropClick" />
       </Transition>
-      <Transition name="modal" appear>
+      <Transition :name="sheet ? 'sheet' : 'modal'" appear>
         <div
-          class="modal-card panel relative flex max-h-[80vh] w-full flex-col shadow-window"
-          :style="{ maxWidth: (width ?? 400) + 'px' }"
+          class="modal-card panel relative flex w-full flex-col shadow-window"
+          :class="sheet ? 'max-h-[88vh] rounded-b-none pb-[env(safe-area-inset-bottom)]' : 'max-h-[80vh]'"
+          :style="sheet ? undefined : { maxWidth: (width ?? 400) + 'px' }"
           @click="resetBackdropClicks"
         >
-          <header class="flex items-center justify-between px-5 pb-3 pt-4">
+          <div v-if="sheet" class="mx-auto mt-2.5 h-1 w-9 shrink-0 rounded-full bg-line-strong" aria-hidden="true" />
+          <header class="flex items-center justify-between px-5 pb-3 pt-4" :class="sheet && 'pt-3'">
             <h2 class="text-[calc(15px*var(--ui-font-scale))] font-semibold">{{ title }}</h2>
             <button class="btn-icon" @click="$emit('cancel')">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
@@ -74,7 +85,7 @@ async function requestClose() {
           <div class="min-h-0 flex-1 overflow-y-auto px-5 pb-5">
             <slot />
           </div>
-          <footer v-if="$slots.footer" class="flex justify-end gap-2 border-t border-line px-5 py-3">
+          <footer v-if="$slots.footer" class="flex justify-end gap-2 border-t border-line px-5 py-3" :class="sheet && 'pb-[max(12px,env(safe-area-inset-bottom))]'">
             <slot name="footer" />
           </footer>
         </div>
@@ -82,3 +93,26 @@ async function requestClose() {
     </div>
   </Teleport>
 </template>
+
+<style scoped>
+/* 底部 sheet:自下而上进出,与遮罩同步;reduced-motion 降级为淡入淡出 */
+.sheet-enter-active,
+.sheet-leave-active {
+  transition: transform 240ms var(--ease-plain);
+}
+.sheet-enter-from,
+.sheet-leave-to {
+  transform: translateY(100%);
+}
+@media (prefers-reduced-motion: reduce) {
+  .sheet-enter-active,
+  .sheet-leave-active {
+    transition: opacity 160ms ease;
+  }
+  .sheet-enter-from,
+  .sheet-leave-to {
+    transform: none;
+    opacity: 0;
+  }
+}
+</style>

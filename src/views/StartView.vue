@@ -5,8 +5,9 @@ import { useAppStore } from "@/stores/app";
 import { useSiteStore } from "@/stores/site";
 import { useUiStore } from "@/stores/ui";
 import { ipc } from "@/ipc/ipc";
-import type { SiteType } from "@/ipc/types";
+import type { LanSiteBrief, SiteType } from "@/ipc/types";
 import { formatSize, formatTime } from "@/lib/format";
+import { isMobilePlatform } from "@/lib/platform";
 import { useBackdropClose } from "@/lib/backdrop-close";
 import AppIcon from "@/components/AppIcon.vue";
 
@@ -15,6 +16,10 @@ const app = useAppStore();
 const site = useSiteStore();
 const ui = useUiStore();
 const { onBackdropClick, resetBackdropClicks } = useBackdropClose();
+
+/** 移动端(安卓/iOS):无系统目录选择,站点固定建在数据目录 sites/ 下,
+ *  打开走本地站点库列表 */
+const mobile = isMobilePlatform;
 
 /** 打开新建向导:空白点击计数随开窗清零 */
 function openWizard() {
@@ -25,9 +30,21 @@ function openWizard() {
 /** 最近打开条目的站点摘要(类型与大小,异步获取;null = 获取失败) */
 const siteInfos = ref<Record<string, { siteType: string; sizeBytes: number } | null>>({});
 
+/** 移动端本地站点库(数据目录 sites/ 下的站点) */
+const library = ref<LanSiteBrief[]>([]);
+
 onMounted(() => {
   void loadSiteInfos();
+  if (mobile.value) void loadLibrary();
 });
+
+async function loadLibrary() {
+  try {
+    library.value = await ipc.lanLocalSites();
+  } catch {
+    library.value = [];
+  }
+}
 
 async function loadSiteInfos() {
   await Promise.all(
@@ -68,14 +85,16 @@ async function createSite() {
     wizardError.value = t("wizard.invalidName");
     return;
   }
-  if (!wizard.folder) {
+  // 移动端不选目录:直接落在数据目录 sites/<名称> 下
+  const dir = mobile.value ? `${app.bootstrap?.appDataDir ?? ""}/sites/${wizard.name.trim()}` : wizard.folder;
+  if (!dir) {
     wizardError.value = t("wizard.invalidFolder");
     return;
   }
   creating.value = true;
   wizardError.value = "";
   try {
-    await site.create(wizard.folder, wizard.name.trim(), wizard.description.trim() || undefined, wizard.siteType);
+    await site.create(dir, wizard.name.trim(), wizard.description.trim() || undefined, wizard.siteType);
     showWizard.value = false;
   } catch (e) {
     const msg = ipc.errText(e);
@@ -103,6 +122,11 @@ async function openRecent(path: string) {
     ui.toast(t("start.openFailed", { msg: t("start.notASite") }), "error");
   }
 }
+
+/** 移动端:打开本地站点库中的站点(路径由数据目录推导) */
+async function openLibrarySite(name: string) {
+  await openRecent(`${app.bootstrap?.appDataDir ?? ""}/sites/${name}`);
+}
 </script>
 
 <template>
@@ -116,30 +140,43 @@ async function openRecent(path: string) {
           <AppIcon name="plus" :size="16" />
           {{ t("start.createSite") }}
         </button>
-        <button class="btn btn-secondary h-10 flex-1" @click="openSite">
+        <button v-if="!mobile" class="btn btn-secondary h-10 flex-1" @click="openSite">
           <AppIcon name="folder" :size="16" />
           {{ t("start.openSite") }}
         </button>
       </div>
 
+      <!-- 桌面:最近打开;移动端:本地站点库(无目录选择,站点来自新建与局域网接收) -->
       <div class="float-in mt-12 w-full" style="--d: 90ms">
-        <h2 class="field-label">{{ t("start.recent") }}</h2>
-        <div v-if="!app.recentSites.length" class="rounded-lg border border-dashed border-line px-4 py-6 text-center text-[calc(13px*var(--ui-font-scale))] text-ink-3">
-          {{ t("start.recentEmpty") }}
+        <h2 class="field-label">{{ mobile ? t("start.library") : t("start.recent") }}</h2>
+        <div
+          v-if="mobile ? !library.length : !app.recentSites.length"
+          class="rounded-lg border border-dashed border-line px-4 py-6 text-center text-[calc(13px*var(--ui-font-scale))] text-ink-3"
+        >
+          {{ mobile ? t("start.libraryEmpty") : t("start.recentEmpty") }}
         </div>
         <TransitionGroup v-else name="list" tag="div" class="panel divide-y divide-line overflow-hidden">
           <button
-            v-for="item in app.recentSites"
-            :key="item.path"
+            v-for="item in mobile
+              ? library.map((s) => ({ key: s.name, name: s.name, path: '', sizeBytes: s.sizeBytes, siteType: s.siteType }))
+              : app.recentSites.map((r) => ({ key: r.path, name: r.name, path: r.path, sizeBytes: 0, siteType: '' }))"
+            :key="item.key"
             class="recent-item"
-            @click="openRecent(item.path)"
+            @click="mobile ? openLibrarySite(item.name) : openRecent(item.path)"
           >
             <AppIcon name="folder" :size="16" class="text-ink-3" />
             <span class="min-w-0 flex-1 text-left">
               <span class="block truncate text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ item.name }}</span>
-              <span class="block truncate text-[calc(11.5px*var(--ui-font-scale))] text-ink-3">{{ item.path }}</span>
+              <span v-if="!mobile" class="block truncate text-[calc(11.5px*var(--ui-font-scale))] text-ink-3">{{ item.path }}</span>
               <span class="block pt-0.5 text-[calc(10.5px*var(--ui-font-scale))] text-ink-3">
-                <template v-if="siteTypeText(item.path)">
+                <template v-if="mobile">
+                  <span class="inline-flex items-center gap-1">
+                    <AppIcon :name="item.siteType === 'blog' ? 'pencil' : 'doc'" :size="11" class="shrink-0" />
+                    {{ item.siteType === 'blog' ? t("wizard.typeBlog") : t("wizard.typeDocs") }}
+                    <template v-if="item.sizeBytes"> · {{ formatSize(item.sizeBytes) }}</template>
+                  </span>
+                </template>
+                <template v-else-if="siteTypeText(item.path)">
                   <span class="inline-flex items-center gap-1">
                     <AppIcon :name="siteTypeIcon(item.path)" :size="11" class="shrink-0" />
                     {{ siteTypeText(item.path) }} · {{ formatSize(siteInfos[item.path]?.sizeBytes ?? 0) || "0 B" }}
@@ -148,7 +185,7 @@ async function openRecent(path: string) {
                 <span v-else class="inline-block h-2 w-24 rounded bg-surface-3 align-middle"></span>
               </span>
             </span>
-            <span class="shrink-0 text-[calc(11.5px*var(--ui-font-scale))] text-ink-3">{{ formatTime(item.openedAt) }}</span>
+            <span v-if="!mobile" class="shrink-0 text-[calc(11.5px*var(--ui-font-scale))] text-ink-3">{{ formatTime(item.path ? app.recentSites.find((r) => r.path === item.path)?.openedAt ?? 0 : 0) }}</span>
           </button>
         </TransitionGroup>
       </div>
@@ -242,7 +279,7 @@ async function openRecent(path: string) {
                   @keydown.enter="createSite"
                 />
               </div>
-              <div>
+              <div v-if="!mobile">
                 <label class="field-label">{{ t("wizard.folder") }}</label>
                 <div class="flex gap-2">
                   <input class="input !text-[calc(12px*var(--ui-font-scale))]" type="text" readonly :value="wizard.folder" :placeholder="t('wizard.chooseFolder')" />
@@ -250,7 +287,7 @@ async function openRecent(path: string) {
                     {{ t("wizard.chooseFolder") }}
                   </button>
                 </div>
-                <p class="field-hint">{{ t("wizard.folderHint") }}</p>
+                <p class="field-hint">{{ mobile ? t("wizard.folderHintMobile") : t("wizard.folderHint") }}</p>
               </div>
               <p v-if="wizardError" class="text-[calc(12.5px*var(--ui-font-scale))] text-danger">{{ wizardError }}</p>
             </div>

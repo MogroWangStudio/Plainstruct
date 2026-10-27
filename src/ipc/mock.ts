@@ -5,6 +5,9 @@ import type {
   CopyItem,
   FolderMeta,
   GithubConfig,
+  LanPeer,
+  LanSiteBrief,
+  LanStatus,
   OutputFile,
   PagesBuildStatus,
   PublishPreflight,
@@ -46,6 +49,8 @@ let siteCounter = 0;
 let buildFiles = new Map<string, string>();
 /** 站点插件(mock):root -> id -> { name, files } */
 const mockPlugins = new Map<string, Map<string, { name: string; files: Map<string, string> }>>();
+/** 局域网同步(mock):纯内存服务状态 */
+const mockLan: LanStatus = { running: false, httpPort: 0, deviceName: "浏览器", trusted: false, session: "mock" };
 
 function lsGet<T>(key: string, fallback: T): T {
   try {
@@ -318,6 +323,55 @@ export const mock = {
   async setDataDir(_path: string | null): Promise<void> {},
 
   async openDataDir(): Promise<void> {},
+
+  /* ---------- 局域网同步(浏览器开发模拟:服务状态纯内存,发现返回空列表) ---------- */
+
+  async lanStartService(deviceName?: string, _trusted?: boolean): Promise<LanStatus> {
+    mockLan.running = true;
+    if (deviceName?.trim()) mockLan.deviceName = deviceName.trim();
+    return { ...mockLan };
+  },
+  async lanStopService(): Promise<LanStatus> {
+    mockLan.running = false;
+    return { ...mockLan };
+  },
+  async lanServiceStatus(): Promise<LanStatus> {
+    return { ...mockLan };
+  },
+  async lanUpdateMeta(deviceName?: string, trusted?: boolean): Promise<LanStatus> {
+    if (deviceName?.trim()) mockLan.deviceName = deviceName.trim();
+    if (typeof trusted === "boolean") mockLan.trusted = trusted;
+    return { ...mockLan };
+  },
+  async lanDiscover(): Promise<LanPeer[]> {
+    await delay(600);
+    return [];
+  },
+  async lanLocalSites(): Promise<LanSiteBrief[]> {
+    ensureInit();
+    // mock 环境以最近打开列表充当站点库(类型与大小走同一 getSiteInfo 判定)
+    const out: LanSiteBrief[] = [];
+    for (const r of recent) {
+      try {
+        const info = await mock.getSiteInfo(r.path);
+        out.push({ name: r.name, siteType: info.siteType, sizeBytes: info.sizeBytes });
+      } catch {
+        /* 非站点目录跳过 */
+      }
+    }
+    return out;
+  },
+  async lanPushSite(_peer: LanPeer, _siteRoot: string): Promise<string> {
+    await delay(800);
+    return "browser-mock";
+  },
+  async lanPullSite(_peer: LanPeer, _siteName: string, _mode: "copy" | "replace"): Promise<string> {
+    await delay(800);
+    return "browser-mock";
+  },
+  async lanDecideIncoming(_accept: boolean, _mode: "copy" | "replace"): Promise<boolean> {
+    return true;
+  },
 
   async createSite(dir: string, name: string, description?: string, siteType?: string): Promise<SiteConfig> {
     ensureInit();

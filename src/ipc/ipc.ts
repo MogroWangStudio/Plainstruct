@@ -6,6 +6,9 @@ import type {
   FolderMeta,
   GithubConfig,
   ImportedPlugin,
+  LanPeer,
+  LanSiteBrief,
+  LanStatus,
   NotifyAction,
   OutputFile,
   PagesBuildStatus,
@@ -352,6 +355,50 @@ export const ipc = {
     } finally {
       stop();
     }
+  },
+
+  /* ---------- 局域网同步 ---------- */
+  /** 开启同步服务(已在运行时仅刷新元数据并返回现状态) */
+  lanStartService(deviceName?: string, trusted?: boolean): Promise<LanStatus> {
+    return inTauri
+      ? invoke<LanStatus>("lan_start_service", { deviceName: deviceName ?? null, trusted: trusted ?? null })
+      : mock.lanStartService(deviceName, trusted);
+  },
+  lanStopService(): Promise<LanStatus> {
+    return inTauri ? invoke<LanStatus>("lan_stop_service") : mock.lanStopService();
+  },
+  lanServiceStatus(): Promise<LanStatus> {
+    return inTauri ? invoke<LanStatus>("lan_service_status") : mock.lanServiceStatus();
+  },
+  /** 运行中服务的元数据更新(设备名/信任开关) */
+  lanUpdateMeta(deviceName?: string, trusted?: boolean): Promise<LanStatus> {
+    return inTauri
+      ? invoke<LanStatus>("lan_update_meta", { deviceName: deviceName ?? null, trusted: trusted ?? null })
+      : mock.lanUpdateMeta(deviceName, trusted);
+  },
+  /** 广播发现局域网设备(约 1s 窗口,阻塞返回) */
+  lanDiscover(): Promise<LanPeer[]> {
+    return inTauri ? invoke<LanPeer[]>("lan_discover") : mock.lanDiscover();
+  },
+  /** 本机站点库(数据目录 sites/ 下的站点;移动端「打开站点」与发送方选择共用) */
+  lanLocalSites(): Promise<LanSiteBrief[]> {
+    return inTauri ? invoke<LanSiteBrief[]>("lan_local_sites") : mock.lanLocalSites();
+  },
+  /** 推送当前打开的站点到对方(阻塞,耗时操作;resolve 后得到对方落盘的站点名) */
+  lanPushSite(peer: LanPeer, siteRoot: string): Promise<string> {
+    return inTauri ? invoke<string>("lan_push_site", { peer, siteRoot }) : mock.lanPushSite(peer, siteRoot);
+  },
+  /** 拉取对方站点(对方须信任当前网络;落盘到本机 sites/) */
+  lanPullSite(peer: LanPeer, siteName: string, mode: "copy" | "replace"): Promise<string> {
+    return inTauri
+      ? invoke<string>("lan_pull_site", { peer, siteName, mode })
+      : mock.lanPullSite(peer, siteName, mode);
+  },
+  /** 用户决定收到的推送计划;接受返回 true */
+  lanDecideIncoming(accept: boolean, mode: "copy" | "replace"): Promise<boolean> {
+    return inTauri
+      ? invoke<boolean>("lan_decide_incoming", { accept, mode })
+      : mock.lanDecideIncoming(accept, mode);
   },
 
   /* ---------- 系统 ---------- */

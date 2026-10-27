@@ -5,8 +5,10 @@
 # 打版本标签不再触发构建:发布 Release 时从对应提交的构建工件(Artifacts)
 # 下载产物手动上传,产物命名已由流水线统一,无需改名。
 #
-# 产物形态:Windows x64 免安装 zip(内含 exe,不再构建安装包)与 macOS arm64 dmg / zip,
-# 命名统一为 Plainstruct_版本号_平台架构(版本取自 Cargo.toml)。
+# 产物形态:Windows x64 免安装 zip(内含 exe)、macOS arm64 dmg / zip 与
+# 安卓 arm64 APK,命名统一为 Plainstruct_版本号_平台(版本取自 package.json/Cargo.toml)。
+# 安卓签名:secrets ANDROID_RELEASE_KEYSTORE_B64 / ANDROID_RELEASE_KEYSTORE_PASSWORD
+# 解出到 gen/android/keystore.properties;未配置时回退临时 debug 密钥(无法覆盖安装)。
 
 name: Build Plainstruct
 
@@ -110,4 +112,76 @@ jobs:
           path: |
             src-tauri/target/release/bundle/macos/Plainstruct_*_macOS_arm64.dmg
             src-tauri/target/release/bundle/macos/Plainstruct_*_macOS_arm64.zip
+          if-no-files-found: error
+
+  # 安卓 APK(arm64-v8a):前端构建 + Rust 交叉编译 + gradle 打包。
+  # 签名:从 secrets 解出 keystore 写入 gen/android/keystore.properties(工程内
+  # build.gradle.kts 已配置读取);secrets 未配置时回退 runner 临时 debug 密钥
+  # —— 仅可用于安装验证,不能覆盖安装旧版本,发版前必须配置正式密钥。
+  android-apk:
+    name: Android apk (arm64)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          prefix-key: plainstruct-android
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Restore release keystore
+        id: keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_B64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEYSTORE_PASSWORD }}
+        run: |
+          cd src-tauri/gen/android
+          if [ -n "$KEYSTORE_B64" ] && [ -n "$KEYSTORE_PASSWORD" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > plainstruct-release.keystore
+            printf 'storeFile=plainstruct-release.keystore\nstorePassword=%s\nkeyAlias=plainstruct-release\nkeyPassword=%s\n' \
+              "$KEYSTORE_PASSWORD" "$KEYSTORE_PASSWORD" > keystore.properties
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Secrets ANDROID_RELEASE_KEYSTORE_B64 / ANDROID_RELEASE_KEYSTORE_PASSWORD are not set. Falling back to the runner's ephemeral debug key — this APK will NOT upgrade-install over existing releases."
+          fi
+
+      - name: Build release apk
+        run: npm run android:build
+
+      - name: Collect apk
+        run: |
+          mkdir -p dist
+          VERSION=$(node -p "require('./package.json').version")
+          APK=$(find src-tauri/gen/android/app/build/outputs/apk -name "*.apk" -path "*release*" | head -n 1)
+          if [ -z "$APK" ]; then echo "No release apk found." >&2; exit 1; fi
+          cp "$APK" "dist/Plainstruct_${VERSION}_android.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: plainstruct-android-apk
+          path: dist/Plainstruct_*_android.apk
           if-no-files-found: error
