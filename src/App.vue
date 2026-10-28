@@ -8,6 +8,7 @@ import { usePublishStore } from "@/stores/publish";
 import { ipc } from "@/ipc/ipc";
 import { Events, listen } from "@/ipc/events";
 import { isMobilePlatform } from "@/lib/platform";
+import { installBackGesture } from "@/lib/backGesture";
 import { useI18n } from "vue-i18n";
 import { installContextMenu } from "@/lib/contextMenu";
 import TitleBar from "@/components/TitleBar.vue";
@@ -94,6 +95,8 @@ onMounted(() => {
   void installCloseGuard();
   void useLanStore().init();
   installContextMenu();
+  // 安卓侧滑/返回键:浮层 → 视图 → 退出应用的统一分发(桌面为 no-op)
+  installBackGesture();
   // Windows 通知按钮回跳:publish = 打开发布页;site = 系统浏览器打开发布站点
   void listen<string>(Events.Navigate, (payload) => {
     if (payload === "publish") app.setView("publish");

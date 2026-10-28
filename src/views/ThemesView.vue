@@ -8,6 +8,7 @@ import { useUiStore } from "@/stores/ui";
 import { ipc } from "@/ipc/ipc";
 import type { ThemeMeta } from "@/ipc/types";
 import { useBackdropClose } from "@/lib/backdrop-close";
+import { isMobilePlatform } from "@/lib/platform";
 import AppIcon from "@/components/AppIcon.vue";
 import ThemeConfigPanel from "@/components/ThemeConfigPanel.vue";
 import ThemePreview from "@/components/ThemePreview.vue";
@@ -32,6 +33,17 @@ function sourceOf(meta: ThemeMeta): "builtin" | "custom" {
 async function activate(meta: ThemeMeta) {
   await theme.selectTheme(meta.id, sourceOf(meta));
   tab.value = "config";
+  showDetail();
+}
+
+/** 移动端单栏切换:列表 / 详情;桌面恒双栏 */
+const mobile = isMobilePlatform;
+const mobilePane = ref<"list" | "detail">("list");
+function showDetail() {
+  if (mobile.value) mobilePane.value = "detail";
+}
+function backToList() {
+  mobilePane.value = "list";
 }
 
 async function edit(meta: ThemeMeta) {
@@ -46,6 +58,7 @@ async function edit(meta: ThemeMeta) {
       await theme.startEditing(meta.id, "custom");
     }
     tab.value = "maker";
+    showDetail();
   } catch (e) {
     ui.toast(t("ui.operationFailed", { msg: ipc.errText(e) }), "error");
   }
@@ -261,12 +274,12 @@ async function resetConfig() {
 <template>
   <div class="flex h-full min-h-0 flex-col bg-bg">
     <!-- 头部 -->
-    <header class="flex h-14 shrink-0 items-center gap-4 border-b border-line bg-surface px-5">
+    <header class="flex min-h-14 shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-b border-line bg-surface px-4 py-1.5 sm:flex-nowrap sm:px-5 sm:py-0">
       <div class="min-w-0">
         <h1 class="text-[calc(15px*var(--ui-font-scale))] font-semibold leading-tight">{{ t("theme.title") }}</h1>
-        <p class="truncate text-[calc(12px*var(--ui-font-scale))] text-ink-3">{{ t("theme.subtitle") }}</p>
+        <p class="hidden truncate text-[calc(12px*var(--ui-font-scale))] text-ink-3 sm:block">{{ t("theme.subtitle") }}</p>
       </div>
-      <div class="ml-auto flex items-center gap-2">
+      <div class="ml-auto flex flex-wrap items-center gap-2">
         <button class="btn btn-secondary" @click="importZip">
           <AppIcon name="download" :size="15" />
           {{ t("theme.importZip") }}
@@ -280,7 +293,10 @@ async function resetConfig() {
 
     <div class="flex min-h-0 flex-1">
       <!-- 主题列表 -->
-      <aside class="w-[264px] shrink-0 overflow-y-auto border-r border-line bg-surface">
+      <aside
+        class="w-[264px] shrink-0 overflow-y-auto border-r border-line bg-surface"
+        :class="mobile && mobilePane === 'detail' ? 'hidden' : 'block'"
+      >
         <div class="p-3">
           <h2 class="field-label mb-1">{{ t("theme.builtin") }}</h2>
           <div class="flex flex-col gap-1">
@@ -354,9 +370,15 @@ async function resetConfig() {
         </div>
       </aside>
 
-      <!-- 右侧:配置 / 制作 -->
-      <section class="flex min-w-0 flex-1 flex-col">
+      <!-- 右侧:配置 / 制作(移动端单栏:列表选主题后进入) -->
+      <section
+        class="min-w-0 flex-1 flex-col"
+        :class="mobile && mobilePane === 'list' ? 'hidden' : 'flex'"
+      >
         <div class="flex h-10 shrink-0 items-center gap-1 border-b border-line bg-surface px-4">
+          <button v-if="mobile" class="btn-icon mr-0.5 !h-7 !w-7" :title="t('common.back')" @click="backToList">
+            <AppIcon name="arrowLeft" :size="16" />
+          </button>
           <button class="tab-btn" :class="{ active: tab === 'config' }" @click="tab = 'config'">
             {{ t("theme.config") }} · {{ activeLabel }}
           </button>
@@ -416,8 +438,8 @@ async function resetConfig() {
             </div>
           </div>
 
-          <!-- 右:实时预览 -->
-          <div class="flex w-[46%] min-w-[320px] shrink-0 flex-col border-l border-line">
+          <!-- 右:实时预览(窄屏隐藏;移动端经构建页全屏预览查看产物) -->
+          <div class="hidden w-[46%] min-w-[320px] shrink-0 flex-col border-l border-line lg:flex">
             <div class="flex h-10 shrink-0 items-center gap-2 border-b border-line bg-surface px-4">
               <span class="text-[calc(12.5px*var(--ui-font-scale))] font-semibold text-ink-2">{{ t("theme.previewDoc") }}</span>
               <button

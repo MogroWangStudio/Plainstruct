@@ -22,6 +22,8 @@ interface State {
   pendingRebuild: boolean;
   /** 独立预览窗口当前是否打开(供界面开关按钮同步状态) */
   previewWindowOpen: boolean;
+  /** 移动端全屏预览覆盖层(安卓单窗口,以覆盖层承担独立预览窗口的角色) */
+  mobilePreviewOpen: boolean;
 }
 
 let rebuildTimer: ReturnType<typeof setTimeout> | null = null;
@@ -51,6 +53,7 @@ export const useBuilderStore = defineStore("builder", {
     previewNonce: 0,
     pendingRebuild: false,
     previewWindowOpen: false,
+    mobilePreviewOpen: false,
   }),
 
   actions: {
@@ -101,6 +104,15 @@ export const useBuilderStore = defineStore("builder", {
      * 独立预览窗口:打开自绘壳层(不加载站点本身);已在则原地刷新加载最新
      * 构建产物并聚焦。新开窗口时恢复上次关闭前的位置与尺寸。
      */
+    /** 移动端全屏预览:未构建先构建,然后打开覆盖层 */
+    async openMobilePreview() {
+      if (this.report || (await this.build())) this.mobilePreviewOpen = true;
+    },
+
+    closeMobilePreview() {
+      this.mobilePreviewOpen = false;
+    },
+
     async openOrRefreshPreviewWindow() {
       const site = useSiteStore();
       const app = useAppStore();

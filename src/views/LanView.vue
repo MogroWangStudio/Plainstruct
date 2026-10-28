@@ -10,6 +10,7 @@ import { ipc } from "@/ipc/ipc";
 import type { LanPeer, LanSiteBrief } from "@/ipc/types";
 import { formatSize } from "@/lib/format";
 import { platformLabel } from "@/lib/platform";
+import { useBackClose } from "@/lib/backGesture";
 import AppIcon from "@/components/AppIcon.vue";
 
 const { t } = useI18n();
@@ -85,6 +86,16 @@ const sendPickerFor = ref<LanPeer | null>(null);
 
 /** 拉取模式(prepare 阶段选择):另存副本 / 覆盖同名 */
 const pullMode = ref<"copy" | "replace">("copy");
+
+// 系统返回手势关闭发送源选择与传输对话框(移动端)
+useBackClose(
+  () => sendPickerFor.value !== null,
+  () => (sendPickerFor.value = null),
+);
+useBackClose(
+  () => !!lan.transfer?.open,
+  () => lan.closeTransfer(),
+);
 
 /** 发送:优先用当前打开的站点(其根目录已知),否则从站点库选择 */
 function beginSendCurrent(peer: LanPeer) {

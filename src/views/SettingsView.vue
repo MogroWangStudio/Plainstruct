@@ -402,18 +402,19 @@ function openRelease(url: string) {
 </script>
 
 <template>
-  <div class="flex h-full">
+  <!-- 移动端:导航收为顶部横向滚动分类条;桌面保持左栏 + 内容双栏 -->
+  <div class="flex h-full flex-col sm:flex-row">
     <!-- 左侧:类别导航(点击切换,右侧仅显示当前类别) -->
-    <aside class="flex w-[208px] shrink-0 flex-col border-r border-line bg-surface">
-      <div class="flex items-center gap-2 px-3 pb-2 pt-4">
+    <aside class="flex w-full shrink-0 flex-col border-b border-line bg-surface sm:w-[208px] sm:border-b-0 sm:border-r">
+      <div class="flex items-center gap-2 px-3 pb-1 pt-3 sm:pb-2 sm:pt-4">
         <button class="btn-icon" :title="t('common.back')" @click="app.setView('editor')">
           <AppIcon name="arrowLeft" :size="17" />
         </button>
         <h2 class="truncate text-[calc(14.5px*var(--ui-font-scale))] font-semibold tracking-tight">{{ t("settings.title") }}</h2>
       </div>
-      <p class="px-4 text-[calc(11.5px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.subtitle") }}</p>
+      <p class="hidden px-4 text-[calc(11.5px*var(--ui-font-scale))] leading-relaxed text-ink-3 sm:block">{{ t("settings.subtitle") }}</p>
 
-      <nav class="mt-5 flex flex-col gap-0.5 px-2">
+      <nav class="nav-scroll mt-1 flex gap-1.5 overflow-x-auto px-3 pb-2 sm:mt-5 sm:flex-col sm:gap-0.5 sm:overflow-visible sm:px-2">
         <button
           v-for="s in sections"
           :key="s.id"
@@ -425,14 +426,14 @@ function openRelease(url: string) {
         </button>
       </nav>
 
-      <div class="mt-auto px-4 pb-4 text-[calc(11px*var(--ui-font-scale))] text-ink-3 mono">v{{ app.version }}</div>
+      <div class="mt-auto hidden px-4 pb-4 text-[calc(11px*var(--ui-font-scale))] text-ink-3 mono sm:block">v{{ app.version }}</div>
     </aside>
 
     <!-- 右侧:当前类别页(切换时整体按方向滑动淡入,行内设置次第浮现) -->
     <div class="relative min-h-0 flex-1 overflow-hidden">
       <Transition name="settings-page" mode="out-in">
         <div :key="active" class="absolute inset-0 overflow-y-auto" :data-dir="direction">
-          <div class="mx-auto w-full max-w-[640px] px-8 pb-10 pt-8">
+          <div class="mx-auto w-full max-w-[640px] px-4 pb-8 pt-5 sm:px-8 sm:pb-10 sm:pt-8">
             <!-- 常规 -->
             <template v-if="active === 'general'">
               <h3 class="settings-heading" style="--i: 0">
@@ -923,7 +924,15 @@ function openRelease(url: string) {
 </template>
 
 <style scoped>
-/* 分区导航项:悬停浅底,当前项实底 */
+/* 移动端分类条:横向滚动,隐藏滚动条 */
+.nav-scroll {
+  scrollbar-width: none;
+}
+.nav-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* 分区导航项:悬停浅底,当前项实底;移动端为等宽胶囊 */
 .settings-nav-item {
   position: relative;
   display: block;
@@ -948,6 +957,21 @@ function openRelease(url: string) {
   background: var(--color-surface-3);
   color: var(--color-ink);
   font-weight: 500;
+}
+@media (max-width: 639px) {
+  .settings-nav-item {
+    flex-shrink: 0;
+    width: auto;
+    padding: 6px 14px;
+    border: 1px solid var(--color-line);
+    border-radius: 999px;
+    background: var(--color-surface);
+    text-align: center;
+    white-space: nowrap;
+  }
+  .settings-nav-item.active {
+    border-color: var(--color-accent);
+  }
 }
 
 /* 类别页切换:进出同路径、镜像缓动,方向随导航次序变化 */
@@ -1020,13 +1044,23 @@ function openRelease(url: string) {
   margin-top: 12px;
 }
 
-/* 设置行:标签与控件左右分布,行间细分隔线 */
+/* 设置行:标签与控件左右分布,行间细分隔线;移动端纵向堆叠 */
 .settings-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 24px;
   padding: 14px 0;
+}
+@media (max-width: 639px) {
+  .settings-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .settings-row > div {
+    flex-wrap: wrap;
+  }
 }
 .settings-row:first-child {
   padding-top: 15px;

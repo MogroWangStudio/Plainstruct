@@ -1,15 +1,18 @@
 <script setup lang="ts">
-/** 移动端应用骨架:顶栏(返回 + 当前位置) + 视图容器 + 底部导航。
- *  底部五项:编辑 / 资产 / 同步 / 发布 / 更多;站点设置、主题、插件、构建、
- *  应用设置与关于收纳进「更多」面板 —— 全部桌面视图在移动端都有对应入口。 */
-import { computed, ref } from "vue";
+/** 移动端应用骨架:顶栏(返回 + 当前位置) + 视图容器 + 可滚动底部导航。
+ *  底部一行容纳全部页面入口(横向滑动),底栏高度加大便于点按;
+ *  设置与关于不依赖站点(主菜单即可进入),站点未打开时同样可渲染。
+ *  系统返回手势经 lib/backGesture 分发:浮层 → 视图 → 退出应用。 */
+import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useAppStore, type AppView } from "@/stores/app";
 import { useSiteStore } from "@/stores/site";
 import { useEditorStore } from "@/stores/editor";
 import { useLanStore } from "@/stores/lan";
+import { navigateBack, navigateView } from "@/lib/backGesture";
 import AppIcon from "@/components/AppIcon.vue";
 import BrandLogo from "@/components/BrandLogo.vue";
+import PreviewMobile from "@/components/mobile/PreviewMobile.vue";
 import StartView from "@/views/StartView.vue";
 import EditorMobile from "@/views/EditorMobile.vue";
 import LanView from "@/views/LanView.vue";
@@ -43,47 +46,44 @@ const viewMap = {
 
 const currentView = computed(() => viewMap[app.view as keyof typeof viewMap]);
 
-/** 更多面板 */
-const moreOpen = ref(false);
-const moreItems: { view: AppView; icon: string; label: string }[] = [
+/** 底部导航:全部入口,一行横向滑动 */
+const navItems: { view: AppView; icon: string; label: string }[] = [
+  { view: "editor", icon: "doc", label: "nav.editor" },
+  { view: "assets", icon: "assets", label: "nav.assets" },
   { view: "site", icon: "sliders", label: "nav.site" },
   { view: "theme", icon: "palette", label: "nav.theme" },
   { view: "plugins", icon: "puzzle", label: "nav.plugins" },
   { view: "build", icon: "box", label: "nav.build" },
+  { view: "publish", icon: "upload", label: "nav.publish" },
+  { view: "lan", icon: "refresh", label: "nav.lan" },
   { view: "settings", icon: "settings", label: "nav.settings" },
   { view: "about", icon: "info", label: "nav.about" },
 ];
 
-const bottomItems: { view: AppView; icon: string; label: string }[] = [
-  { view: "editor", icon: "doc", label: "nav.editor" },
-  { view: "assets", icon: "assets", label: "nav.assets" },
-  { view: "lan", icon: "refresh", label: "nav.lan" },
-  { view: "publish", icon: "upload", label: "nav.publish" },
-];
+/** 设置与关于不依赖站点:站点未打开时也可作为独立视图渲染 */
+const standalone = computed(() => app.view === "settings" || app.view === "about");
 
-/** 当前视图的顶栏标题:编辑器显示站点名,其余显示页面名 */
+/** 顶栏标题:编辑器显示站点名,其余显示页面名 */
 const topTitle = computed(() => {
-  if (!site.open) return "";
   if (app.view === "editor") return site.config?.name ?? "";
-  const all = [...bottomItems, ...moreItems];
-  return t(all.find((i) => i.view === app.view)?.label ?? "nav.editor");
+  return t(navItems.find((i) => i.view === app.view)?.label ?? "nav.editor");
 });
 
-/** 非编辑器视图顶栏提供返回:回到编辑器(移动端的主页面) */
+/** 顶栏返回:回到编辑器(站点打开时)或主菜单(未打开时) */
 function goBack() {
-  if (app.view !== "editor" && site.open) app.setView("editor");
+  navigateBack();
 }
 </script>
 
 <template>
   <div class="flex h-full flex-col overflow-hidden bg-bg">
-    <!-- 顶栏:站点打开时显示位置与返回;未开站点时 StartView 自带品牌区 -->
+    <!-- 顶栏:独立视图与站点工作区显示位置与返回;主菜单(StartView)自带品牌区 -->
     <header
-      v-if="site.open"
+      v-if="site.open || standalone"
       class="flex min-h-12 shrink-0 items-center gap-1.5 border-b border-line bg-surface px-2 pt-[env(safe-area-inset-top)]"
     >
       <button
-        v-if="app.view !== 'editor'"
+        v-if="!site.open || app.view !== 'editor'"
         class="btn-icon !h-9 !w-9 shrink-0"
         :aria-label="t('common.back')"
         @click="goBack"
@@ -100,9 +100,9 @@ function goBack() {
       />
     </header>
 
-    <!-- 视图容器 -->
+    <!-- 视图容器:主菜单(StartView)仅在「站点未开且非独立视图」时呈现 -->
     <main class="relative min-h-0 flex-1">
-      <StartView v-if="!site.open" class="absolute inset-0" />
+      <StartView v-if="!site.open && !standalone" class="absolute inset-0" />
       <template v-else>
         <Transition name="view" mode="out-in">
           <component :is="currentView" :key="app.view" class="absolute inset-0" />
@@ -110,76 +110,54 @@ function goBack() {
       </template>
     </main>
 
-    <!-- 底部导航(站点打开时出现) -->
+    <!-- 底部导航:站点打开时出现;全部入口一行排布,超出可横向滑动 -->
     <nav
       v-if="site.open"
-      class="flex shrink-0 items-stretch border-t border-line bg-surface pb-[env(safe-area-inset-bottom)]"
+      class="nav-scroll flex shrink-0 items-stretch border-t border-line bg-surface pb-[env(safe-area-inset-bottom)]"
     >
       <button
-        v-for="item in bottomItems"
+        v-for="item in navItems"
         :key="item.view"
-        class="tab-btn flex-1"
+        class="tab-btn"
         :class="{ active: app.view === item.view }"
         :aria-label="t(item.label)"
-        @click="app.setView(item.view)"
+        @click="navigateView(item.view)"
       >
         <span class="tab-icon">
-          <AppIcon :name="item.icon" :size="20" />
+          <AppIcon :name="item.icon" :size="21" />
           <!-- 同步页有待接收推送时的提示点 -->
           <i v-if="item.view === 'lan' && lan.incoming" class="tab-dot" />
         </span>
         <span class="tab-label">{{ t(item.label) }}</span>
       </button>
-      <button class="tab-btn flex-1" :class="{ active: moreOpen }" :aria-label="t('mobile.more')" @click="moreOpen = true">
-        <span class="tab-icon">
-          <AppIcon :name="moreOpen ? 'x' : 'more'" :size="20" />
-        </span>
-        <span class="tab-label">{{ t("mobile.more") }}</span>
-      </button>
     </nav>
 
-    <!-- 更多面板:底部弹出,列出其余页面 -->
-    <Teleport to="body">
-      <Transition name="sheet-scrim">
-        <div v-if="moreOpen" class="fixed inset-0 z-40" @click="moreOpen = false">
-          <div class="absolute inset-0 bg-scrim" />
-        </div>
-      </Transition>
-      <Transition name="sheet">
-        <div
-          v-if="moreOpen"
-          class="fixed inset-x-0 bottom-0 z-40 rounded-t-xl border-t border-line bg-surface pb-[max(env(safe-area-inset-bottom),12px)] shadow-window"
-        >
-          <div class="mx-auto mt-2.5 h-1 w-9 rounded-full bg-line-strong" aria-hidden="true" />
-          <div class="grid grid-cols-4 gap-1 px-3 pb-1 pt-3">
-            <button
-              v-for="item in moreItems"
-              :key="item.view"
-              class="more-item"
-              :class="{ active: app.view === item.view }"
-              @click="
-                app.setView(item.view);
-                moreOpen = false;
-              "
-            >
-              <AppIcon :name="item.icon" :size="19" />
-              <span>{{ t(item.label) }}</span>
-            </button>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
+    <!-- 移动端全屏预览(构建产物,类浏览器) -->
+    <PreviewMobile />
   </div>
 </template>
 
 <style scoped>
-/* 底部导航项:图标 + 文字纵向排布;按下即时缩小(apple-design:反馈在触点上,不等抬起) */
+/* 底部导航:横向滚动,隐藏滚动条;触屏直接滑动点按 */
+.nav-scroll {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.nav-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* 底部导航项:图标 + 文字纵向排布,加高便于点按;按下即时缩小(apple-design:反馈在触点上,不等抬起) */
 .tab-btn {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  padding: 7px 0 5px;
+  justify-content: center;
+  gap: 3px;
+  flex: 1 0 auto;
+  min-width: 66px;
+  padding: 11px 0 9px;
   border: none;
   background: transparent;
   color: var(--color-ink-3);
@@ -195,13 +173,13 @@ function goBack() {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 24px;
+  height: 26px;
   transition: transform var(--duration-fast) ease-out;
 }
 .tab-dot {
   position: absolute;
   top: 1px;
-  right: -3px;
+  right: -4px;
   width: 6px;
   height: 6px;
   border-radius: 999px;
@@ -214,53 +192,14 @@ function goBack() {
 .tab-btn.active {
   color: var(--color-ink);
 }
-
-/* 更多面板九宫格项 */
-.more-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding: 12px 4px 10px;
-  border: none;
-  border-radius: 10px;
-  background: transparent;
-  color: var(--color-ink-2);
-  font-size: calc(11px * var(--ui-font-scale));
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  transition: background-color var(--duration-base) var(--ease-plain);
-}
-.more-item:active {
-  background: var(--color-surface-2);
-}
-.more-item.active {
-  color: var(--color-ink);
-}
-
-/* 更多面板:进出同路径,自底部平移(遮罩同步淡入) */
-.sheet-enter-active,
-.sheet-leave-active {
-  transition: transform 220ms var(--ease-plain);
-}
-.sheet-enter-from,
-.sheet-leave-to {
-  transform: translateY(100%);
-}
-.sheet-scrim-enter-active,
-.sheet-scrim-leave-active {
-  transition: opacity 220ms var(--ease-plain);
-}
-.sheet-scrim-enter-from,
-.sheet-scrim-leave-to {
-  opacity: 0;
-}
-@media (prefers-reduced-motion: reduce) {
-  .sheet-enter-active,
-  .sheet-leave-active,
-  .sheet-scrim-enter-active,
-  .sheet-scrim-leave-active {
-    transition: none;
-  }
+/* 当前项顶缘指示条 */
+.tab-btn.active::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  width: 28px;
+  height: 2px;
+  border-radius: 0 0 2px 2px;
+  background: var(--color-accent);
 }
 </style>

@@ -8,6 +8,7 @@ import { useAppStore } from "@/stores/app";
 import { useEditorStore } from "@/stores/editor";
 import { basename } from "@/lib/paths";
 import { siteUrl } from "@/lib/preview";
+import { useBackClose } from "@/lib/backGesture";
 import FileTree from "@/components/FileTree.vue";
 import MarkdownEditor from "@/components/MarkdownEditor.vue";
 import DocPreview from "@/components/DocPreview.vue";
@@ -32,6 +33,10 @@ watch(() => editor.activeImage, () => (imageFailed.value = false));
 
 /* ---------- 文件树抽屉:左缘滑入,打开文档后自动收起 ---------- */
 const treeOpen = ref(false);
+useBackClose(
+  () => treeOpen.value,
+  () => (treeOpen.value = false),
+);
 watch(
   () => editor.activePath,
   () => (treeOpen.value = false),

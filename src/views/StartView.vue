@@ -9,6 +9,7 @@ import type { LanSiteBrief, SiteType } from "@/ipc/types";
 import { formatSize, formatTime } from "@/lib/format";
 import { isMobilePlatform } from "@/lib/platform";
 import { useBackdropClose } from "@/lib/backdrop-close";
+import { navigateView, useBackClose } from "@/lib/backGesture";
 import AppIcon from "@/components/AppIcon.vue";
 
 const { t } = useI18n();
@@ -26,6 +27,12 @@ function openWizard() {
   showWizard.value = true;
   resetBackdropClicks();
 }
+
+// 系统返回手势关闭向导(移动端)
+useBackClose(
+  () => showWizard.value,
+  () => (showWizard.value = false),
+);
 
 /** 最近打开条目的站点摘要(类型与大小,异步获取;null = 获取失败) */
 const siteInfos = ref<Record<string, { siteType: string; sizeBytes: number } | null>>({});
@@ -237,12 +244,12 @@ function openLibrarySite(name: string) {
         </TransitionGroup>
       </div>
 
-      <button class="btn btn-ghost float-in mt-10 h-9 px-4 text-[calc(12.5px*var(--ui-font-scale))] text-ink-3" style="--d: 120ms" @click="app.setView('about')">
+      <button class="btn btn-ghost float-in mt-10 h-9 px-4 text-[calc(12.5px*var(--ui-font-scale))] text-ink-3" style="--d: 120ms" @click="navigateView('about')">
         <AppIcon name="info" :size="15" />
         {{ t("nav.about") }}
       </button>
 
-      <button class="btn btn-ghost float-in mt-2 h-9 px-4 text-[calc(12.5px*var(--ui-font-scale))] text-ink-3" style="--d: 120ms" @click="app.setView('settings')">
+      <button class="btn btn-ghost float-in mt-2 h-9 px-4 text-[calc(12.5px*var(--ui-font-scale))] text-ink-3" style="--d: 120ms" @click="navigateView('settings')">
         <AppIcon name="settings" :size="15" />
         {{ t("nav.settings") }}
       </button>

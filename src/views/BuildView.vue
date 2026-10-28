@@ -20,10 +20,10 @@ function openOutput() {
 <template>
   <div class="flex h-full min-h-0 flex-col bg-bg">
     <!-- 头部 -->
-    <header class="flex h-14 shrink-0 items-center gap-4 border-b border-line bg-surface px-5">
+    <header class="flex min-h-14 shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-b border-line bg-surface px-4 py-1.5 sm:flex-nowrap sm:px-5 sm:py-0">
       <div class="min-w-0">
         <h1 class="text-[calc(15px*var(--ui-font-scale))] font-semibold leading-tight">{{ t("build.title") }}</h1>
-        <p class="truncate text-[calc(12px*var(--ui-font-scale))] text-ink-3">{{ t("build.subtitle") }}</p>
+        <p class="hidden truncate text-[calc(12px*var(--ui-font-scale))] text-ink-3 sm:block">{{ t("build.subtitle") }}</p>
       </div>
       <div class="ml-auto flex items-center gap-3">
         <label class="flex cursor-pointer items-center gap-2 text-[calc(12.5px*var(--ui-font-scale))] text-ink-2">
@@ -42,8 +42,8 @@ function openOutput() {
     </header>
 
     <div class="flex min-h-0 flex-1">
-      <!-- 侧栏:构建报告 -->
-      <aside class="flex w-[280px] shrink-0 flex-col overflow-y-auto border-r border-line bg-surface">
+      <!-- 侧栏:构建报告(移动端全宽;右侧内嵌预览仅在宽屏显示,移动端经全屏预览查看) -->
+      <aside class="flex w-full shrink-0 flex-col overflow-y-auto border-r border-line bg-surface sm:w-[280px]">
         <div class="flex min-h-0 flex-1 flex-col gap-5 p-5">
           <template v-if="builder.report">
             <div>
@@ -101,8 +101,7 @@ function openOutput() {
 
           <!-- 输出操作:与「重新构建」同规格的大按钮 -->
           <div class="mt-auto flex flex-col gap-2 border-t border-line pt-4">
-            <!-- 独立窗口加载的是构建产物,未构建时不可用;浏览器 mock 以新标签页打开壳层;
-                 移动端单窗口无独立预览,隐藏该入口 -->
+            <!-- 桌面:独立预览窗口;移动端:单窗口,以全屏覆盖层预览构建产物 -->
             <button
               v-if="!isMobilePlatform"
               class="btn btn-secondary w-full"
@@ -112,7 +111,16 @@ function openOutput() {
               <AppIcon name="window" :size="15" />
               {{ t("build.openWindow") }}
             </button>
-            <button class="btn btn-secondary w-full" @click="openOutput">
+            <button
+              v-else
+              class="btn btn-primary w-full"
+              :disabled="!builder.report && !builder.error"
+              @click="builder.openMobilePreview()"
+            >
+              <AppIcon name="eye" :size="15" />
+              {{ t("titlebar.previewSite") }}
+            </button>
+            <button v-if="!isMobilePlatform" class="btn btn-secondary w-full" @click="openOutput">
               <AppIcon name="external" :size="15" />
               {{ t("build.openFolder") }}
             </button>
@@ -120,8 +128,8 @@ function openOutput() {
         </div>
       </aside>
 
-      <!-- 预览 -->
-      <section class="flex min-w-0 flex-1 flex-col">
+      <!-- 预览(移动端走全屏预览,此处隐藏) -->
+      <section class="hidden min-w-0 flex-1 flex-col sm:flex">
         <div class="flex h-10 shrink-0 items-center gap-2 border-b border-line bg-surface px-4">
           <span class="text-[calc(12.5px*var(--ui-font-scale))] font-semibold text-ink-2">{{ t("build.preview") }}</span>
           <span class="text-[calc(11.5px*var(--ui-font-scale))] text-ink-3">{{ t("build.previewHint") }}</span>

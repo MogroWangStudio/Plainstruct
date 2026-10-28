@@ -2,11 +2,12 @@
 /** 通用模态外壳 -- 父级用 v-if 控制出现,Transition 在此组件内;
  *  空白区域(模糊遮罩)点击按设置关窗(默认两次),表单有改动时先询问保存。
  *  移动端(安卓/iOS)以底部 sheet 呈现:贴底全宽,自下而上进出。 */
-import { computed } from "vue";
+import { computed, onBeforeUnmount, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useAppStore } from "@/stores/app";
 import { useUiStore } from "@/stores/ui";
 import { useBackdropClose } from "@/lib/backdrop-close";
+import { registerBackTarget } from "@/lib/backGesture";
 
 const props = defineProps<{
   title: string;
@@ -32,6 +33,17 @@ const { onBackdropClick: backdropClickDecision, resetBackdropClicks } = useBackd
 const sheet = computed(() => {
   const platform = useAppStore().platform;
   return platform === "android" || platform === "ios";
+});
+
+// 系统返回手势关闭当前弹窗(仅移动平台生效;随挂载/卸载自动注册与释放);
+// 走与空白点击相同的守卫路径,表单有未保存改动时先询问
+let releaseBack: (() => void) | null = null;
+onMounted(() => {
+  releaseBack = registerBackTarget(() => void requestClose());
+});
+onBeforeUnmount(() => {
+  releaseBack?.();
+  releaseBack = null;
 });
 
 async function onBackdropClick() {
