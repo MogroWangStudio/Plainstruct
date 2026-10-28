@@ -76,7 +76,6 @@ pub struct LanPushPlan {
 }
 
 struct PendingPlan {
-    plan: LanPushPlan,
     responder: Sender<Option<(String, String)>>,
 }
 
@@ -733,7 +732,7 @@ fn handle_plan(svc: Arc<LanService>, stream: &mut TcpStream, req: &HttpRequest) 
     }
     // 交前端决定:mpsc 一对一应答(token 与落盘模式)
     let (tx, rx) = std::sync::mpsc::channel::<Option<(String, String)>>();
-    *svc.pending.lock().unwrap_or_else(|e| e.into_inner()) = Some(PendingPlan { plan: plan.clone(), responder: tx });
+    *svc.pending.lock().unwrap_or_else(|e| e.into_inner()) = Some(PendingPlan { responder: tx });
     {
         use tauri::Emitter;
         let _ = svc.app.emit(events::LAN_INCOMING, &plan);

@@ -180,6 +180,9 @@ fn handle_protocol_arg(app: &tauri::AppHandle, arg: &str) {
     let _ = app.emit("plainstruct://navigate", payload);
 }
 
+/// 移动端入口:mobile_entry_point 宏为安卓/iOS 生成原生侧调用的导出符号
+/// (gradle 构建时会校验 .so 必须包含该符号);桌面平台宏展开为空。
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // 单实例插件仅桌面平台可用(安卓由系统保证单实例)
     #[cfg(not(target_os = "android"))]
