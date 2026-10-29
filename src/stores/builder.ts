@@ -123,7 +123,7 @@ export const useBuilderStore = defineStore("builder", {
       // 浏览器 mock:以命名标签页打开壳层页面(site:// 协议不可用,壳层仅演示界面形态;
       // 命名窗口让重复打开复用同一标签,与 Tauri 侧 getByLabel 的语义一致)
       if (app.platform === "browser") {
-        const title = `${site.config?.name ?? "Plainstruct"} · ${i18n.global.t("build.preview")}`;
+        const title = `${site.config?.name ?? "Plainstruct"} ${i18n.global.t("build.preview")}`;
         browserPreviewTab = window.open(previewShellUrl(app, title), "plainstruct-preview");
         // 弹窗被拦截时 open 返回 null:不开就不同步开关状态,避免按钮卡在「已开启」
         if (browserPreviewTab) {
@@ -153,7 +153,7 @@ export const useBuilderStore = defineStore("builder", {
           return;
         }
         const onMac = app.platform === "macos";
-        const title = `${site.config?.name ?? "Plainstruct"} · ${i18n.global.t("build.preview")}`;
+        const title = `${site.config?.name ?? "Plainstruct"} ${i18n.global.t("build.preview")}`;
         const win = new WebviewWindow("site-preview", {
           url: previewShellUrl(app, title),
           title,

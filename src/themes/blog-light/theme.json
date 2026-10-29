@@ -1,10 +1,10 @@
 {
   "id": "blog-light",
-  "name": "素记 · 浅色",
+  "name": "素记 浅色",
   "version": "4.0.0",
   "author": "MogroWang Studio",
   "type": "blog",
-  "description": "博客·浅色：纸面素栏，文章为流，日期为记。",
+  "description": "博客 浅色：纸面素栏，文章为流，日期为记。",
   "config": [
     {
       "key": "navMode",

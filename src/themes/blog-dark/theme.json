@@ -1,10 +1,10 @@
 {
   "id": "blog-dark",
-  "name": "素记 · 深色",
+  "name": "素记 深色",
   "version": "4.0.0",
   "author": "MogroWang Studio",
   "type": "blog",
-  "description": "博客·深色：暖炭夜纸，文章为流，日期为记。",
+  "description": "博客 深色：暖炭夜纸，文章为流，日期为记。",
   "config": [
     {
       "key": "navMode",

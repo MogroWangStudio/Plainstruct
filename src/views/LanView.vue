@@ -244,7 +244,7 @@ const scanningNote = computed(() => (lan.scanning ? t("lan.scanning") : t("lan.s
                   </span>
                 </p>
                 <p class="mt-0.5 truncate text-[calc(11.5px*var(--ui-font-scale))] text-ink-3">
-                  {{ peer.ip }} · {{ t("lan.peerSiteCount", { n: peer.sites.length }) }}
+                  {{ peer.ip }} {{ t("lan.peerSiteCount", { n: peer.sites.length }) }}
                 </p>
               </div>
               <button class="btn btn-sm btn-secondary shrink-0 gap-1.5" @click="beginSendCurrent(peer)">
@@ -269,7 +269,7 @@ const scanningNote = computed(() => (lan.scanning ? t("lan.scanning") : t("lan.s
                   <p class="truncate text-[calc(13px*var(--ui-font-scale))]">{{ brief.name }}</p>
                   <p class="text-[calc(11px*var(--ui-font-scale))] text-ink-3">
                     {{ brief.siteType === "blog" ? t("wizard.typeBlog") : t("wizard.typeDocs") }}
-                    <template v-if="brief.sizeBytes"> · {{ formatSize(brief.sizeBytes) }}</template>
+                    <template v-if="brief.sizeBytes"> {{ formatSize(brief.sizeBytes) }}</template>
                   </p>
                 </div>
                 <button class="btn btn-sm btn-secondary shrink-0 gap-1.5" @click="beginPull(peer, brief)">

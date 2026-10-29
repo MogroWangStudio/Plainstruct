@@ -844,7 +844,7 @@ async function onTreeDrop(e: DragEvent) {
   <div ref="treeHost" class="flex h-full flex-col" @contextmenu="openTreeMenu" @touchstart.passive="onTreeTouchStart" @touchmove.passive="onTreeTouchMove" @touchend.passive="onTreeTouchEnd" @touchcancel.passive="onTreeTouchEnd">
     <div class="flex items-center justify-between px-3 pb-1 pt-3">
       <span class="text-[calc(12px*var(--ui-font-scale))] font-semibold tracking-wide text-ink-3">
-        {{ t("nav.editor") }} · {{ site.docCount }}
+        {{ t("nav.editor") }} {{ site.docCount }}
       </span>
       <div class="flex items-center gap-0.5">
         <button
@@ -951,7 +951,7 @@ async function onTreeDrop(e: DragEvent) {
     <div class="flex shrink-0 flex-col" :style="{ height: assetH + 'px' }">
       <div class="flex items-center justify-between px-3 pb-1 pt-2">
         <span class="text-[calc(12px*var(--ui-font-scale))] font-semibold tracking-wide text-ink-3">
-          {{ t("tree.assets") }} · {{ site.assetFiles.length }}
+          {{ t("tree.assets") }} {{ site.assetFiles.length }}
         </span>
         <div class="flex items-center gap-0.5">
           <!-- 单按钮切换:图标显示将要切换到的视图 -->

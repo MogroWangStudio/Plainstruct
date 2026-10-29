@@ -136,6 +136,15 @@ function setAwake(focused: boolean) {
 }
 
 async function watchWindowFocus() {
+  // 触屏设备(安卓/iOS)的 WebView 窗口焦点不可靠:软键盘、滚动乃至触摸都可能
+  // 触发 blur,使 logo 误判「窗口失焦」而常驻入睡,触控也无法唤醒。
+  // 改用页面可见性驱动:应用退到后台才入睡,回到前台即苏醒。
+  if (window.matchMedia("(hover: none)").matches) {
+    const onVisibility = () => setAwake(document.visibilityState === "visible");
+    document.addEventListener("visibilitychange", onVisibility);
+    unlisten.push(() => document.removeEventListener("visibilitychange", onVisibility));
+    return;
+  }
   if ("__TAURI_INTERNALS__" in window) {
     try {
       const { getCurrentWindow } = await import("@tauri-apps/api/window");

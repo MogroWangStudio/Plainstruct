@@ -380,7 +380,7 @@ async function resetConfig() {
             <AppIcon name="arrowLeft" :size="16" />
           </button>
           <button class="tab-btn" :class="{ active: tab === 'config' }" @click="tab = 'config'">
-            {{ t("theme.config") }} · {{ activeLabel }}
+            {{ t("theme.config") }} {{ activeLabel }}
           </button>
           <button class="tab-btn" :class="{ active: tab === 'maker' }" :disabled="!theme.editing" @click="tab = 'maker'">
             {{ t("theme.maker") }}

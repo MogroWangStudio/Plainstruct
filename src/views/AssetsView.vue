@@ -713,7 +713,7 @@ async function removeFolder(g: { dir: string; label: string; images: TreeNode[] 
       <!-- 工具行:仅剩计数(视图切换与新建文件夹已移到页头顶栏) -->
       <div class="flex items-center">
         <span class="field-label">
-          {{ t("tree.assets") }} · {{ images.length }}
+          {{ t("tree.assets") }} {{ images.length }}
           <span v-if="selected.length" class="ml-2 text-ink-3">{{ t("assets.selectedCount", { n: selected.length }) }}</span>
         </span>
       </div>
@@ -821,7 +821,7 @@ async function removeFolder(g: { dir: string; label: string; images: TreeNode[] 
               </div>
               <p
                 class="truncate px-2 pt-1.5 text-[calc(12px*var(--ui-font-scale))]"
-                :title="img.size != null ? `${img.name} · ${formatSize(img.size)}` : img.name"
+                :title="img.size != null ? `${img.name} ${formatSize(img.size)}` : img.name"
               >
                 {{ img.name }}
               </p>
@@ -958,7 +958,7 @@ async function removeFolder(g: { dir: string; label: string; images: TreeNode[] 
         <p class="mono mt-2 break-all text-[calc(11px*var(--ui-font-scale))] text-ink-3">{{ selectedNode.path }}</p>
         <!-- 详细大小:人类可读 + 精确字节 -->
         <p v-if="selectedNodeSize != null" class="mono mt-1 text-[calc(11px*var(--ui-font-scale))] text-ink-3">
-          {{ formatSize(selectedNodeSize) }} · {{ selectedNodeSize.toLocaleString("en-US") }} B
+          {{ formatSize(selectedNodeSize) }} {{ selectedNodeSize.toLocaleString("en-US") }} B
         </p>
 
         <h3 class="field-label mt-4">{{ t("assets.refsHeading") }}</h3>

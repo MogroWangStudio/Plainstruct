@@ -10,7 +10,7 @@
     "check": "vue-tsc --noEmit",
     "preview": "vite preview",
     "tauri": "tauri",
-    "icons": "tauri icon src-tauri/icons/icon.svg -o src-tauri/icons",
+    "icons": "tauri icon src-tauri/icons/icon.svg -o src-tauri/icons && python3 scripts/gen-android-icon.py",
     "windows:portable": "powershell -ExecutionPolicy Bypass -File scripts/build-portable.ps1",
     "android:build": "tauri android build --apk --target aarch64"
   },

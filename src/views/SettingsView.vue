@@ -16,6 +16,7 @@ import { APP_THEMES, type AppThemeSwatch } from "@/lib/app-themes";
 import { fireConfetti } from "@/lib/confetti";
 import { formatSize } from "@/lib/format";
 import { isMobilePlatform } from "@/lib/platform";
+import { navigateBack, navigateView } from "@/lib/backGesture";
 import AppIcon from "@/components/AppIcon.vue";
 import SelectMenu from "@/components/SelectMenu.vue";
 
@@ -334,6 +335,7 @@ const update = ref<UpdateState>({ kind: "idle" });
 /** 更新流程进行中(下载/暂停):左栏展示包名与进度明细 */
 const downloading = computed(() => app.updatePhase === "downloading" || app.updatePhase === "paused");
 
+/** 更新状态行:仅在实际状态(检查中/结果/下载进度)时返回文案,空闲时留空隐藏 */
 const updateHint = computed(() => {
   switch (app.updatePhase) {
     case "downloading":
@@ -353,7 +355,7 @@ const updateHint = computed(() => {
     case "error":
       return t("settings.checkFailed", { msg: update.value.message });
     default:
-      return t("settings.checkUpdateHint");
+      return "";
   }
 });
 
@@ -407,12 +409,12 @@ function openRelease(url: string) {
     <!-- 左侧:类别导航(点击切换,右侧仅显示当前类别) -->
     <aside class="flex w-full shrink-0 flex-col border-b border-line bg-surface sm:w-[208px] sm:border-b-0 sm:border-r">
       <div class="flex items-center gap-2 px-3 pb-1 pt-3 sm:pb-2 sm:pt-4">
-        <button class="btn-icon" :title="t('common.back')" @click="app.setView('editor')">
+        <!-- 移动端由全局顶栏的「返回主菜单」承担返回,此处仅桌面显示 -->
+        <button class="btn-icon max-sm:hidden" :title="t('common.back')" @click="navigateBack">
           <AppIcon name="arrowLeft" :size="17" />
         </button>
         <h2 class="truncate text-[calc(14.5px*var(--ui-font-scale))] font-semibold tracking-tight">{{ t("settings.title") }}</h2>
       </div>
-      <p class="hidden px-4 text-[calc(11.5px*var(--ui-font-scale))] leading-relaxed text-ink-3 sm:block">{{ t("settings.subtitle") }}</p>
 
       <nav class="nav-scroll mt-1 flex gap-1.5 overflow-x-auto px-3 pb-2 sm:mt-5 sm:flex-col sm:gap-0.5 sm:overflow-visible sm:px-2">
         <button
@@ -444,7 +446,6 @@ function openRelease(url: string) {
                 <div class="settings-row" style="--i: 0">
                   <div class="min-w-0">
                     <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.publishNotify") }}</p>
-                    <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.publishNotifyHint") }}</p>
                   </div>
                   <SelectMenu v-model="publishNotifyModel" :options="publishNotifyOptions" align="right" class="shrink-0" />
                 </div>
@@ -453,7 +454,6 @@ function openRelease(url: string) {
                 <div class="settings-row" style="--i: 1">
                   <div class="min-w-0">
                     <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.backdropClose") }}</p>
-                    <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.backdropCloseHint") }}</p>
                   </div>
                   <SelectMenu v-model="backdropCloseModel" :options="backdropCloseOptions" align="right" class="shrink-0" />
                 </div>
@@ -469,7 +469,6 @@ function openRelease(url: string) {
                 <div class="settings-row" style="--i: 0">
                   <div class="min-w-0">
                     <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.language") }}</p>
-                    <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.languageHint") }}</p>
                   </div>
                   <SelectMenu v-model="localeModel" :options="localeOptions" align="right" class="shrink-0" />
                 </div>
@@ -485,7 +484,6 @@ function openRelease(url: string) {
                 <div class="settings-row" style="--i: 0">
                   <div class="min-w-0">
                     <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.autosave") }}</p>
-                    <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.autosaveHint") }}</p>
                   </div>
                   <button
                     class="relative inline-flex h-6 w-10 shrink-0 items-center rounded-full transition-colors"
@@ -507,7 +505,6 @@ function openRelease(url: string) {
                       {{ t("settings.autosaveDelay") }}
                       <span class="ml-1 font-normal text-ink-3">{{ t("settings.autosaveDelayN", { n: autosaveDelaySeconds }) }}</span>
                     </p>
-                    <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.autosaveDelayHint") }}</p>
                     <input
                       v-model.number="autosaveDelayModel"
                       type="range"
@@ -523,7 +520,6 @@ function openRelease(url: string) {
                 <div class="settings-row" style="--i: 0">
                   <div class="min-w-0">
                     <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.disableRefreshAnim") }}</p>
-                    <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.disableRefreshAnimHint") }}</p>
                   </div>
                   <button
                     class="relative inline-flex h-6 w-10 shrink-0 items-center rounded-full transition-colors"
@@ -547,7 +543,6 @@ function openRelease(url: string) {
                 <div class="settings-row" style="--i: 0">
                   <div class="min-w-0">
                     <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.editorWhitespace") }}</p>
-                    <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.editorWhitespaceHint") }}</p>
                   </div>
                   <button
                     class="relative inline-flex h-6 w-10 shrink-0 items-center rounded-full transition-colors"
@@ -565,21 +560,18 @@ function openRelease(url: string) {
                 <div class="settings-row" style="--i: 1">
                   <div class="min-w-0">
                     <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.editorBreakKey") }}</p>
-                    <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.editorBreakKeyHint") }}</p>
                   </div>
                   <SelectMenu v-model="breakKeyModel" :options="breakKeyOptions" align="right" class="shrink-0" />
                 </div>
                 <div class="settings-row" style="--i: 2">
                   <div class="min-w-0">
                     <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.editorIndentKey") }}</p>
-                    <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.editorIndentKeyHint") }}</p>
                   </div>
                   <SelectMenu v-model="indentKeyModel" :options="indentKeyOptions" align="right" class="shrink-0" />
                 </div>
                 <div class="settings-row" style="--i: 3">
                   <div class="min-w-0">
                     <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.editorIndentWidth") }}</p>
-                    <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.editorIndentWidthHint") }}</p>
                   </div>
                   <SelectMenu v-model="indentWidthModel" :options="indentWidthOptions" align="right" class="shrink-0" />
                 </div>
@@ -595,7 +587,6 @@ function openRelease(url: string) {
                 <!-- 软件主题:配色预览网格,点选即换 -->
                 <div class="settings-block" style="--i: 0">
                   <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.theme") }}</p>
-                  <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.themeHint") }}</p>
                   <div class="theme-grid">
                     <button
                       v-for="th in APP_THEMES"
@@ -624,7 +615,6 @@ function openRelease(url: string) {
                 <div class="settings-row" style="--i: 1">
                   <div class="min-w-0">
                     <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.uiFont") }}</p>
-                    <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.uiFontHint") }}</p>
                     <div v-if="uiFontModel === 'custom'" class="mt-2.5">
                       <input
                         class="input h-8 w-full max-w-[320px] text-[calc(12.5px*var(--ui-font-scale))]"
@@ -634,7 +624,6 @@ function openRelease(url: string) {
                         :value="app.settings.uiFontCustom ?? ''"
                         @change="onUiFontCustom"
                       />
-                      <p class="mt-1 text-[calc(11px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.fontCustomHint") }}</p>
                     </div>
                   </div>
                   <SelectMenu v-model="uiFontModel" :options="uiFontOptions" align="right" class="shrink-0" />
@@ -644,7 +633,6 @@ function openRelease(url: string) {
                 <div class="settings-row" style="--i: 2">
                   <div class="min-w-0">
                     <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.uiFontSize") }}</p>
-                    <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.uiFontSizeHint") }}</p>
                   </div>
                   <div class="flex shrink-0 items-center gap-2">
                     <SelectMenu v-model="uiFontSizeModel" :options="uiFontSizeOptions" align="right" class="shrink-0" />
@@ -667,7 +655,6 @@ function openRelease(url: string) {
                 <div class="settings-row" style="--i: 3">
                   <div class="min-w-0">
                     <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.uiFontWeight") }}</p>
-                    <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.uiFontWeightHint") }}</p>
                   </div>
                   <div class="flex shrink-0 items-center gap-2">
                     <SelectMenu v-model="uiFontWeightModel" :options="uiFontWeightOptions" align="right" class="shrink-0" />
@@ -688,7 +675,6 @@ function openRelease(url: string) {
                 <div class="settings-row" style="--i: 4">
                   <div class="min-w-0">
                     <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.editorFont") }}</p>
-                    <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.editorFontHint") }}</p>
                     <div v-if="editorFontModel === 'custom'" class="mt-2.5">
                       <input
                         class="input h-8 w-full max-w-[320px] text-[calc(12.5px*var(--ui-font-scale))]"
@@ -698,7 +684,6 @@ function openRelease(url: string) {
                         :value="app.settings.editorFontCustom ?? ''"
                         @change="onEditorFontCustom"
                       />
-                      <p class="mt-1 text-[calc(11px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.fontCustomHint") }}</p>
                     </div>
                   </div>
                   <SelectMenu v-model="editorFontModel" :options="editorFontOptions" align="right" class="shrink-0" />
@@ -708,7 +693,6 @@ function openRelease(url: string) {
                 <div class="settings-row" style="--i: 6">
                   <div class="min-w-0">
                     <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.confetti") }}</p>
-                    <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.confettiHint") }}</p>
                   </div>
                   <div class="flex shrink-0 items-center gap-2">
                     <SelectMenu
@@ -732,7 +716,6 @@ function openRelease(url: string) {
                 <div class="settings-row" style="--i: 7">
                   <div class="min-w-0">
                     <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.modalBlur") }}</p>
-                    <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.modalBlurHint") }}</p>
                   </div>
                   <label class="flex cursor-pointer items-center gap-2">
                     <input
@@ -759,7 +742,6 @@ function openRelease(url: string) {
                     <p class="mt-0.5 break-all text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3 mono">
                       {{ app.bootstrap?.appDataDir || "—" }}
                     </p>
-                    <p class="mt-1 text-[calc(11.5px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.dataDirHint") }}</p>
                   </div>
                   <button class="btn btn-secondary shrink-0" @click="openDataDir">
                     <AppIcon name="folder" :size="14" />
@@ -770,7 +752,6 @@ function openRelease(url: string) {
                 <div class="settings-row" style="--i: 1">
                   <div class="min-w-0">
                     <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.moveData") }}</p>
-                    <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.moveDataHint") }}</p>
                     <p
                       v-if="dataError"
                       class="mt-1 text-[calc(11.5px*var(--ui-font-scale))] leading-relaxed text-danger"
@@ -796,7 +777,6 @@ function openRelease(url: string) {
                 <div class="settings-row" style="--i: 2">
                   <div class="min-w-0">
                     <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.repairWebview") }}</p>
-                    <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ t("settings.repairWebviewHint") }}</p>
                   </div>
                   <button class="btn btn-secondary shrink-0" :disabled="repairing" @click="repairWebview">
                     {{ t("settings.repairWebview") }}
@@ -816,7 +796,7 @@ function openRelease(url: string) {
                     <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.version") }}</p>
                     <p class="mt-0.5 text-[calc(12px*var(--ui-font-scale))] leading-relaxed text-ink-3">{{ app.version }}</p>
                   </div>
-                  <button class="btn btn-secondary shrink-0" @click="app.setView('about')">
+                  <button class="btn btn-secondary shrink-0" @click="navigateView('about')">
                     <AppIcon name="info" :size="14" />
                     {{ t("nav.about") }}
                   </button>
@@ -826,7 +806,7 @@ function openRelease(url: string) {
                 <div v-if="!isMobilePlatform" class="settings-row" style="--i: 1">
                   <div class="min-w-0">
                     <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.checkUpdate") }}</p>
-                    <p class="mt-0.5 truncate text-[calc(12px*var(--ui-font-scale))] leading-relaxed" :class="hintTone">
+                    <p v-if="updateHint" class="mt-0.5 truncate text-[calc(12px*var(--ui-font-scale))] leading-relaxed" :class="hintTone">
                       {{ updateHint }}
                     </p>
 
@@ -845,7 +825,7 @@ function openRelease(url: string) {
                           {{ formatSize(app.updateReceived) }} / {{ formatSize(app.updateTotal) }}
                         </template>
                         <template v-else>{{ formatSize(app.updateReceived) }}</template>
-                        <template v-if="app.updatePhase === 'downloading' && speedText"> · {{ speedText }}</template>
+                        <template v-if="app.updatePhase === 'downloading' && speedText"> {{ speedText }}</template>
                       </p>
                     </div>
                   </div>

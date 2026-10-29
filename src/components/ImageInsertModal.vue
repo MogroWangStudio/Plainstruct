@@ -124,7 +124,7 @@ function saveChanges() {
       <div>
         <span class="field-label">{{ t("imageInsert.source") }}</span>
         <p class="mono truncate rounded border border-line bg-surface-2 px-2 py-1.5 text-[calc(12px*var(--ui-font-scale))] text-ink-2" :title="source.path">
-          {{ source.kind === "asset" ? t("imageInsert.sourceAsset") + " · " : "" }}{{ source.path }}
+          {{ source.kind === "asset" ? t("imageInsert.sourceAsset") + " " : "" }}{{ source.path }}
         </p>
       </div>
 

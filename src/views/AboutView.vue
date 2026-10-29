@@ -43,7 +43,7 @@ function openStudioSite() {
         <!-- 架构 -->
         <div class="mt-3 rounded-xl border border-line bg-surface p-6">
           <h2 class="field-label">{{ t("about.sectionArchitecture") }}</h2>
-          <p class="text-[calc(13px*var(--ui-font-scale))] leading-relaxed text-ink-2">Vue 3 · TypeScript · Tauri 2</p>
+          <p class="text-[calc(13px*var(--ui-font-scale))] leading-relaxed text-ink-2">Vue 3 TypeScript Tauri 2</p>
         </div>
 
         <!-- 工作室:署名字标可点击前往官网 + 版权 -->

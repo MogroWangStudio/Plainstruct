@@ -57,14 +57,14 @@ const DEVICE_GROUPS: { brand: string; devices: DevicePreset[] }[] = [
     ],
   },
   {
-    brand: "小米 · Redmi",
+    brand: "小米 Redmi",
     devices: [
       { name: "小米 14 / 15", w: 400, h: 890, dpr: 3 },
       { name: "Redmi Note 13", w: 393, h: 873, dpr: 2.75 },
     ],
   },
   {
-    brand: "华为 · 荣耀",
+    brand: "华为 荣耀",
     devices: [
       { name: "华为 Mate 60 Pro", w: 420, h: 907, dpr: 3 },
       { name: "荣耀 Magic6", w: 427, h: 933, dpr: 3 },
@@ -72,7 +72,7 @@ const DEVICE_GROUPS: { brand: string; devices: DevicePreset[] }[] = [
     ],
   },
   {
-    brand: "OPPO · vivo",
+    brand: "OPPO vivo",
     devices: [
       { name: "OPPO Find X7", w: 421, h: 920, dpr: 3 },
       { name: "OPPO Find X8", w: 419, h: 920, dpr: 3 },
@@ -145,7 +145,7 @@ const deviceOuterW = computed(() => screenW.value + BEZEL * 2);
 const deviceOuterH = computed(() => screenH.value + BEZEL * 2);
 const deviceOptions = [
   ...DEVICE_GROUPS.flatMap((g) =>
-    g.devices.map((d) => ({ value: d.name, label: `${d.name} · ${d.w}×${d.h} @${d.dpr}x`, group: g.brand })),
+    g.devices.map((d) => ({ value: d.name, label: `${d.name} ${d.w}×${d.h} @${d.dpr}x`, group: g.brand })),
   ),
   { value: CUSTOM_NAME, label: t("previewShell.customDevice") },
 ];
@@ -675,7 +675,7 @@ onBeforeUnmount(() => {
         </div>
         <p class="ops-viewport">
           <span>{{ t("previewShell.viewportLogical") }} {{ screenW }} × {{ screenH }}</span>
-          <span>@{{ device.dpr }}x · {{ t("previewShell.viewportPhysical") }} {{ physW }} × {{ physH }}</span>
+          <span>@{{ device.dpr }}x {{ t("previewShell.viewportPhysical") }} {{ physW }} × {{ physH }}</span>
         </p>
         <p class="ops-hint">{{ t("previewShell.swipeHint") }}</p>
       </aside>

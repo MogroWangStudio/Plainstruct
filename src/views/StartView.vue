@@ -22,6 +22,8 @@ const { onBackdropClick, resetBackdropClicks } = useBackdropClose();
  *  打开走本地站点库列表 */
 const mobile = isMobilePlatform;
 
+const showWizard = ref(false);
+
 /** 打开新建向导:空白点击计数随开窗清零 */
 function openWizard() {
   showWizard.value = true;
@@ -124,7 +126,6 @@ async function togglePin(item: StartItem) {
   await app.togglePinned(item.path);
 }
 
-const showWizard = ref(false);
 const wizard = reactive({ name: "", description: "", folder: "", siteType: "docs" as SiteType });
 const wizardError = ref("");
 const creating = ref(false);
@@ -222,7 +223,7 @@ function openLibrarySite(name: string) {
                     <span class="inline-flex items-center gap-1">
                       <AppIcon :name="item.siteType === 'blog' ? 'pencil' : 'doc'" :size="11" class="shrink-0" />
                       {{ item.siteType === "blog" ? t("wizard.typeBlog") : t("wizard.typeDocs") }}
-                      <template v-if="item.sizeBytes"> · {{ formatSize(item.sizeBytes) }}</template>
+                      <template v-if="item.sizeBytes"> {{ formatSize(item.sizeBytes) }}</template>
                     </span>
                   </template>
                   <span v-else-if="!item.isLibrary" class="inline-block h-2 w-24 rounded bg-surface-3 align-middle"></span>
@@ -244,15 +245,19 @@ function openLibrarySite(name: string) {
         </TransitionGroup>
       </div>
 
-      <button class="btn btn-ghost float-in mt-10 h-9 px-4 text-[calc(12.5px*var(--ui-font-scale))] text-ink-3" style="--d: 120ms" @click="navigateView('about')">
-        <AppIcon name="info" :size="15" />
-        {{ t("nav.about") }}
-      </button>
+      <!-- 入口按钮整体浮入:动画在容器上,按钮本身无「不可见但可命中」的误触窗口
+           (此前两按钮各自延迟入场,快速点按时会命中尚未显现的另一个按钮) -->
+      <div class="float-in mt-10 flex flex-col items-center gap-2" style="--d: 120ms">
+        <button class="btn btn-ghost h-9 px-4 text-[calc(12.5px*var(--ui-font-scale))] text-ink-3" @click="navigateView('about')">
+          <AppIcon name="info" :size="15" />
+          {{ t("nav.about") }}
+        </button>
 
-      <button class="btn btn-ghost float-in mt-2 h-9 px-4 text-[calc(12.5px*var(--ui-font-scale))] text-ink-3" style="--d: 120ms" @click="navigateView('settings')">
-        <AppIcon name="settings" :size="15" />
-        {{ t("nav.settings") }}
-      </button>
+        <button class="btn btn-ghost h-9 px-4 text-[calc(12.5px*var(--ui-font-scale))] text-ink-3" @click="navigateView('settings')">
+          <AppIcon name="settings" :size="15" />
+          {{ t("nav.settings") }}
+        </button>
+      </div>
     </div>
 
     <!-- 新建站点向导 -->
@@ -369,10 +374,13 @@ function openLibrarySite(name: string) {
   from {
     opacity: 0;
     transform: translateY(10px);
+    /* 入场期间不可命中:延迟与淡入前半程点击不会落在「看不见的按钮」上 */
+    pointer-events: none;
   }
   to {
     opacity: 1;
     transform: none;
+    pointer-events: auto;
   }
 }
 @media (prefers-reduced-motion: reduce) {

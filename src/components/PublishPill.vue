@@ -138,7 +138,7 @@ function formatTime(ms: number): string {
           <AppIcon v-else-if="task.phase === 'done'" name="check" :size="14" class="shrink-0 text-ok" />
           <AppIcon v-else name="alert" :size="14" class="shrink-0" :class="task.phase === 'cancelled' ? 'text-ink-3' : 'text-danger'" />
           <span class="truncate">{{ statusText }}</span>
-          <span class="hidden truncate text-ink-3 sm:inline">· {{ task.siteName }}</span>
+          <span class="hidden truncate text-ink-3 sm:inline">{{ task.siteName }}</span>
         </button>
         <button class="pill-close" :title="t('publish.pillClose')" @click.stop="task.dismissPill()">
           <AppIcon name="x" :size="13" />

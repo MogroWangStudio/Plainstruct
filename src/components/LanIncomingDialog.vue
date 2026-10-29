@@ -56,7 +56,7 @@ async function decide(mode: "copy" | "replace") {
       <div class="flex items-center gap-3">
         <span class="min-w-0 flex-1 truncate text-[calc(13.5px*var(--ui-font-scale))]">{{ lan.incoming.siteName }}</span>
         <span class="shrink-0 text-[calc(12px*var(--ui-font-scale))] text-ink-3">
-          {{ formatSize(lan.incoming.sizeBytes) }} · {{ t("lan.fileCount", { n: lan.incoming.fileCount }) }}
+          {{ formatSize(lan.incoming.sizeBytes) }} {{ t("lan.fileCount", { n: lan.incoming.fileCount }) }}
         </span>
       </div>
 
