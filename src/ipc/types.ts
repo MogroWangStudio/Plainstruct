@@ -249,7 +249,7 @@ export interface SiteConfig {
   /** 站点外图标(favicon):浏览器标签页使用;未设置时回退站点内 logo */
   favicon?: string;
   locale?: string; // 站点语言:生成页面的 <html lang>
-  titleFormat?: string; // 浏览器标题格式,如 "{page} · {site}"
+  titleFormat?: string; // 浏览器标题格式,如 "{page} {site}"(留空同此)
   siteType?: SiteType; // 站点类型,缺省 docs(兼容旧站点)
   /** 站点插件(搜索/图片预览开关与用户导入的插件),缺省时全部内置插件开启 */
   plugins?: SitePluginsConfig;

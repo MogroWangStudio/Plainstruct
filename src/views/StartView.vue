@@ -202,16 +202,17 @@ function openLibrarySite(name: string) {
       </div>
 
       <!-- 桌面:最近打开;移动端:本地站点库(无目录选择,站点来自新建与局域网接收)。
-           每行可固定 / 取消固定:固定项置顶,且不随最近列表 8 条上限被淘汰 -->
+           每行可固定 / 取消固定:固定项置顶,且不随最近列表 8 条上限被淘汰。
+           列表异步加载,容器预留最小高度,避免载入瞬间把上方按钮顶离指尖 -->
       <div class="float-in mt-12 w-full" style="--d: 90ms">
         <h2 class="field-label">{{ mobile ? t("start.library") : t("start.recent") }}</h2>
         <div
           v-if="!listItems.length"
-          class="rounded-lg border border-dashed border-line px-4 py-6 text-center text-[calc(13px*var(--ui-font-scale))] text-ink-3"
+          class="grid min-h-[104px] place-items-center rounded-lg border border-dashed border-line px-4 py-6 text-center text-[calc(13px*var(--ui-font-scale))] text-ink-3"
         >
           {{ mobile ? t("start.libraryEmpty") : t("start.recentEmpty") }}
         </div>
-        <TransitionGroup v-else name="list" tag="div" class="panel divide-y divide-line overflow-hidden">
+        <TransitionGroup v-else name="list" tag="div" class="panel min-h-[104px] divide-y divide-line overflow-hidden">
           <div v-for="item in listItems" :key="item.key" class="recent-row">
             <button class="recent-item" @click="item.isLibrary ? openLibrarySite(item.name) : openRecent(item.path)">
               <AppIcon name="folder" :size="16" class="text-ink-3" />
@@ -245,9 +246,9 @@ function openLibrarySite(name: string) {
         </TransitionGroup>
       </div>
 
-      <!-- 入口按钮整体浮入:动画在容器上,按钮本身无「不可见但可命中」的误触窗口
-           (此前两按钮各自延迟入场,快速点按时会命中尚未显现的另一个按钮) -->
-      <div class="float-in mt-10 flex flex-col items-center gap-2" style="--d: 120ms">
+      <!-- 桌面:设置与关于在主菜单底部(活动栏只出现在工作区内)。
+           移动端这两个入口常驻于全局顶栏右侧,正文不再重复堆叠 -->
+      <div v-if="!mobile" class="float-in mt-10 flex flex-col items-center gap-2" style="--d: 120ms">
         <button class="btn btn-ghost h-9 px-4 text-[calc(12.5px*var(--ui-font-scale))] text-ink-3" @click="navigateView('about')">
           <AppIcon name="info" :size="15" />
           {{ t("nav.about") }}

@@ -1,9 +1,11 @@
 <script setup lang="ts">
 /** 移动端应用骨架:全局顶栏(桌面式品牌区 + 右侧常驻操作) + 视图容器 + 底部导航。
- *  顶栏始终存在(含主菜单),顶部以 safe-area 避让状态栏;桌面顶栏的悬停入口
- *  (返回主菜单/查看发布状态/预览站点)在触屏上改为常驻右侧按钮。
- *  底部一行容纳全部页面入口(横向滑动),滑动余量以边缘渐隐 + 箭头提示。
- *  系统返回手势经 lib/backGesture 分发:浮层 → 视图 → 退出应用。 */
+ *  顶栏在全部页面(含主菜单)常驻,顶部以 safe-area 避让状态栏;桌面顶栏的悬停入口
+ *  (返回主菜单/查看发布状态/预览站点)在触屏上改为右侧常驻按钮,设置与关于这两个
+ *  应用级入口也收进顶栏 —— 主菜单不再堆叠两枚外观一致、上下相邻的按钮(此前点
+ *  「设置」会误入「关于」)。
+ *  底部一行容纳站点内全部页面入口(横向滑动):边缘渐隐 + 箭头提示还有更多,当前项
+ *  自动滚入视野。系统返回手势经 lib/backGesture 分发:浮层 → 视图 → 站点 → 退出。 */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useAppStore, type AppView } from "@/stores/app";
@@ -12,7 +14,7 @@ import { useLanStore } from "@/stores/lan";
 import { useBuilderStore } from "@/stores/builder";
 import { usePublishStore } from "@/stores/publish";
 import { usePublishTaskStore } from "@/stores/publishTask";
-import { navigateBack, navigateView } from "@/lib/backGesture";
+import { goToMenu, navigateBack, navigateView } from "@/lib/backGesture";
 import AppIcon from "@/components/AppIcon.vue";
 import BrandLogo from "@/components/BrandLogo.vue";
 import BrandStatus from "@/components/BrandStatus.vue";
@@ -52,7 +54,7 @@ const viewMap = {
 
 const currentView = computed(() => viewMap[app.view as keyof typeof viewMap]);
 
-/** 底部导航:全部入口,一行横向滑动 */
+/** 底部导航:站点内页面入口,一行横向滑动;设置与关于属应用级入口,归顶栏 */
 const navItems: { view: AppView; icon: string; label: string }[] = [
   { view: "editor", icon: "doc", label: "nav.editor" },
   { view: "assets", icon: "assets", label: "nav.assets" },
@@ -62,15 +64,14 @@ const navItems: { view: AppView; icon: string; label: string }[] = [
   { view: "build", icon: "box", label: "nav.build" },
   { view: "publish", icon: "upload", label: "nav.publish" },
   { view: "lan", icon: "refresh", label: "nav.lan" },
-  { view: "settings", icon: "settings", label: "nav.settings" },
-  { view: "about", icon: "info", label: "nav.about" },
 ];
 
 /** 设置与关于不依赖站点:站点未打开时也可作为独立视图渲染 */
 const standalone = computed(() => app.view === "settings" || app.view === "about");
 
-/** 「返回主菜单」常驻右侧:离开主菜单后始终可用(含站点未开的独立视图) */
-const showBack = computed(() => site.open || standalone.value);
+/** 主菜单:站点未开且不在独立视图上(此时无路可退,「返回主菜单」置灰而非隐藏,
+ *  顶栏因此不会随状态跳格) */
+const atMenu = computed(() => !site.open && !standalone.value);
 
 /** 「查看发布状态」:存在发布上下文(进行中/已完成/失败,含后台任务)时出现 */
 const showPublish = computed(
@@ -87,14 +88,13 @@ const showPublish = computed(
 /** 「预览站点」:站点构建完毕(已有产物)后出现 */
 const showPreview = computed(() => site.open && builder.report !== null);
 
-/** 返回主菜单:站点打开时收尾工作区(自动保存后关闭),独立视图则弹回主菜单 */
-async function goBackToMenu() {
-  if (site.open) {
-    await site.close();
-    app.setView("editor");
-    return;
-  }
-  navigateBack();
+/** 返回:站点打开时是「返回主菜单」(收起工作区),独立视图上只是退回上一层 */
+const backLabel = computed(() => (site.open ? t("titlebar.backToMenu") : t("common.back")));
+
+/** 返回主菜单:站点打开时收起工作区(自动保存后关闭),独立视图则弹回上一层 */
+function goBack() {
+  if (site.open) goToMenu();
+  else navigateBack();
 }
 
 /** 查看发布状态:后台发布时先切回发起站点,再打开发布页(任务状态就地恢复) */
@@ -122,6 +122,19 @@ function updateNavEdges() {
   navRight.value = el.scrollLeft + el.clientWidth < el.scrollWidth - 4;
 }
 
+/** 当前项滚入视野:从主菜单直接落到靠后的页面(或返回时)也能看到高亮项 */
+function revealActive() {
+  const el = navEl.value;
+  if (!el) return;
+  const item = el.querySelector<HTMLElement>(".tab-btn.active");
+  if (!item) return;
+  const target = item.offsetLeft + item.offsetWidth / 2 - el.clientWidth / 2;
+  el.scrollTo({
+    left: Math.max(0, Math.min(target, el.scrollWidth - el.clientWidth)),
+    behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+  });
+}
+
 let navResize: ResizeObserver | null = null;
 
 watch(
@@ -130,10 +143,20 @@ watch(
     if (!open) return;
     await nextTick();
     updateNavEdges();
+    revealActive();
     if (navEl.value && !navResize) {
       navResize = new ResizeObserver(updateNavEdges);
       navResize.observe(navEl.value);
     }
+  },
+);
+
+watch(
+  () => app.view,
+  async () => {
+    if (!site.open) return;
+    await nextTick();
+    revealActive();
   },
 );
 
@@ -148,9 +171,7 @@ onBeforeUnmount(() => {
   <div class="flex h-full flex-col overflow-hidden bg-bg">
     <!-- 顶栏:全局常驻,桌面式品牌区(logo + 状态 + 站点名),右侧常驻操作;
          safe-area 顶部内边距避免与系统状态栏重叠 -->
-    <header
-      class="flex min-h-12 shrink-0 items-center gap-1.5 border-b border-line bg-surface pl-3 pr-1.5 pt-[env(safe-area-inset-top)]"
-    >
+    <header class="topbar">
       <div class="flex min-w-0 flex-1 items-center gap-2">
         <BrandLogo :size="22" class="shrink-0" />
         <BrandStatus class="topbar-status" />
@@ -159,24 +180,68 @@ onBeforeUnmount(() => {
           <span class="min-w-0 truncate text-[calc(13px*var(--ui-font-scale))] text-ink-2">{{ site.config.name }}</span>
         </template>
       </div>
-      <!-- 桌面顶栏的悬停入口在触屏上常驻:返回主菜单、查看发布状态、预览站点 -->
-      <nav class="flex shrink-0 items-center">
-        <button v-if="showBack" class="topbar-link" @click="goBackToMenu">
-          <AppIcon name="arrowLeft" :size="14" />
-          <span>{{ t("titlebar.backToMenu") }}</span>
+      <!-- 桌面顶栏的悬停入口在触屏上常驻右侧:返回主菜单、查看发布状态、预览站点;
+           设置与关于为主菜单与各页共用的应用级入口,同样常驻 -->
+      <nav class="flex shrink-0 items-center gap-0.5">
+        <button
+          type="button"
+          class="topbar-btn"
+          :class="{ 'is-idle': atMenu }"
+          :disabled="atMenu"
+          :aria-label="backLabel"
+          :title="backLabel"
+          @click="goBack"
+        >
+          <AppIcon name="arrowLeft" :size="17" />
         </button>
-        <button v-if="showPublish" class="topbar-link" @click="goPublish">
-          {{ t("titlebar.viewPublish") }}
+        <button
+          v-if="showPublish"
+          type="button"
+          class="topbar-btn"
+          :aria-label="t('titlebar.viewPublish')"
+          :title="t('titlebar.viewPublish')"
+          @click="goPublish"
+        >
+          <AppIcon name="upload" :size="17" />
         </button>
-        <button v-if="showPreview" class="topbar-link" @click="builder.openMobilePreview()">
-          {{ t("titlebar.previewSite") }}
+        <button
+          v-if="showPreview"
+          type="button"
+          class="topbar-btn"
+          :aria-label="t('titlebar.previewSite')"
+          :title="t('titlebar.previewSite')"
+          @click="builder.openMobilePreview()"
+        >
+          <AppIcon name="eye" :size="17" />
+        </button>
+        <button
+          type="button"
+          class="topbar-btn"
+          :class="{ current: app.view === 'settings' }"
+          :aria-label="t('nav.settings')"
+          :aria-current="app.view === 'settings' ? 'page' : undefined"
+          :title="t('nav.settings')"
+          @click="navigateView('settings')"
+        >
+          <AppIcon name="settings" :size="17" />
+        </button>
+        <button
+          type="button"
+          class="topbar-btn"
+          :class="{ current: app.view === 'about' }"
+          :aria-label="t('nav.about')"
+          :aria-current="app.view === 'about' ? 'page' : undefined"
+          :title="t('nav.about')"
+          @click="navigateView('about')"
+        >
+          <AppIcon name="info" :size="17" />
         </button>
       </nav>
     </header>
 
     <!-- 视图容器:主菜单(StartView)仅在「站点未开且非独立视图」时呈现 -->
     <main class="relative min-h-0 flex-1">
-      <StartView v-if="!site.open && !standalone" class="absolute inset-0" />
+      <StartView v-if="atMenu" class="absolute inset-0" />
       <template v-else>
         <Transition name="view" mode="out-in">
           <component :is="currentView" :key="app.view" class="absolute inset-0" />
@@ -208,7 +273,7 @@ onBeforeUnmount(() => {
           <span class="tab-label">{{ t(item.label) }}</span>
         </button>
       </nav>
-      <!-- 边缘渐隐:左缘在右滑后出现,右缘 + 箭头提示还有更多入口 -->
+      <!-- 边缘渐隐:两侧按是否还有未露出的入口显隐,箭头指明还能往哪滑 -->
       <Transition name="edge">
         <i v-if="navLeft" class="nav-fade left" aria-hidden="true" />
       </Transition>
@@ -216,8 +281,13 @@ onBeforeUnmount(() => {
         <i v-if="navRight" class="nav-fade right" aria-hidden="true" />
       </Transition>
       <Transition name="edge">
-        <span v-if="navRight" class="nav-more" aria-hidden="true">
-          <AppIcon name="chevronRight" :size="15" />
+        <span v-if="navLeft" class="nav-arrow left" aria-hidden="true">
+          <AppIcon name="chevronLeft" :size="14" />
+        </span>
+      </Transition>
+      <Transition name="edge">
+        <span v-if="navRight" class="nav-arrow right" aria-hidden="true">
+          <AppIcon name="chevronRight" :size="14" />
         </span>
       </Transition>
     </div>
@@ -228,31 +298,57 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-/* 顶栏状态区:窄屏收紧问候语宽度,给站点名与右侧操作留位 */
-.topbar-status :deep(.status-text) {
-  max-width: 11ch;
+/* 顶栏:与桌面 titlebar 同一套材质(表面色 + 细分隔线)。高度 = 48 + 状态栏高度
+   (border-box 下内边距算在高度里,故用 calc 补上);无遮罩机型 inset 为 0,不多留空带 */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: calc(48px + env(safe-area-inset-top));
+  flex: 0 0 auto;
+  padding: 0 6px 0 12px;
+  padding-top: env(safe-area-inset-top);
+  border-bottom: 1px solid var(--color-line);
+  background: var(--color-surface);
 }
 
-/* 右侧常驻操作:与桌面 brand-link 同源的轻量文字按钮,触屏热区加高 */
-.topbar-link {
+/* 顶栏状态区:窄屏收紧问候语宽度,给站点名与右侧操作留位 */
+.topbar-status :deep(.status-text) {
+  max-width: 12ch;
+}
+
+/* 右侧常驻操作:图标按钮,热区 34 见方(指腹友好),按下即时响应 */
+.topbar-btn {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  justify-content: center;
+  width: 34px;
   height: 34px;
-  padding: 0 8px;
+  padding: 0;
   border: none;
-  border-radius: 7px;
+  border-radius: 8px;
   background: transparent;
   color: var(--color-ink-2);
-  font-size: calc(12.5px * var(--ui-font-scale));
-  white-space: nowrap;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   transition:
     background-color var(--duration-fast) var(--ease-plain),
     color var(--duration-fast) var(--ease-plain);
 }
-.topbar-link:active {
+.topbar-btn:active {
+  background: var(--color-surface-3);
+  color: var(--color-ink);
+}
+.topbar-btn:disabled {
+  opacity: 0.3;
+  pointer-events: none;
+}
+/* 主菜单上没有可返回的层级:按钮留位但不显示,顶栏右侧不会随着开站与否跳格 */
+.topbar-btn.is-idle {
+  visibility: hidden;
+}
+/* 当前所在页:与底栏当前项同一语言(实底 + 墨色),一眼看出位置 */
+.topbar-btn.current {
   background: var(--color-surface-3);
   color: var(--color-ink);
 }
@@ -271,7 +367,7 @@ onBeforeUnmount(() => {
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 44px;
+  width: 40px;
   pointer-events: none;
 }
 .nav-fade.left {
@@ -282,19 +378,25 @@ onBeforeUnmount(() => {
   right: 0;
   background: linear-gradient(to left, var(--color-surface), transparent);
 }
-.nav-more {
+.nav-arrow {
   position: absolute;
-  top: 16px;
-  right: 5px;
+  top: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
+  margin-top: -4px;
   border-radius: 999px;
   background: var(--color-surface-3);
-  color: var(--color-ink-3);
+  color: var(--color-ink-2);
   pointer-events: none;
+}
+.nav-arrow.left {
+  left: 4px;
+}
+.nav-arrow.right {
+  right: 4px;
 }
 .edge-enter-active,
 .edge-leave-active {

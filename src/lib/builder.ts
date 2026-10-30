@@ -276,10 +276,11 @@ function navForSidebar(raw: RawNav[]): RawNav[] {
     .map((item) => (item.children.length ? { ...item, children: navForSidebar(item.children) } : item));
 }
 
-/** 浏览器标签页标题:按站点 titleFormat 拼接 {page}/{site},首页只显示站点名 */
+/** 浏览器标签页标题:按站点 titleFormat 拼接 {page}/{site},首页只显示站点名。
+ *  留空时以空格连接两部分(界面文案一律不用「·」分隔)。 */
 function pageTitle(site: SiteConfig, docTitle: string): string {
   if (docTitle === site.name) return site.name;
-  const fmt = (site.titleFormat ?? "").trim() || "{page} · {site}";
+  const fmt = (site.titleFormat ?? "").trim() || "{page} {site}";
   if (!fmt.includes("{page}")) return site.name;
   return fmt.replace(/\{page\}/g, docTitle).replace(/\{site\}/g, site.name);
 }

@@ -5,6 +5,7 @@
  *  窗口失焦时先转头看一看,随后闭眼睡觉(Zzz 循环)并整体变淡(透明度,随深浅主题通用);
  *  重新聚焦后透明度恢复、Zzz 渐隐、缓缓睁眼,继续眨眼与鼠标跟踪。 */
 import { onBeforeUnmount, onMounted, ref } from "vue";
+import { isMobilePlatform } from "@/lib/platform";
 
 const props = withDefaults(defineProps<{ size?: number; /** 水平注视幅度系数:logo 靠窗口边缘(如 macOS 右上角)时减幅,避免眼神总偏向一侧 */ gazeScaleX?: number }>(), {
   size: 20,
@@ -27,6 +28,9 @@ let blinkTimer = 0;
 let pressResetTimer = 0;
 let sleepTimer = 0;
 let reduceMotion = false;
+/** 触控设备:没有真实的窗口焦点(软键盘、滚动都会让 WebView blur),
+ *  入睡与否只由页面可见性决定,且点一下就能叫醒 */
+let touchDevice = false;
 let unlisten: Array<() => void> = [];
 
 function onMove(e: MouseEvent) {
@@ -78,9 +82,13 @@ function ensureBlinkLoop() {
   if (!reduceMotion && blinkTimer === 0) scheduleBlink();
 }
 
-/** 鼠标点按反馈:整体轻压 + 眯眼;动画播放中忽略连点,避免抖动 */
+/** 鼠标/手指点按反馈:整体轻压 + 眯眼;动画播放中忽略连点,避免抖动。
+ *  触屏上点按是唯一可靠的交互信号,睡着时点一下就醒(不再只能等页面可见性变化)。 */
 function onPress() {
-  if (logoState.value !== "awake") return;
+  if (logoState.value !== "awake") {
+    if (touchDevice) setAwake(true);
+    return;
+  }
   const svg = svgEl.value;
   if (!svg || svg.classList.contains("pressed")) return;
   svg.classList.add("pressed");
@@ -136,13 +144,15 @@ function setAwake(focused: boolean) {
 }
 
 async function watchWindowFocus() {
-  // 触屏设备(安卓/iOS)的 WebView 窗口焦点不可靠:软键盘、滚动乃至触摸都可能
-  // 触发 blur,使 logo 误判「窗口失焦」而常驻入睡,触控也无法唤醒。
-  // 改用页面可见性驱动:应用退到后台才入睡,回到前台即苏醒。
-  if (window.matchMedia("(hover: none)").matches) {
+  // 触屏设备(安卓/iOS):WebView 的窗口焦点不可靠 —— 软键盘、滚动乃至一次触摸都可能
+  // 触发 blur,而 hover 媒体特性在部分 WebView 上又报告为 hover:hover,于是 logo 被误判
+  // 「窗口失焦」常驻入睡。这里以应用自身识别的平台为准(不依赖媒体查询),只由页面
+  // 可见性驱动:退到后台才睡,回到前台即醒,任何点按也能立刻叫醒。
+  if (touchDevice) {
     const onVisibility = () => setAwake(document.visibilityState === "visible");
     document.addEventListener("visibilitychange", onVisibility);
     unlisten.push(() => document.removeEventListener("visibilitychange", onVisibility));
+    onVisibility();
     return;
   }
   if ("__TAURI_INTERNALS__" in window) {
@@ -173,9 +183,18 @@ async function watchWindowFocus() {
 
 onMounted(() => {
   reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // 平台以应用自身识别为准;媒体查询仅作补充(hover:none / any-pointer:coarse)
+  touchDevice =
+    isMobilePlatform.value ||
+    window.matchMedia("(hover: none)").matches ||
+    window.matchMedia("(any-pointer: coarse)").matches;
   if (!reduceMotion) {
     ensureBlinkLoop();
-    window.addEventListener("mousemove", onMove, { passive: true });
+    // 触屏没有真正的指针移动,眼珠跟随由点按唤醒取代
+    if (!touchDevice) window.addEventListener("mousemove", onMove, { passive: true });
+    window.addEventListener("pointerdown", onPress, { passive: true });
+  } else if (touchDevice) {
+    // 减少动态效果下也要能点醒
     window.addEventListener("pointerdown", onPress, { passive: true });
   }
   void watchWindowFocus();

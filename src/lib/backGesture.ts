@@ -1,123 +1,215 @@
 /** 安卓侧滑/返回键支持 —— 基于历史栈的统一返回分发。
  *
  * 原理:安卓 WebView 的系统返回在手势触发时若 WebView 可后退则触发
- * history 回退(popstate),否则退出应用。因此每个「可返回的层」都在打开时
- * pushState 一条记录,popstate 时按 LIFO 分发:
+ * history 回退(popstate),否则退出应用。因此每一层「可返回的东西」在打开时
+ * pushState 一条记录并压入同一个栈,popstate 时按 LIFO 关闭:
  *   1. 浮层(抽屉/弹窗/全屏预览) —— 关闭最上层浮层;
- *   2. 应用视图(设置/发布/主题…) —— 回到上一个视图;
- *   3. 都没有 —— 历史也到了底,下一次返回由系统结束应用(标准安卓行为)。
+ *   2. 应用视图(设置/发布/主题…) —— 回到上一层视图;
+ *   3. 站点工作区 —— 收起站点回到主菜单(而不是直接退出应用)。
+ * 栈空了,下一次返回由系统结束应用(标准安卓行为)。
  *
- * 视图栈与历史条目严格 1:1:UI 前进导航 pushState,UI 返回/关闭浮层用
- * history.back() 消耗记录并置 ignorePop 跳过那次 popstate;系统返回手势
- * 消耗记录后,对应的 release 不再回退历史。
+ * 栈与历史条目严格 1:1:前进导航 pushState,UI 主动返回用 history.go(-n) 消耗记录
+ * 并跳过随之而来的 popstate;系统返回已消耗的记录不会再被回退。
  *
  * 桌面平台全部调用点为 no-op(直接改视图状态,不触碰 history)。 */
 
 import { onScopeDispose, watch, type WatchSource } from "vue";
 import { useAppStore, type AppView } from "@/stores/app";
-import { isMobilePlatform } from "@/lib/platform";interface BackTarget {
+import { useSiteStore } from "@/stores/site";
+import { isMobilePlatform } from "@/lib/platform";
+
+type StepKind = "overlay" | "view" | "site";
+
+interface Step {
+  kind: StepKind;
+  /** 视图层要回到的目标视图 */
+  view?: AppView;
+  /** 关闭 / 回退这一层 */
   close: () => void;
+  /** 历史记录已被系统返回消耗,释放时不再回退 */
   consumed: boolean;
 }
 
-const targets: BackTarget[] = [];
-/** 视图栈(与历史条目 1:1;栈底是应用启动视图) */
-const viewStack: AppView[] = [];
-/** UI 主动回退历史时,跳过随之而来的那次 popstate */
-let ignorePop = false;
+/** 统一返回栈(与历史条目 1:1;栈底是应用启动状态) */
+const steps: Step[] = [];
+/** UI 主动回退历史时,需要跳过的 popstate 次数 */
+let ignorePops = 0;
 let installed = false;
+/** 由本模块驱动的视图切换:watcher 不再重复补栈 */
+let expectedView: AppView | null = null;
 
 function pushHistory() {
   history.pushState({ psBack: Date.now() }, "");
 }
 
-function backHistory() {
-  ignorePop = true;
-  history.back();
+/** 吃掉 n 条历史记录(无对应返回层时用) */
+function consumeHistory(n = 1) {
+  if (n <= 0) return;
+  ignorePops += 1;
+  history.go(-n);
+}
+
+function setViewQuiet(view: AppView) {
+  // 视图没有实际变化时不要留下「待跳过」标记,否则会吞掉下一次兜底补栈
+  const app = useAppStore();
+  if (app.view === view) return;
+  expectedView = view;
+  app.setView(view);
+}
+
+function lastStep(kind?: StepKind): Step | undefined {
+  for (let i = steps.length - 1; i >= 0; i--) {
+    if (!kind || steps[i].kind === kind) return steps[i];
+  }
+  return undefined;
+}
+
+/** 倒数第二个视图层(判断「目标恰为上一层」用) */
+function previousViewStep(): Step | undefined {
+  let seen = 0;
+  for (let i = steps.length - 1; i >= 0; i--) {
+    if (steps[i].kind !== "view") continue;
+    seen += 1;
+    if (seen === 2) return steps[i];
+  }
+  return undefined;
+}
+
+/** 摘下并关闭栈内某一层(历史记录已由调用方处理) */
+function popStep(): Step | undefined {
+  const step = steps.pop();
+  if (!step) return undefined;
+  step.consumed = true;
+  step.close();
+  return step;
 }
 
 /** 安装 popstate 分发(仅移动平台;应用启动时调用一次) */
 export function installBackGesture() {
   if (installed || !isMobilePlatform.value) return;
   installed = true;
-  viewStack.push(useAppStore().view);
-  // 兜底同步:绕过 navigateView 的视图变化(开站后跳编辑器、发布药丸跳发布页等)
-  // 也要保持视图栈与历史条目 1:1,否则系统返回会错位
+  const app = useAppStore();
+  const site = useSiteStore();
+
+  // 站点开合也是一层:打开站点后可返回主菜单,而不是直接退出应用
   watch(
-    () => useAppStore().view,
-    (view) => {
-      const top = viewStack[viewStack.length - 1];
-      if (view === top) return;
-      if (viewStack.length > 1 && viewStack[viewStack.length - 2] === view) {
-        viewStack.pop();
+    () => site.open,
+    (open) => {
+      if (open) {
+        steps.push({
+          kind: "site",
+          consumed: false,
+          close: () => {
+            void site.close();
+            setViewQuiet("editor");
+          },
+        });
+        pushHistory();
         return;
       }
+      // UI 关闭站点:摘掉站点层并消耗其记录
+      const step = lastStep("site");
+      if (!step) return;
+      steps.splice(steps.indexOf(step), 1);
+      if (!step.consumed) consumeHistory(1);
+    },
+    { flush: "post" },
+  );
+
+  // 兜底同步:绕过 navigateView 的视图变化(发布药丸跳发布页、开站后跳编辑器等)
+  // 也要保持栈与历史条目 1:1,否则系统返回会错位
+  watch(
+    () => app.view,
+    (view, from) => {
+      if (expectedView === view) {
+        expectedView = null;
+        return;
+      }
+      if (lastStep("view")?.view === view) return;
       if (view === "editor") {
-        // 开站/回工作区:视为回到根视图,清空回退深度
-        viewStack.length = 0;
-        viewStack.push("editor");
+        // 回到工作区根:视图层一并清空(记录随之吃掉)
+        let dropped = 0;
+        for (let i = steps.length - 1; i >= 0; i--) {
+          if (steps[i].kind !== "view") continue;
+          steps.splice(i, 1);
+          dropped += 1;
+        }
+        consumeHistory(dropped);
         return;
       }
-      viewStack.push(view);
+      const back: AppView = from ?? "editor";
+      steps.push({ kind: "view", view, consumed: false, close: () => setViewQuiet(back) });
       pushHistory();
     },
   );
+
   window.addEventListener("popstate", () => {
-    if (ignorePop) {
-      ignorePop = false;
+    if (ignorePops > 0) {
+      ignorePops -= 1;
       return;
     }
-    const top = targets[targets.length - 1];
-    if (top) {
-      // 系统返回已弹出该浮层的历史记录:标记已消费并关闭,release 不再回退历史
-      targets.pop();
-      top.consumed = true;
-      top.close();
-      return;
-    }
-    // 视图层返回:弹栈回到上一视图(栈底时不动,下次返回由系统结束应用)
-    if (viewStack.length > 1) {
-      viewStack.pop();
-      const previous = viewStack[viewStack.length - 1];
-      useAppStore().setView(previous);
-    }
+    // 系统返回已弹出该层的历史记录:标记已消费后关闭,不再回退历史
+    popStep();
   });
 }
 
 /** UI 前进导航:桌面 = 直接切换;移动 = 切换 + 压栈 + pushState。
- *  目标视图恰为上一视图时按返回语义处理(弹栈 + 回退历史,避免越走越深)。 */
+ *  目标视图恰为上一层视图时按返回语义处理(弹栈 + 回退历史,避免越走越深)。 */
 export function navigateView(view: AppView) {
   const app = useAppStore();
   if (!isMobilePlatform.value) {
     app.setView(view);
     return;
   }
-  if (viewStack[viewStack.length - 1] === view) return;
-  if (viewStack.length > 1 && viewStack[viewStack.length - 2] === view) {
-    viewStack.pop();
-    app.setView(view);
-    backHistory();
+  if (lastStep("view")?.view === view) return;
+  const from = app.view;
+  if (previousViewStep()?.view === view) {
+    setViewQuiet(view);
+    const step = lastStep("view");
+    if (step) {
+      steps.splice(steps.indexOf(step), 1);
+      step.consumed = true;
+      consumeHistory(1);
+    }
     return;
   }
-  viewStack.push(view);
-  app.setView(view);
+  steps.push({ kind: "view", view, consumed: false, close: () => setViewQuiet(from) });
+  setViewQuiet(view);
   pushHistory();
 }
 
-/** UI 返回按钮:回到上一视图(移动端弹栈并回退历史;桌面回到编辑器) */
+/** UI 返回按钮:关闭栈顶一层(浮层 → 视图 → 站点);桌面回到编辑器 */
 export function navigateBack() {
   const app = useAppStore();
   if (!isMobilePlatform.value) {
     app.setView("editor");
     return;
   }
-  if (viewStack.length > 1) {
-    viewStack.pop();
-    app.setView(viewStack[viewStack.length - 1]);
-    backHistory();
-  } else {
+  const step = steps[steps.length - 1];
+  if (!step) {
     app.setView("editor");
+    return;
   }
+  popStep();
+  consumeHistory(1);
+}
+
+/** 返回主菜单:收起站点工作区(含其上的全部视图层),回到启动页 */
+export function goToMenu() {
+  const site = useSiteStore();
+  if (!isMobilePlatform.value) {
+    void site.close();
+    return;
+  }
+  const index = steps.findIndex((s) => s.kind === "site");
+  if (index < 0) {
+    setViewQuiet("editor");
+    return;
+  }
+  const removed = steps.splice(index);
+  void site.close();
+  setViewQuiet("editor");
+  consumeHistory(removed.filter((s) => !s.consumed).length);
 }
 
 /** 注册一个「系统返回时关闭」的浮层:打开时调用,返回 release(关闭时调用)。
@@ -125,16 +217,16 @@ export function navigateBack() {
  *  release 不会再回退历史。桌面平台为 no-op。 */
 export function registerBackTarget(close: () => void): () => void {
   if (!isMobilePlatform.value) return () => undefined;
-  const target: BackTarget = { close, consumed: false };
-  targets.push(target);
+  const step: Step = { kind: "overlay", consumed: false, close };
+  steps.push(step);
   pushHistory();
   let released = false;
   return () => {
     if (released) return;
     released = true;
-    const index = targets.indexOf(target);
-    if (index >= 0) targets.splice(index, 1);
-    if (!target.consumed) backHistory();
+    const index = steps.indexOf(step);
+    if (index >= 0) steps.splice(index, 1);
+    if (!step.consumed) consumeHistory(1);
   };
 }
 

@@ -2,7 +2,9 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover:安卓(enableEdgeToEdge)下 WebView 铺到状态栏/导航栏之下,
+         必须让 env(safe-area-inset-*) 生效,顶栏与底栏才能各让出一条安全边 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
     <title>素构 Plainstruct</title>
     <script src="/diagnostics.js"></script>

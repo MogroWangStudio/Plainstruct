@@ -719,9 +719,9 @@
       var seg = [name];
       if (m.dataset.dim) seg.push(m.dataset.dim);
       if (m.dataset.size) seg.push(m.dataset.size);
-      m.textContent = seg.join(" · ");
+      m.textContent = seg.join(" ");
     }
-    meta.textContent = parts.join(" · ");
+    meta.textContent = parts.join(" ");
     host.appendChild(meta);
   }
 

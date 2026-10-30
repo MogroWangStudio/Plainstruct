@@ -717,15 +717,18 @@ function openRelease(url: string) {
                   <div class="min-w-0">
                     <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.modalBlur") }}</p>
                   </div>
-                  <label class="flex cursor-pointer items-center gap-2">
-                    <input
-                      type="checkbox"
-                      class="checkbox-input"
-                      :checked="app.settings.modalBlur !== false"
-                      @change="app.setAppearance({ modalBlur: ($event.target as HTMLInputElement).checked })"
+                  <button
+                    class="relative inline-flex h-6 w-10 shrink-0 items-center rounded-full transition-colors"
+                    :class="app.settings.modalBlur !== false ? 'bg-accent' : 'bg-line-strong'"
+                    role="switch"
+                    :aria-checked="app.settings.modalBlur !== false"
+                    @click="app.setAppearance({ modalBlur: app.settings.modalBlur === false })"
+                  >
+                    <span
+                      class="inline-block h-4 w-4 rounded-full bg-surface shadow-sm transition-transform"
+                      :class="app.settings.modalBlur !== false ? 'translate-x-[22px]' : 'translate-x-[4px]'"
                     />
-                    <span class="text-[calc(12px*var(--ui-font-scale))] text-ink-2">{{ t("settings.modalBlurOn") }}</span>
-                  </label>
+                  </button>
                 </div>
               </div>
             </template>
