@@ -1,9 +1,9 @@
 <script setup lang="ts">
 /** 移动端应用骨架:全局顶栏(桌面式品牌区 + 右侧常驻操作) + 视图容器 + 底部导航。
  *  顶栏在全部页面(含主菜单)常驻,顶部以 safe-area 避让状态栏;桌面顶栏的悬停入口
- *  (返回主菜单/查看发布状态/预览站点)在触屏上改为右侧常驻按钮,设置与关于这两个
- *  应用级入口也收进顶栏 —— 主菜单不再堆叠两枚外观一致、上下相邻的按钮(此前点
- *  「设置」会误入「关于」)。
+ *  (返回主菜单/查看发布状态/预览站点)在触屏上改为右侧常驻按钮,设置是唯一的应用级
+ *  顶栏入口(「关于」内嵌于设置页,不再单独设入口) —— 主菜单不再堆叠两枚外观一致、
+ *  上下相邻的按钮(此前点「设置」会误入「关于」)。
  *  底部一行容纳站点内全部页面入口(横向滑动):边缘渐隐 + 箭头提示还有更多,当前项
  *  自动滚入视野。系统返回手势经 lib/backGesture 分发:浮层 → 视图 → 站点 → 退出。 */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
@@ -29,7 +29,6 @@ import ThemesView from "@/views/ThemesView.vue";
 import PluginsView from "@/views/PluginsView.vue";
 import PublishView from "@/views/PublishView.vue";
 import SettingsView from "@/views/SettingsView.vue";
-import AboutView from "@/views/AboutView.vue";
 
 const { t } = useI18n();
 const app = useAppStore();
@@ -48,13 +47,12 @@ const viewMap = {
   plugins: PluginsView,
   publish: PublishView,
   settings: SettingsView,
-  about: AboutView,
   lan: LanView,
 } as const;
 
 const currentView = computed(() => viewMap[app.view as keyof typeof viewMap]);
 
-/** 底部导航:站点内页面入口,一行横向滑动;设置与关于属应用级入口,归顶栏 */
+/** 底部导航:站点内页面入口,一行横向滑动;设置属应用级入口,归顶栏 */
 const navItems: { view: AppView; icon: string; label: string }[] = [
   { view: "editor", icon: "doc", label: "nav.editor" },
   { view: "assets", icon: "assets", label: "nav.assets" },
@@ -66,8 +64,9 @@ const navItems: { view: AppView; icon: string; label: string }[] = [
   { view: "lan", icon: "refresh", label: "nav.lan" },
 ];
 
-/** 设置与关于不依赖站点:站点未打开时也可作为独立视图渲染 */
-const standalone = computed(() => app.view === "settings" || app.view === "about");
+/** 设置不依赖站点:站点未打开时也可作为独立视图渲染。
+ *  「关于」没有独立视图 —— 内容内嵌于设置页「关于」分区,顶栏不再设「关于」入口 */
+const standalone = computed(() => app.view === "settings");
 
 /** 主菜单:站点未开且不在独立视图上(此时无路可退,「返回主菜单」置灰而非隐藏,
  *  顶栏因此不会随状态跳格) */
@@ -184,7 +183,7 @@ onBeforeUnmount(() => {
         </div>
       </div>
       <!-- 桌面顶栏的悬停入口在触屏上常驻右侧:返回主菜单、查看发布状态、预览站点;
-           设置与关于为主菜单与各页共用的应用级入口,同样常驻 -->
+           设置为主菜单与各页共用的应用级入口,同样常驻(「关于」在设置页内) -->
       <nav class="flex shrink-0 items-center gap-0.5">
         <button
           type="button"
@@ -227,17 +226,6 @@ onBeforeUnmount(() => {
           @click="navigateView('settings')"
         >
           <AppIcon name="settings" :size="17" />
-        </button>
-        <button
-          type="button"
-          class="topbar-btn"
-          :class="{ current: app.view === 'about' }"
-          :aria-label="t('nav.about')"
-          :aria-current="app.view === 'about' ? 'page' : undefined"
-          :title="t('nav.about')"
-          @click="navigateView('about')"
-        >
-          <AppIcon name="info" :size="17" />
         </button>
       </nav>
     </header>

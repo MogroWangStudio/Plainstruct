@@ -19,6 +19,7 @@ import { isMobilePlatform } from "@/lib/platform";
 import { navigateBack, navigateView } from "@/lib/backGesture";
 import AppIcon from "@/components/AppIcon.vue";
 import SelectMenu from "@/components/SelectMenu.vue";
+import AboutPanel from "@/components/AboutPanel.vue";
 
 const { t } = useI18n();
 const app = useAppStore();
@@ -788,12 +789,13 @@ function openRelease(url: string) {
               </div>
             </template>
 
-            <!-- 关于 -->
+            <!-- 关于:移动端直接内嵌关于内容(顶栏不再有独立关于入口);桌面保留版本行与独立关于页 -->
             <template v-else>
               <h3 class="settings-heading" style="--i: 0">
                 {{ t("settings.sectionAbout") }}
               </h3>
-              <div class="settings-card">
+              <AboutPanel v-if="isMobilePlatform" class="settings-about-panel" />
+              <div v-else class="settings-card">
                 <div class="settings-row" style="--i: 0">
                   <div class="min-w-0">
                     <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.version") }}</p>
@@ -805,8 +807,8 @@ function openRelease(url: string) {
                   </button>
                 </div>
 
-                <!-- 检查更新与自动更新(移动端无应用内更新,经重新安装 APK 升级) -->
-                <div v-if="!isMobilePlatform" class="settings-row" style="--i: 1">
+                <!-- 检查更新与自动更新 -->
+                <div class="settings-row" style="--i: 1">
                   <div class="min-w-0">
                     <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.checkUpdate") }}</p>
                     <p v-if="updateHint" class="mt-0.5 truncate text-[calc(12px*var(--ui-font-scale))] leading-relaxed" :class="hintTone">
@@ -995,6 +997,13 @@ function openRelease(url: string) {
   transition: opacity var(--duration-base) var(--ease-plain);
 }
 .settings-page-enter-from .settings-card {
+  opacity: 0;
+}
+/* 移动端「关于」分区的内嵌面板:与设置卡片同节奏淡入 */
+.settings-page-enter-active .settings-about-panel {
+  transition: opacity var(--duration-base) var(--ease-plain);
+}
+.settings-page-enter-from .settings-about-panel {
   opacity: 0;
 }
 .settings-page-enter-active .settings-row {
