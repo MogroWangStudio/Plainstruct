@@ -54,6 +54,14 @@ export interface AppSettings {
   modalBlur?: boolean;
   /** 点击弹窗空白区域(模糊遮罩)的关窗方式:never=不关闭 single=一次 double=两次(默认) */
   modalBackdropClose?: ModalBackdropClose;
+  /** 启动动画:默认开启;关闭后启动画面直接硬切 */
+  bootAnimEnabled?: boolean;
+  /** 启动动画时长(毫秒,档位 300/600/1200,默认 600) */
+  bootAnimDuration?: number;
+  /** 启动动画曲线:plain=平缓 pop=弹性 swift=利落(默认 plain) */
+  bootAnimCurve?: BootAnimCurve;
+  /** 启动动画预设(logo 进场方式):fade=淡入 scale=缩放 slide=上滑(默认 fade) */
+  bootAnimPreset?: BootAnimPreset;
   /** 移动端底栏显示方式:both=图标+文字(默认) icon=仅图标 */
   mobileTabStyle?: MobileTabStyle;
   /** 局域网同步:随应用启动恢复服务 */
@@ -66,6 +74,12 @@ export interface AppSettings {
 
 /** 移动端底栏显示方式 */
 export type MobileTabStyle = "both" | "icon";
+
+/** 启动动画曲线 */
+export type BootAnimCurve = "plain" | "pop" | "swift";
+
+/** 启动动画预设(logo 进场方式) */
+export type BootAnimPreset = "fade" | "scale" | "slide";
 
 /** 弹窗空白区域点击的关窗方式 */
 export type ModalBackdropClose = "never" | "single" | "double";

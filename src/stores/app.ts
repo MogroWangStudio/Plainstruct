@@ -17,6 +17,8 @@ import type {
   UiFontMode,
   UpdateProgress,
   MobileTabStyle,
+  BootAnimCurve,
+  BootAnimPreset,
 } from "@/ipc/types";
 import { i18n, type Locale as I18nLocale } from "@/i18n";
 import { appThemeDef } from "@/lib/app-themes";
@@ -46,6 +48,14 @@ export interface AppearanceSettings {
   modalBlur?: boolean;
   /** 点击弹窗空白区域的关窗方式(默认两次点击) */
   modalBackdropClose?: ModalBackdropClose;
+  /** 启动动画(默认开) */
+  bootAnimEnabled?: boolean;
+  /** 启动动画时长毫秒(档位 300/600/1200,默认 600) */
+  bootAnimDuration?: number;
+  /** 启动动画曲线(默认平缓) */
+  bootAnimCurve?: BootAnimCurve;
+  /** 启动动画预设(默认淡入) */
+  bootAnimPreset?: BootAnimPreset;
   /** 移动端底栏显示方式(默认图标+文字) */
   mobileTabStyle?: MobileTabStyle;
 }

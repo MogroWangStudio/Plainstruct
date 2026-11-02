@@ -170,6 +170,10 @@ pub(crate) fn settings_defaults() -> Value {
         "modalBackdropClose": "double",
         "confetti": "standard",
         "mobileTabStyle": "both",
+        "bootAnimEnabled": true,
+        "bootAnimDuration": 600,
+        "bootAnimCurve": "plain",
+        "bootAnimPreset": "fade",
     })
 }
 

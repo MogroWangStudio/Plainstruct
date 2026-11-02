@@ -7,6 +7,7 @@ import { useLanStore } from "@/stores/lan";
 import { usePublishStore } from "@/stores/publish";
 import { ipc } from "@/ipc/ipc";
 import { Events, listen } from "@/ipc/events";
+import type { BootAnimCurve } from "@/ipc/types";
 import { isMobilePlatform } from "@/lib/platform";
 import { installBackGesture } from "@/lib/backGesture";
 import { useI18n } from "vue-i18n";
@@ -36,6 +37,21 @@ const site = useSiteStore();
 const editor = useEditorStore();
 const publish = usePublishStore();
 const { t } = useI18n();
+
+/* ---------- 启动画面:时长与曲线由设置注入 CSS 变量,进场与离场共用 ---------- */
+
+const bootAnim = computed(() => app.settings.bootAnimEnabled !== false);
+
+const BOOT_CURVES: Record<BootAnimCurve, string> = {
+  plain: "var(--ease-plain)",
+  pop: "var(--ease-pop)",
+  swift: "cubic-bezier(0.16, 1, 0.3, 1)",
+};
+
+const bootStyle = computed(() => ({
+  "--boot-dur": `${app.settings.bootAnimDuration ?? 600}ms`,
+  "--boot-ease": BOOT_CURVES[app.settings.bootAnimCurve ?? "plain"],
+}));
 
 /* ---------- 关窗守卫:有未保存修改时先询问(保存并关闭 / 不保存 / 取消) ----------
  * 非 macOS 下,Rust 侧拦截 CloseRequested 后转发本事件;无未保存修改时直接销毁窗口,
@@ -137,15 +153,21 @@ onMounted(() => {
             </div>
           </Transition>
         </template>
-
-        <!-- 启动画面:就绪后整体淡出与主界面交叉,不再阻塞 -->
-        <Transition name="boot">
-          <div v-if="!app.ready" class="absolute inset-0 z-10 flex flex-col items-center justify-center gap-5 bg-bg">
-            <img :src="app.isDark ? '/logo-dark.svg' : '/logo.svg'" alt="" class="h-10 w-10 opacity-70" />
-          </div>
-        </Transition>
       </div>
     </template>
+
+    <!-- 启动画面(桌面与移动共用,全屏覆盖):logo 按预设进场,应用就绪后按配置的时长与曲线
+         整体淡出;关闭启动动画时直接硬切;系统减弱动态下降级为快速淡出 -->
+    <Transition name="boot">
+      <div
+        v-if="!app.ready && bootAnim"
+        class="boot-layer"
+        :class="`boot-preset-${app.settings.bootAnimPreset ?? 'fade'}`"
+        :style="bootStyle"
+      >
+        <img :src="app.isDark ? '/logo-dark.svg' : '/logo.svg'" alt="" class="boot-logo" />
+      </div>
+    </Transition>
 
     <FeedbackHost />
     <PublishPill />
@@ -167,9 +189,63 @@ onMounted(() => {
 </template>
 
 <style scoped>
-/* 离场:整体淡出与主界面交叉,进出同路径 */
+/* 启动画面:全屏覆盖(桌面含标题栏,移动含顶栏底栏),时长与曲线由设置注入(--boot-dur/--boot-ease) */
+.boot-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg);
+}
+.boot-logo {
+  height: 40px;
+  width: 40px;
+  opacity: 0.7;
+}
+/* 进场预设:淡入 / 缩放浮现 / 上滑浮现 */
+.boot-preset-fade .boot-logo {
+  animation: boot-fade var(--boot-dur, 600ms) var(--boot-ease, var(--ease-plain)) both;
+}
+.boot-preset-scale .boot-logo {
+  animation: boot-scale var(--boot-dur, 600ms) var(--boot-ease, var(--ease-plain)) both;
+}
+.boot-preset-slide .boot-logo {
+  animation: boot-slide var(--boot-dur, 600ms) var(--boot-ease, var(--ease-plain)) both;
+}
+@keyframes boot-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 0.7;
+  }
+}
+@keyframes boot-scale {
+  from {
+    opacity: 0;
+    transform: scale(0.86);
+  }
+  to {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+}
+@keyframes boot-slide {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 0.7;
+    transform: none;
+  }
+}
+/* 离场:整体淡出与主界面交叉,进出同路径(时长曲线走设置) */
 .boot-leave-active {
-  transition: opacity 260ms var(--ease-plain);
+  transition: opacity var(--boot-dur, 600ms) var(--boot-ease, var(--ease-plain));
 }
 .boot-leave-from {
   opacity: 1;
@@ -179,8 +255,12 @@ onMounted(() => {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .boot-logo {
+    animation: none !important;
+    opacity: 0.7;
+  }
   .boot-leave-active {
-    transition: none;
+    transition: opacity 80ms linear;
   }
 }
 </style>

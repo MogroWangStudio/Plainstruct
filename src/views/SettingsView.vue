@@ -13,7 +13,7 @@ import {
 } from "@/stores/app";
 import { useUiStore } from "@/stores/ui";
 import { ipc } from "@/ipc/ipc";
-import type { ConfettiLevel, EditorBreakKey, EditorFontMode, EditorIndentKey, Locale, MobileTabStyle, ModalBackdropClose, PublishNotifyMode, UiFontMode } from "@/ipc/types";
+import type { BootAnimCurve, BootAnimPreset, ConfettiLevel, EditorBreakKey, EditorFontMode, EditorIndentKey, Locale, MobileTabStyle, ModalBackdropClose, PublishNotifyMode, UiFontMode } from "@/ipc/types";
 import { APP_THEMES, type AppThemeSwatch } from "@/lib/app-themes";
 import { fireConfetti } from "@/lib/confetti";
 import { formatSize } from "@/lib/format";
@@ -252,6 +252,42 @@ const tabStyleOptions = computed<{ value: string; label: string }[]>(() => [
 const tabStyleModel = computed({
   get: () => app.settings.mobileTabStyle ?? "both",
   set: (v: string) => void app.setAppearance({ mobileTabStyle: v as MobileTabStyle }),
+});
+
+/* ---------- 启动动画:开关、时长、曲线与进场预设 ---------- */
+
+async function onBootAnimToggle() {
+  await app.setAppearance({ bootAnimEnabled: app.settings.bootAnimEnabled === false });
+}
+
+const bootAnimTimeOptions = computed(() => [
+  { value: "300", label: t("settings.bootTimeShort") },
+  { value: "600", label: t("settings.bootTimeStandard") },
+  { value: "1200", label: t("settings.bootTimeLong") },
+]);
+const bootAnimTimeModel = computed({
+  get: () => String(app.settings.bootAnimDuration ?? 600),
+  set: (v: string) => void app.setAppearance({ bootAnimDuration: Number(v) }),
+});
+
+const bootAnimCurveOptions = computed(() => [
+  { value: "plain", label: t("settings.bootCurvePlain") },
+  { value: "pop", label: t("settings.bootCurvePop") },
+  { value: "swift", label: t("settings.bootCurveSwift") },
+]);
+const bootAnimCurveModel = computed({
+  get: () => app.settings.bootAnimCurve ?? "plain",
+  set: (v: string) => void app.setAppearance({ bootAnimCurve: v as BootAnimCurve }),
+});
+
+const bootAnimPresetOptions = computed(() => [
+  { value: "fade", label: t("settings.bootPresetFade") },
+  { value: "scale", label: t("settings.bootPresetScale") },
+  { value: "slide", label: t("settings.bootPresetSlide") },
+]);
+const bootAnimPresetModel = computed({
+  get: () => app.settings.bootAnimPreset ?? "fade",
+  set: (v: string) => void app.setAppearance({ bootAnimPreset: v as BootAnimPreset }),
 });
 
 const uiFontModel = computed({
@@ -788,6 +824,45 @@ function openRelease(url: string) {
                   </div>
                   <SelectMenu v-model="tabStyleModel" :options="tabStyleOptions" align="right" class="shrink-0" />
                 </div>
+
+                <!-- 启动动画:开关;时长/曲线/预设仅在开启时显示,两端共用同一启动画面 -->
+                <div class="settings-row" style="--i: 9">
+                  <div class="min-w-0">
+                    <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.bootAnim") }}</p>
+                  </div>
+                  <button
+                    class="relative inline-flex h-6 w-10 shrink-0 items-center rounded-full transition-colors"
+                    :class="app.settings.bootAnimEnabled !== false ? 'bg-accent' : 'bg-line-strong'"
+                    role="switch"
+                    :aria-checked="app.settings.bootAnimEnabled !== false"
+                    @click="onBootAnimToggle"
+                  >
+                    <span
+                      class="inline-block h-4 w-4 rounded-full bg-surface shadow-sm transition-transform"
+                      :class="app.settings.bootAnimEnabled !== false ? 'translate-x-[22px]' : 'translate-x-[4px]'"
+                    />
+                  </button>
+                </div>
+                <template v-if="app.settings.bootAnimEnabled !== false">
+                  <div class="settings-row" style="--i: 10">
+                    <div class="min-w-0">
+                      <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.bootAnimTime") }}</p>
+                    </div>
+                    <SelectMenu v-model="bootAnimTimeModel" :options="bootAnimTimeOptions" align="right" class="shrink-0" />
+                  </div>
+                  <div class="settings-row" style="--i: 11">
+                    <div class="min-w-0">
+                      <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.bootAnimCurve") }}</p>
+                    </div>
+                    <SelectMenu v-model="bootAnimCurveModel" :options="bootAnimCurveOptions" align="right" class="shrink-0" />
+                  </div>
+                  <div class="settings-row" style="--i: 12">
+                    <div class="min-w-0">
+                      <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.bootAnimPreset") }}</p>
+                    </div>
+                    <SelectMenu v-model="bootAnimPresetModel" :options="bootAnimPresetOptions" align="right" class="shrink-0" />
+                  </div>
+                </template>
               </div>
             </template>
 
