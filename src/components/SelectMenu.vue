@@ -42,7 +42,7 @@ const listEl = ref<HTMLElement | null>(null);
 
 const current = () => props.options.find((o) => o.value === props.modelValue);
 
-function placePanel() {
+function placePanel(reposition = false) {
   const t = trigger.value;
   if (!t) return;
   const r = t.getBoundingClientRect();
@@ -53,7 +53,8 @@ function placePanel() {
   const panelH = Math.min(estimatedH, Math.min(320, window.innerHeight * 0.6));
   // 界面缩放(zoom)下:rect/视口比较在视觉像素中进行,面板 CSS 定位值经 toCssPx 还原
   const z = uiZoom();
-  flipUp.value = r.bottom + 6 + panelH * z > window.innerHeight - 8;
+  // 跟随重定位时不重算翻转:滚动经过临界点会在上/下展开间抖动,展开侧沿用打开时的判定
+  if (!reposition) flipUp.value = r.bottom + 6 + panelH * z > window.innerHeight - 8;
   pos.value = {
     left: toCssPx(props.align === "right" ? r.right : r.left) + "px",
     minWidth: toCssPx(Math.max(r.width, 150)) + "px",
@@ -90,12 +91,27 @@ function onDocPointer(e: PointerEvent) {
   if (open.value && root.value && !root.value.contains(e.target as Node)) close();
 }
 
-/** 滚动收起:只对外部容器滚动生效。面板自身滚动不收起 —— 选中项在面板可视区
- *  之外时,打开菜单聚焦它会自动滚动面板;选项列表超高后滚动手势也在面板内,
- *  这两种滚动若触发收起,菜单就会在打开的瞬间或使用中直接消失 */
+/** 外部滚动:面板跟随触发器重新定位(触发器滚出视口才收起)。
+ *  原为「任何外部滚动立即收起」—— 移动端滑动页面(包括刚打开就带上来的惯性滚动)
+ *  会瞬间卷走下拉,选项还没看到就消失;固定定位的面板与滚动中的触发器脱节问题,
+ *  由跟随重定位解决,面板内滚动仍不参与(见 contains 判断) */
+let scrollRaf = 0;
 function onDocScroll(e: Event) {
+  if (!open.value) return;
   if (listEl.value && e.target instanceof Node && listEl.value.contains(e.target)) return;
-  close();
+  if (scrollRaf) return;
+  scrollRaf = requestAnimationFrame(() => {
+    scrollRaf = 0;
+    if (!open.value) return;
+    const t = trigger.value;
+    if (!t) return;
+    const r = t.getBoundingClientRect();
+    if (r.bottom < -4 || r.top > window.innerHeight + 4) {
+      close();
+      return;
+    }
+    placePanel(true);
+  });
 }
 
 function onPanelKeydown(e: KeyboardEvent) {
@@ -116,7 +132,7 @@ function onPanelKeydown(e: KeyboardEvent) {
 
 onMounted(() => {
   document.addEventListener("pointerdown", onDocPointer, true);
-  // 滚动/改变尺寸时收起,避免面板与触发器脱节(面板内部滚动除外,见 onDocScroll)
+  // 滚动时面板跟随触发器(面板内部滚动除外,见 onDocScroll);改变尺寸时收起重开
   window.addEventListener("scroll", onDocScroll, true);
   window.addEventListener("resize", close);
 });
@@ -125,6 +141,7 @@ onBeforeUnmount(() => {
   document.removeEventListener("pointerdown", onDocPointer, true);
   window.removeEventListener("scroll", onDocScroll, true);
   window.removeEventListener("resize", close);
+  if (scrollRaf) cancelAnimationFrame(scrollRaf);
 });
 </script>
 

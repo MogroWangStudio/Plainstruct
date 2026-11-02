@@ -7,6 +7,8 @@ import {
   normalizeAutosaveDelay,
   normalizeUiFontSize,
   normalizeUiFontWeight,
+  UI_FONT_SCALE_MAX,
+  UI_FONT_SCALE_MIN,
   useAppStore,
 } from "@/stores/app";
 import { useUiStore } from "@/stores/ui";
@@ -227,6 +229,22 @@ const editorFontOptions = computed<{ value: EditorFontMode; label: string }[]>((
   { value: "serif", label: t("settings.fontSerif") },
   { value: "custom", label: t("settings.fontCustom") },
 ]);
+
+/* ---------- 界面缩放(移动端):增减按钮步进,桌面仍为预设下拉 + 自定义数值 ---------- */
+
+const UI_SCALE_STEP = 0.05;
+
+const scalePercent = computed(() => Math.round(normalizeUiFontSize(app.settings.uiFontSize) * 100));
+const scaleAtMin = computed(() => normalizeUiFontSize(app.settings.uiFontSize) <= UI_FONT_SCALE_MIN + 1e-6);
+const scaleAtMax = computed(() => normalizeUiFontSize(app.settings.uiFontSize) >= UI_FONT_SCALE_MAX - 1e-6);
+
+function stepScale(dir: 1 | -1) {
+  const cur = normalizeUiFontSize(app.settings.uiFontSize);
+  // 自定义数值先吸附到 5% 档位再步进,任意值都能落回规整档
+  const grid = Math.round(cur / UI_SCALE_STEP) * UI_SCALE_STEP;
+  const next = Math.min(UI_FONT_SCALE_MAX, Math.max(UI_FONT_SCALE_MIN, grid + dir * UI_SCALE_STEP));
+  void app.setAppearance({ uiFontSize: Number(next.toFixed(2)) });
+}
 
 const uiFontModel = computed({
   get: () => app.settings.uiFont ?? "system",
@@ -630,12 +648,35 @@ function openRelease(url: string) {
                   <SelectMenu v-model="uiFontModel" :options="uiFontOptions" align="right" class="shrink-0" />
                 </div>
 
-                <!-- 界面字号 -->
+                <!-- 界面字号(界面整体缩放):移动端用增减按钮步进,桌面保持预设下拉 + 自定义数值 -->
                 <div class="settings-row" style="--i: 2">
                   <div class="min-w-0">
-                    <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.uiFontSize") }}</p>
+                    <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">
+                      {{ t(isMobilePlatform ? "settings.uiScale" : "settings.uiFontSize") }}
+                    </p>
                   </div>
-                  <div class="flex shrink-0 items-center gap-2">
+                  <div v-if="isMobilePlatform" class="scale-stepper">
+                    <button
+                      type="button"
+                      class="scale-btn"
+                      :disabled="scaleAtMin"
+                      :aria-label="t('settings.uiScaleDecrease')"
+                      @click="stepScale(-1)"
+                    >
+                      <AppIcon name="minus" :size="15" />
+                    </button>
+                    <span class="scale-value mono">{{ scalePercent }}%</span>
+                    <button
+                      type="button"
+                      class="scale-btn"
+                      :disabled="scaleAtMax"
+                      :aria-label="t('settings.uiScaleIncrease')"
+                      @click="stepScale(1)"
+                    >
+                      <AppIcon name="plus" :size="15" />
+                    </button>
+                  </div>
+                  <div v-else class="flex shrink-0 items-center gap-2">
                     <SelectMenu v-model="uiFontSizeModel" :options="uiFontSizeOptions" align="right" class="shrink-0" />
                     <template v-if="uiFontSizeModel === CUSTOM_SIZE">
                       <input
@@ -1071,6 +1112,49 @@ function openRelease(url: string) {
 .settings-block + .settings-row,
 .settings-row + .settings-block {
   border-top: 1px solid var(--color-line);
+}
+
+/* 界面缩放步进器(移动端):− 值 + 一行排布,按下即时缩小给出触点反馈 */
+.scale-stepper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  align-self: flex-start;
+}
+.scale-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--color-line);
+  border-radius: 10px;
+  background: var(--color-bg);
+  color: var(--color-ink-2);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background-color var(--duration-fast) var(--ease-plain),
+    color var(--duration-fast) var(--ease-plain),
+    transform var(--duration-fast) var(--ease-plain);
+}
+.scale-btn:active {
+  background: var(--color-surface-3);
+  color: var(--color-ink);
+  transform: scale(0.92);
+}
+.scale-btn:disabled {
+  opacity: 0.3;
+  pointer-events: none;
+}
+.scale-value {
+  min-width: 56px;
+  text-align: center;
+  font-size: calc(14.5px * var(--ui-font-scale));
+  font-weight: 500;
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
 }
 
 /* 软件主题:配色预览卡片网格 */
