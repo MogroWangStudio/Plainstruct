@@ -172,13 +172,16 @@ onBeforeUnmount(() => {
     <!-- 顶栏:全局常驻,桌面式品牌区(logo + 状态 + 站点名),右侧常驻操作;
          safe-area 顶部内边距避免与系统状态栏重叠 -->
     <header class="topbar">
-      <div class="flex min-w-0 flex-1 items-center gap-2">
-        <BrandLogo :size="22" class="shrink-0" />
+      <div class="brand-row flex min-w-0 flex-1 items-center gap-2">
+        <BrandLogo :size="22" class="topbar-logo shrink-0" />
         <BrandStatus class="topbar-status" />
-        <template v-if="site.open && site.config">
-          <span class="shrink-0 text-[calc(13px*var(--ui-font-scale))] text-ink-3">/</span>
-          <span class="min-w-0 truncate text-[calc(13px*var(--ui-font-scale))] text-ink-2">{{ site.config.name }}</span>
-        </template>
+        <!-- 站点名收进同一容器:祝福语播报期间随 Logo 一起平滑让位,把文本位整个让给状态语 -->
+        <div v-if="site.open && site.config" class="topbar-site">
+          <div class="topbar-site-clip">
+            <span class="shrink-0 text-[calc(13px*var(--ui-font-scale))] text-ink-3" aria-hidden="true">/</span>
+            <span class="min-w-0 truncate text-[calc(13px*var(--ui-font-scale))] text-ink-2">{{ site.config.name }}</span>
+          </div>
+        </div>
       </div>
       <!-- 桌面顶栏的悬停入口在触屏上常驻右侧:返回主菜单、查看发布状态、预览站点;
            设置与关于为主菜单与各页共用的应用级入口,同样常驻 -->
@@ -315,6 +318,59 @@ onBeforeUnmount(() => {
 /* 顶栏状态区:窄屏收紧问候语宽度,给站点名与右侧操作留位 */
 .topbar-status :deep(.status-text) {
   max-width: 12ch;
+}
+/* 祝福语播报期间(发布完成,与发布页彩带同帧的 12s)放开上限:此刻状态语是顶栏最高
+   优先级的信息,Logo 与站点名让位后文本位全归它,最长一条也能完整显示 */
+.topbar-status.is-bless :deep(.status-text) {
+  max-width: none;
+}
+
+/* 祝福语播报期间的品牌区让位:发布成功是一切之上的时刻,顶栏文本位整个让给这句祝福,
+   播报结束(12s)祝福语退场,两者原路回归(去与回走同一条路)。
+   Logo 以 max-width(22px→0) 收起并用负外边距吞掉自身两侧的间距,把释放的宽度全部
+   让给状态文本;站点名容器以 grid 1fr→0fr 收起(与 transitions.css 树形折叠同一手法) */
+.topbar-logo {
+  max-width: 22px;
+  /* 收放过渡中 svg(固定 22px)始终被容器裁住,不会中途溢出;
+     Zzz 仅在页面退后台时出现,彼时顶栏不可见,常驻裁剪无碍 */
+  overflow: hidden;
+  transition:
+    max-width var(--duration-slow) var(--ease-plain),
+    margin var(--duration-slow) var(--ease-plain),
+    opacity var(--duration-base) var(--ease-plain);
+}
+.topbar-site {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  min-width: 0;
+  transition:
+    grid-template-columns var(--duration-slow) var(--ease-plain),
+    opacity var(--duration-base) var(--ease-plain);
+}
+.topbar-site > * {
+  overflow: hidden;
+  min-width: 0;
+}
+.topbar-site-clip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.brand-row:has(.topbar-status.is-bless) .topbar-logo {
+  max-width: 0;
+  margin-inline: -8px;
+  opacity: 0;
+}
+.topbar-status.is-bless ~ .topbar-site {
+  grid-template-columns: minmax(0, 0fr);
+  opacity: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .topbar-logo,
+  .topbar-site {
+    transition: none;
+  }
 }
 
 /* 右侧常驻操作:图标按钮,热区 34 见方(指腹友好),按下即时响应 */
