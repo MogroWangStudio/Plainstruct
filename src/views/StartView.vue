@@ -246,7 +246,8 @@ async function openRecent(path: string) {
         >
           {{ mobile ? t("start.libraryEmpty") : t("start.recentEmpty") }}
         </div>
-        <TransitionGroup v-else name="list" tag="div" class="panel min-h-[104px] divide-y divide-line overflow-hidden">
+        <!-- 空态与加载占位有最小高度;非空列表按条目真实高度渲染 —— 底部不再多出一截空白 -->
+        <TransitionGroup v-else name="list" tag="div" class="panel divide-y divide-line overflow-hidden">
           <div v-for="item in listItems" :key="item.key" class="recent-row">
             <button class="recent-item" @click="openRecent(item.path)">
               <AppIcon name="folder" :size="16" class="text-ink-3" />
@@ -451,6 +452,23 @@ async function openRecent(path: string) {
 }
 .recent-row:hover {
   background: var(--color-surface-2);
+}
+/* 列表过渡:固定置顶/增删条目时其余行平滑让位,离开的行淡出下移 */
+.list-move,
+.list-enter-active,
+.list-leave-active {
+  transition:
+    transform var(--duration-base) var(--ease-plain),
+    opacity var(--duration-base) var(--ease-plain);
+}
+.list-enter-from,
+.list-leave-to {
+  opacity: 0;
+  transform: translateY(6px);
+}
+.list-leave-active {
+  position: absolute;
+  width: 100%;
 }
 .recent-item {
   display: flex;
