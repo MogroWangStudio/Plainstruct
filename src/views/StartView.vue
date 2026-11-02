@@ -11,6 +11,7 @@ import { isMobilePlatform } from "@/lib/platform";
 import { useBackdropClose } from "@/lib/backdrop-close";
 import { navigateView, useBackClose } from "@/lib/backGesture";
 import AppIcon from "@/components/AppIcon.vue";
+import DirBrowseModal from "@/components/DirBrowseModal.vue";
 
 const { t } = useI18n();
 const app = useAppStore();
@@ -18,15 +19,33 @@ const site = useSiteStore();
 const ui = useUiStore();
 const { onBackdropClick, resetBackdropClicks } = useBackdropClose();
 
-/** 移动端(安卓/iOS):无系统目录选择,站点固定建在数据目录 sites/ 下,
- *  打开走本地站点库列表 */
+/** 移动端(安卓/iOS):系统目录选择器不可用,目录浏览走自建对话框(需「所有文件访问」权限);
+ *  站点默认建在数据目录 sites/ 下,也可在新建时选手机上的其他文件夹 */
 const mobile = isMobilePlatform;
 
 const showWizard = ref(false);
 
-/** 打开新建向导:空白点击计数随开窗清零 */
+/** 目录浏览对话框:open=打开本地站点;location=新建向导的保存位置 */
+const browseOpen = ref(false);
+const browseMode = ref<"open" | "location">("open");
+
+function openBrowse(mode: "open" | "location") {
+  browseMode.value = mode;
+  browseOpen.value = true;
+}
+
+function onBrowseSelect(path: string) {
+  if (browseMode.value === "open") {
+    void openRecent(path);
+    return;
+  }
+  wizard.customDir = path;
+}
+
+/** 打开新建向导:空白点击计数随开窗清零,保存位置复位为软件本地 */
 function openWizard() {
   showWizard.value = true;
+  wizard.customDir = "";
   resetBackdropClicks();
 }
 
@@ -39,7 +58,7 @@ useBackClose(
 /** 最近打开条目的站点摘要(类型与大小,异步获取;null = 获取失败) */
 const siteInfos = ref<Record<string, { siteType: string; sizeBytes: number } | null>>({});
 
-/** 移动端本地站点库(数据目录 sites/ 下的站点) */
+/** 移动端:本地站点库(数据目录 sites/ 下的站点) */
 const library = ref<LanSiteBrief[]>([]);
 
 onMounted(() => {
@@ -119,14 +138,27 @@ const libraryItems = computed<StartItem[]>(() =>
     ),
 );
 
-const listItems = computed<StartItem[]>(() => (mobile.value ? libraryItems.value : recentItems.value));
+/** 移动端:本地站点项目 = 站点库(sites/) ∪ 最近打开(含手机其他文件夹的站点),按路径去重。
+ *  库条目优先(有类型与大小摘要),固定项置顶,组内按名称排序 */
+const mobileItems = computed<StartItem[]>(() => {
+  const byPath = new Map<string, StartItem>();
+  for (const lib of libraryItems.value) byPath.set(lib.path, lib);
+  for (const rec of recentItems.value) {
+    if (!byPath.has(rec.path)) byPath.set(rec.path, rec);
+  }
+  return [...byPath.values()].sort((a, b) =>
+    a.pinned === b.pinned ? a.name.localeCompare(b.name, undefined, { sensitivity: "base" }) : a.pinned ? -1 : 1,
+  );
+});
+
+const listItems = computed<StartItem[]>(() => (mobile.value ? mobileItems.value : recentItems.value));
 
 /** 固定 / 取消固定:后端持久化并重排最近列表,刷新后新顺序就地生效 */
 async function togglePin(item: StartItem) {
   await app.togglePinned(item.path);
 }
 
-const wizard = reactive({ name: "", description: "", folder: "", siteType: "docs" as SiteType });
+const wizard = reactive({ name: "", description: "", folder: "", customDir: "", siteType: "docs" as SiteType });
 const wizardError = ref("");
 const creating = ref(false);
 
@@ -140,8 +172,10 @@ async function createSite() {
     wizardError.value = t("wizard.invalidName");
     return;
   }
-  // 移动端不选目录:直接落在数据目录 sites/<名称> 下
-  const dir = mobile.value ? libraryPath(wizard.name.trim()) : wizard.folder;
+  // 移动端:默认落数据目录 sites/<名称>,向导里也可改选手机上的其他文件夹
+  const dir = mobile.value
+    ? wizard.customDir.trim() || libraryPath(wizard.name.trim())
+    : wizard.folder;
   if (!dir) {
     wizardError.value = t("wizard.invalidFolder");
     return;
@@ -159,7 +193,12 @@ async function createSite() {
   }
 }
 
+/** 打开站点:桌面走系统目录选择器;移动端走自建目录浏览(系统选择器在安卓不可用) */
 async function openSite() {
+  if (mobile.value) {
+    openBrowse("open");
+    return;
+  }
   const dir = await ipc.pickDirectory();
   if (!dir) return;
   try {
@@ -177,11 +216,6 @@ async function openRecent(path: string) {
     ui.toast(t("start.openFailed", { msg: t("start.notASite") }), "error");
   }
 }
-
-/** 移动端:打开本地站点库中的站点 */
-function openLibrarySite(name: string) {
-  void openRecent(libraryPath(name));
-}
 </script>
 
 <template>
@@ -195,7 +229,7 @@ function openLibrarySite(name: string) {
           <AppIcon name="plus" :size="16" />
           {{ t("start.createSite") }}
         </button>
-        <button v-if="!mobile" class="btn btn-secondary h-10 flex-1" @click="openSite">
+        <button class="btn btn-secondary h-10 flex-1" @click="openSite">
           <AppIcon name="folder" :size="16" />
           {{ t("start.openSite") }}
         </button>
@@ -214,7 +248,7 @@ function openLibrarySite(name: string) {
         </div>
         <TransitionGroup v-else name="list" tag="div" class="panel min-h-[104px] divide-y divide-line overflow-hidden">
           <div v-for="item in listItems" :key="item.key" class="recent-row">
-            <button class="recent-item" @click="item.isLibrary ? openLibrarySite(item.name) : openRecent(item.path)">
+            <button class="recent-item" @click="openRecent(item.path)">
               <AppIcon name="folder" :size="16" class="text-ink-3" />
               <span class="min-w-0 flex-1 text-left">
                 <span class="block truncate text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ item.name }}</span>
@@ -260,6 +294,9 @@ function openLibrarySite(name: string) {
         </button>
       </div>
     </div>
+
+    <!-- 移动端目录浏览:打开本地站点 / 新建向导选保存位置 -->
+    <DirBrowseModal v-if="browseOpen" :title="browseMode === 'open' ? t('start.openSite') : t('wizard.location')" @select="onBrowseSelect" @cancel="browseOpen = false" />
 
     <!-- 新建站点向导 -->
     <Teleport to="body">
@@ -348,6 +385,22 @@ function openLibrarySite(name: string) {
                   </button>
                 </div>
                 <p class="field-hint">{{ mobile ? t("wizard.folderHintMobile") : t("wizard.folderHint") }}</p>
+              </div>
+              <!-- 移动端:保存位置可选,默认软件本地(数据目录 sites/);目录浏览需「所有文件访问」权限 -->
+              <div v-else>
+                <label class="field-label">{{ t("wizard.location") }}</label>
+                <div class="flex gap-2">
+                  <input
+                    class="input !text-[calc(12px*var(--ui-font-scale))]"
+                    type="text"
+                    readonly
+                    :value="wizard.customDir || t('wizard.locationDefault')"
+                  />
+                  <button class="btn btn-secondary shrink-0" @click="openBrowse('location')">
+                    {{ t("wizard.changeLocation") }}
+                  </button>
+                </div>
+                <p class="field-hint">{{ t("wizard.locationHint") }}</p>
               </div>
               <p v-if="wizardError" class="text-[calc(12.5px*var(--ui-font-scale))] text-danger">{{ wizardError }}</p>
             </div>

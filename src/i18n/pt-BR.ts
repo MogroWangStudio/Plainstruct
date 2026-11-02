@@ -129,6 +129,16 @@ export default {
     copyOfBuiltin: "Copiado do integrado “{name}”",
     copyOfBuiltinShort: "Do integrado",
   },
+  browse: {
+    up: "Pasta acima",
+    choose: "Usar esta pasta",
+    empty: "Esta pasta está vazia",
+    isSite: "Site",
+    deniedTitle: "Acesso a arquivos necessário",
+    deniedBody: "Para navegar pelas pastas do dispositivo é preciso a permissão \"Acesso a todos os arquivos\": Configurações → Aplicativos → Plainstruct → Permissões → Arquivos e mídia → Permitir o gerenciamento de todos os arquivos.",
+    retry: "Tentar novamente",
+  },
+
   start: {
     title: "Crie seu site de documentação",
     subtitle: "Escreva Markdown em pastas, compile com um clique, visualize localmente e publique no GitHub Pages.",
@@ -144,6 +154,10 @@ export default {
     unpin: "Desafixar",
   },
   wizard: {
+    location: "Local de salvamento",
+    locationDefault: "Armazenamento do app",
+    changeLocation: "Alterar",
+    locationHint: "Os sites são salvos por padrão no diretório de dados do app. Toque em \"Alterar\" para escolher outra pasta do dispositivo.",
     title: "Novo site",
     siteType: "Tipo de site",
     typeDocs: "Documentação",

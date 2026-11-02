@@ -449,6 +449,16 @@ export const ipc = {
     const dir = await open({ directory: true, multiple: false });
     return typeof dir === "string" ? dir : null;
   },
+  /** 存储是否可访问(安卓「所有文件访问」授权探测;桌面恒为 true 由系统目录选择器接管) */
+  async storageAccessible(): Promise<boolean> {
+    if (!inTauri) return true;
+    return invoke<boolean>("storage_accessible");
+  },
+  /** 列出目录下的子目录(移动端自建目录浏览对话框用;无权限时后端返回 "storage-denied") */
+  async listBrowseDirs(path: string): Promise<{ name: string; isSite: boolean }[]> {
+    if (!inTauri) return [];
+    return invoke<{ name: string; isSite: boolean }[]>("list_browse_dirs", { path });
+  },
   async pickLogo(): Promise<string | null> {
     if (!inTauri) return mockPickImage();
     const { open } = await import("@tauri-apps/plugin-dialog");

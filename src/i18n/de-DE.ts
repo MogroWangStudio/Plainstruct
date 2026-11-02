@@ -129,6 +129,16 @@ export default {
     copyOfBuiltin: "Kopiert vom integrierten Plugin „{name}“",
     copyOfBuiltinShort: "Aus integriertem",
   },
+  browse: {
+    up: "Übergeordneter Ordner",
+    choose: "Diesen Ordner verwenden",
+    empty: "Dieser Ordner ist leer",
+    isSite: "Website",
+    deniedTitle: "Dateizugriff erforderlich",
+    deniedBody: "Zum Durchsuchen von Geräteordnern wird die Berechtigung „Auf alle Dateien zugreifen“ benötigt: Einstellungen → Apps → Plainstruct → Berechtigungen → Dateien und Medien → Verwaltung aller Dateien erlauben.",
+    retry: "Erneut versuchen",
+  },
+
   start: {
     title: "Erstellen Sie Ihre Dokumentations-Website",
     subtitle: "Markdown in Ordnern schreiben, mit einem Klick kompilieren, lokal in der Vorschau ansehen, auf GitHub Pages veröffentlichen.",
@@ -144,6 +154,10 @@ export default {
     unpin: "Anheften aufheben",
   },
   wizard: {
+    location: "Speicherort",
+    locationDefault: "App-Speicher",
+    changeLocation: "Ändern",
+    locationHint: "Websites werden standardmäßig im App-Datenverzeichnis gespeichert. Über „Ändern“ wählen Sie einen anderen Ordner auf dem Gerät.",
     title: "Neue Website",
     siteType: "Website-Typ",
     typeDocs: "Dokumentation",

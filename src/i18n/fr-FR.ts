@@ -129,6 +129,16 @@ export default {
     copyOfBuiltin: "Copiée depuis l’extension intégrée « {name} »",
     copyOfBuiltinShort: "Copie d’une intégrée",
   },
+  browse: {
+    up: "Dossier parent",
+    choose: "Utiliser ce dossier",
+    empty: "Ce dossier est vide",
+    isSite: "Site",
+    deniedTitle: "Accès aux fichiers requis",
+    deniedBody: "La navigation dans les dossiers de l'appareil nécessite l'autorisation « Accéder à tous les fichiers » : Paramètres → Applications → Plainstruct → Autorisations → Fichiers et multimédia → Autoriser la gestion de tous les fichiers.",
+    retry: "Réessayer",
+  },
+
   start: {
     title: "Créez votre site de documentation",
     subtitle: "Écrivez du Markdown dans des dossiers, compilez en un clic, prévisualisez en local et publiez sur GitHub Pages.",
@@ -144,6 +154,10 @@ export default {
     unpin: "Désépingler",
   },
   wizard: {
+    location: "Emplacement",
+    locationDefault: "Stockage de l'app",
+    changeLocation: "Modifier",
+    locationHint: "Les sites sont enregistrés par défaut dans le dossier de données de l'app. Touchez « Modifier » pour choisir un autre dossier de l'appareil.",
     title: "Nouveau site",
     siteType: "Type de site",
     typeDocs: "Documentation",

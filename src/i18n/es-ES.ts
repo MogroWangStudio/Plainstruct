@@ -129,6 +129,16 @@ export default {
     copyOfBuiltin: "Copiado del integrado “{name}”",
     copyOfBuiltinShort: "Del integrado",
   },
+  browse: {
+    up: "Carpeta superior",
+    choose: "Usar esta carpeta",
+    empty: "Esta carpeta está vacía",
+    isSite: "Sitio",
+    deniedTitle: "Se necesita acceso a archivos",
+    deniedBody: "Para explorar carpetas del dispositivo se necesita el permiso «Acceder a todos los archivos»: Ajustes → Aplicaciones → Plainstruct → Permisos → Archivos y multimedia → Permitir administrar todos los archivos.",
+    retry: "Reintentar",
+  },
+
   start: {
     title: "Crea tu sitio de documentación",
     subtitle: "Escribe Markdown en carpetas, compila con un clic, previsualiza en local y publica en GitHub Pages.",
@@ -144,6 +154,10 @@ export default {
     unpin: "Desanclar",
   },
   wizard: {
+    location: "Ubicación",
+    locationDefault: "Almacenamiento de la app",
+    changeLocation: "Cambiar",
+    locationHint: "Los sitios se guardan por defecto en el directorio de datos de la app. Toca «Cambiar» para elegir otra carpeta del dispositivo.",
     title: "Nuevo sitio",
     siteType: "Tipo de sitio",
     typeDocs: "Documentación",

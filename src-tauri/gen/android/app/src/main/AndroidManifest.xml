@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 「所有文件访问」:站点可新建/保存在应用沙箱之外的任意文件夹(新建向导自选位置、
+         主菜单打开本地站点)。运行时以探测(read_dir /sdcard)判定,未授权时界面引导
+         用户到系统设置手动授予 -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
 
     <!-- AndroidTV support -->
     <uses-feature android:name="android.software.leanback" android:required="false" />

@@ -129,6 +129,16 @@ export default {
     copyOfBuiltin: "Copied from built-in “{name}”",
     copyOfBuiltinShort: "From built-in",
   },
+  browse: {
+    up: "Up one level",
+    choose: "Use this folder",
+    empty: "This folder is empty",
+    isSite: "Site",
+    deniedTitle: "File access required",
+    deniedBody: "Browsing folders on this device needs the \"All files access\" permission: System settings → Apps → Plainstruct → Permissions → Files and media → Allow managing all files.",
+    retry: "Retry",
+  },
+
   start: {
     title: "Build your documentation site",
     subtitle: "Write Markdown in folders, build with one click, preview locally, publish to GitHub Pages.",
@@ -144,6 +154,10 @@ export default {
     unpin: "Unpin",
   },
   wizard: {
+    location: "Save location",
+    locationDefault: "App storage",
+    changeLocation: "Change",
+    locationHint: "Sites are saved in the app data directory by default. Tap \"Change\" to pick another folder on this device.",
     title: "New site",
     siteType: "Site type",
     typeDocs: "Documentation",

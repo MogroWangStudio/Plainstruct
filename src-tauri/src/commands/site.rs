@@ -328,3 +328,47 @@ pub fn get_site_info(window: tauri::WebviewWindow, path: String) -> Result<SiteB
         size_bytes: dir_size(&root),
     })
 }
+
+/// 移动端目录浏览条目:子目录名 + 是否为素构站点(含 plainstruct/site.json)
+#[derive(Serialize)]
+pub struct BrowseEntry {
+    pub name: String,
+    pub is_site: bool,
+}
+
+/// 存储是否可访问:安卓「所有文件访问」权限的试探判定 —— 能列出 /sdcard 即已授权。
+/// 系统目录选择器(dialog 插件)在安卓没有目录树实现,自建浏览对话框用它探测权限。
+#[tauri::command]
+pub fn storage_accessible(window: tauri::WebviewWindow) -> Result<bool, String> {
+    ensure_main(&window)?;
+    Ok(std::fs::read_dir("/sdcard").is_ok() || std::fs::read_dir("/storage/emulated/0").is_ok())
+}
+
+/// 列出某目录下的子目录(移动端自建目录浏览对话框用)。只列目录不列文件;
+/// 隐藏目录跳过。无存储权限时返回 "storage-denied",前端据此引导授权。
+#[tauri::command]
+pub fn list_browse_dirs(window: tauri::WebviewWindow, path: String) -> Result<Vec<BrowseEntry>, String> {
+    ensure_main(&window)?;
+    let rd = std::fs::read_dir(&path).map_err(|e| {
+        if matches!(e.kind(), std::io::ErrorKind::PermissionDenied) {
+            "storage-denied".to_string()
+        } else {
+            format!("{path}: {e}")
+        }
+    })?;
+    let mut out: Vec<BrowseEntry> = Vec::new();
+    for entry in rd.flatten() {
+        let Ok(ft) = entry.file_type() else { continue };
+        if !ft.is_dir() {
+            continue;
+        }
+        let name = entry.file_name().to_string_lossy().to_string();
+        if name.starts_with('.') {
+            continue;
+        }
+        let is_site = entry.path().join("plainstruct").join("site.json").is_file();
+        out.push(BrowseEntry { name, is_site });
+    }
+    out.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    Ok(out)
+}

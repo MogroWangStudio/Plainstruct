@@ -260,6 +260,8 @@ pub fn run() {
             commands::get_site_root,
             commands::read_site_config,
             commands::get_site_info,
+            commands::storage_accessible,
+            commands::list_browse_dirs,
             commands::save_site_config,
             commands::set_site_logo,
             commands::remove_site_logo,

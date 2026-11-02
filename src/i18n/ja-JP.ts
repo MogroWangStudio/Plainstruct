@@ -129,6 +129,16 @@ export default {
     copyOfBuiltin: "内蔵「{name}」から複製",
     copyOfBuiltinShort: "内蔵から複製",
   },
+  browse: {
+    up: "一つ上へ",
+    choose: "このフォルダを選択",
+    empty: "このフォルダは空です",
+    isSite: "サイト",
+    deniedTitle: "ファイルアクセス権限が必要です",
+    deniedBody: "端末内のフォルダを閲覧するには「すべてのファイルへのアクセス」権限が必要です。設定 → アプリ → Plainstruct → 権限 → ファイルとメディア → すべてのファイルの管理を許可してください。",
+    retry: "再試行",
+  },
+
   start: {
     title: "ドキュメントサイトを作りましょう",
     subtitle: "フォルダに Markdown を書き、ワンクリックでビルド。ローカルでプレビューし、GitHub Pages へ公開できます。",
@@ -144,6 +154,10 @@ export default {
     unpin: "固定を解除",
   },
   wizard: {
+    location: "保存先",
+    locationDefault: "アプリ内",
+    changeLocation: "変更",
+    locationHint: "サイトは既定でアプリのデータディレクトリに保存されます。「変更」をタップすると端末内の別のフォルダを選択できます。",
     title: "サイトを新規作成",
     siteType: "サイトの種類",
     typeDocs: "ドキュメント",

@@ -129,6 +129,16 @@ export default {
     copyOfBuiltin: "내장 플러그인 “{name}”에서 복사",
     copyOfBuiltinShort: "내장에서 복사",
   },
+  browse: {
+    up: "위로",
+    choose: "이 폴더 선택",
+    empty: "이 폴더는 비어 있습니다",
+    isSite: "사이트",
+    deniedTitle: "파일 접근 권한이 필요합니다",
+    deniedBody: "기기의 폴더를 탐색하려면 '모든 파일 접근' 권한이 필요합니다. 설정 → 앱 → Plainstruct → 권한 → 파일 및 미디어 → 모든 파일 관리를 허용해 주세요.",
+    retry: "다시 시도",
+  },
+
   start: {
     title: "나만의 문서 사이트를 만들어 보세요",
     subtitle: "폴더에 마크다운을 쓰고, 클릭 한 번으로 빌드하고, 로컬에서 미리본 뒤 GitHub Pages에 게시하세요.",
@@ -144,6 +154,10 @@ export default {
     unpin: "고정 해제",
   },
   wizard: {
+    location: "저장 위치",
+    locationDefault: "앱 저장소",
+    changeLocation: "변경",
+    locationHint: "사이트는 기본적으로 앱 데이터 디렉터리에 저장됩니다. '변경'을 눌러 기기의 다른 폴더를 선택할 수 있습니다.",
     title: "새 사이트",
     siteType: "사이트 유형",
     typeDocs: "문서",

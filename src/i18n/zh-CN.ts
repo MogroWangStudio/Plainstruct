@@ -131,6 +131,16 @@ export default {
     copyOfBuiltin: "复制自内置插件「{name}」",
     copyOfBuiltinShort: "复制自内置",
   },
+  browse: {
+    up: "上一级",
+    choose: "选择此文件夹",
+    empty: "此文件夹为空",
+    isSite: "站点",
+    deniedTitle: "需要文件访问权限",
+    deniedBody: "浏览手机上的文件夹需要「所有文件访问」权限：系统设置 → 应用 → 素构 → 权限 → 文件和媒体 → 允许管理所有文件。",
+    retry: "重试",
+  },
+
   start: {
     title: "创建你的文档站点",
     subtitle: "文件夹里写 Markdown，一键构建、发布到 GitHub Pages。",
@@ -146,6 +156,10 @@ export default {
     unpin: "取消固定",
   },
   wizard: {
+    location: "保存位置",
+    locationDefault: "软件本地",
+    changeLocation: "更改",
+    locationHint: "站点默认保存在应用数据目录,点「更改」可选择手机上的其他文件夹。",
     title: "新建站点",
     siteType: "站点类型",
     typeDocs: "文档站点",
