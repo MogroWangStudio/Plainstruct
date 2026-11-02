@@ -194,7 +194,9 @@ onBeforeUnmount(() => {
           :title="backLabel"
           @click="goBack"
         >
-          <AppIcon name="arrowLeft" :size="17" />
+          <!-- 站点内用主菜单语义的单一图标:后退箭头在真机上易被误读为「上一步」,
+               让人找不到返回主菜单的入口;独立视图(设置页)才是「返回上一层」 -->
+          <AppIcon :name="site.open ? 'home' : 'arrowLeft'" :size="17" />
         </button>
         <button
           v-if="showPublish"
