@@ -118,7 +118,7 @@ pub async fn lan_push_site(
     site_root: String,
 ) -> Result<String, String> {
     ensure_main(&window)?;
-    drop(state);
+    drop(state); // 无 Drop 类型:仅为释放 State 借用,命令体内重新获取 // 无 Drop 类型:仅为释放 State 借用,命令体内重新获取
     // 打包与传输都在阻塞线程执行,避免卡住命令运行时
     let svc = {
         let state = app.state::<AppState>();

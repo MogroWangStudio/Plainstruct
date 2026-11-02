@@ -40,13 +40,8 @@ async function load() {
   }
 }
 
-/** 授权引导后重试:重新探测权限(用户可能已去系统设置授完)并刷新列表 */
+/** 授权引导后重试:列表加载本身就是权威探测(未授权时再次给出引导) */
 async function retry() {
-  try {
-    await ipc.storageAccessible();
-  } catch {
-    /* 探测失败按未授权处理,由列表加载再次报错 */
-  }
   await load();
 }
 

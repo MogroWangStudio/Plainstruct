@@ -1,6 +1,6 @@
 /** 站点插件命令:用户导入插件的文件管理(.plainstruct/plugins/<id>/) */
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tauri::State;
 
 use crate::fsutil::{safe_join, safe_name};
@@ -51,7 +51,7 @@ pub struct SitePluginFiles {
     pub files: Vec<SitePluginFile>,
 }
 
-fn plugins_root(root: &PathBuf) -> PathBuf {
+fn plugins_root(root: &Path) -> PathBuf {
     root.join(".plainstruct").join("plugins")
 }
 
@@ -68,7 +68,7 @@ fn plugin_ext(path: &std::path::Path) -> Option<String> {
     }
 }
 
-fn plugin_dir(root: &PathBuf, id: &str) -> Result<PathBuf, String> {
+fn plugin_dir(root: &Path, id: &str) -> Result<PathBuf, String> {
     safe_join(&plugins_root(root), id)
 }
 

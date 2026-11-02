@@ -23,9 +23,6 @@ onMounted(() => {
     greetIdx.value = (greetIdx.value + 1) % GREETING_KEYS.length;
   }, 45000);
 });
-onBeforeUnmount(() => {
-  if (greetTimer) clearInterval(greetTimer);
-});
 
 /* ---------- 祝福语:发布结果出现时播报 12s(与 PublishView 的彩带同帧触发) ---------- */
 const blessing = ref("");
@@ -55,6 +52,12 @@ watch(
     }
   },
 );
+
+onBeforeUnmount(() => {
+  if (greetTimer) clearInterval(greetTimer);
+  if (blessingTimer) clearTimeout(blessingTimer);
+  if (savedTimer) clearTimeout(savedTimer);
+});
 
 type StatusKind = "greet" | "bless" | "saving" | "countdown" | "dirty" | "saved" | "publish" | "deploy" | "fail";
 

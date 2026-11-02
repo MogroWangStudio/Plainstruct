@@ -1,6 +1,6 @@
 /** 构建命令:清理/写出文本文件/拷贝资源 */
 use serde::Deserialize;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tauri::State;
 
 use crate::fsutil::{rel_posix, safe_join};
@@ -19,7 +19,7 @@ pub struct CopyItem {
     pub dest: String,
 }
 
-fn build_root(root: &PathBuf) -> PathBuf {
+fn build_root(root: &Path) -> PathBuf {
     root.join("build")
 }
 
@@ -129,7 +129,7 @@ pub(crate) fn dir_size(dir: &std::path::Path) -> u64 {
 }
 
 /// 供 GitHub 同步收集构建产物
-pub fn collect_build_files(root: &PathBuf) -> Result<Vec<(String, Vec<u8>)>, String> {
+pub fn collect_build_files(root: &Path) -> Result<Vec<(String, Vec<u8>)>, String> {
     let build = build_root(root);
     if !build.exists() {
         return Err("build 目录不存在,请先构建".into());

@@ -1,7 +1,7 @@
 /** 内容命令:文件树、文档读写、增删改移、导入、手动排序 */
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tauri::State;
 
 use crate::commands::site::plainstruct_dir;
@@ -25,7 +25,7 @@ pub struct TreeNode {
     pub children: Vec<TreeNode>,
 }
 
-fn content_root(root: &PathBuf) -> PathBuf {
+fn content_root(root: &Path) -> PathBuf {
     root.join("content")
 }
 
@@ -76,11 +76,11 @@ pub struct FolderMeta {
 
 type FolderConfigMap = BTreeMap<String, FolderMeta>;
 
-fn folders_path(root: &PathBuf) -> PathBuf {
+fn folders_path(root: &Path) -> PathBuf {
     plainstruct_dir(root).join("folders.json")
 }
 
-fn read_folder_map(root: &PathBuf) -> FolderConfigMap {
+fn read_folder_map(root: &Path) -> FolderConfigMap {
     std::fs::read_to_string(folders_path(root))
         .ok()
         .and_then(|text| serde_json::from_str(&text).ok())
@@ -122,25 +122,25 @@ pub fn write_folder_config(window: tauri::WebviewWindow, state: State<'_, AppSta
 /// 已记录的项按列表顺序排列;未记录的项按默认规则追加在后,因此新建/导入不打乱既有排列。
 type DocOrderMap = BTreeMap<String, Vec<String>>;
 
-fn order_path(root: &PathBuf) -> PathBuf {
+fn order_path(root: &Path) -> PathBuf {
     plainstruct_dir(root).join("order.json")
 }
 
-fn read_order_map(root: &PathBuf) -> DocOrderMap {
+fn read_order_map(root: &Path) -> DocOrderMap {
     std::fs::read_to_string(order_path(root))
         .ok()
         .and_then(|text| serde_json::from_str(&text).ok())
         .unwrap_or_default()
 }
 
-fn write_order_map(root: &PathBuf, map: &DocOrderMap) -> Result<(), String> {
+fn write_order_map(root: &Path, map: &DocOrderMap) -> Result<(), String> {
     std::fs::create_dir_all(plainstruct_dir(root)).map_err(|e| e.to_string())?;
     let json = serde_json::to_string_pretty(map).map_err(|e| e.to_string())?;
     std::fs::write(order_path(root), json).map_err(|e| e.to_string())
 }
 
 /// 就地修改 order.json;无实际变化时不写盘
-fn mutate_order(root: &PathBuf, f: impl FnOnce(&mut DocOrderMap)) -> Result<(), String> {
+fn mutate_order(root: &Path, f: impl FnOnce(&mut DocOrderMap)) -> Result<(), String> {
     let mut map = read_order_map(root);
     let before = map.clone();
     f(&mut map);
@@ -162,7 +162,7 @@ fn rel_dirname(p: &str) -> &str {
 }
 
 /// 同级排序:手动顺序在前,未记录项按「目录优先 + 名称自然排序」追加在后
-fn sort_nodes(nodes: &mut Vec<TreeNode>, manual: Option<&Vec<String>>) {
+fn sort_nodes(nodes: &mut [TreeNode], manual: Option<&[String]>) {
     match manual {
         Some(names) => nodes.sort_by(|a, b| {
             let pa = names.iter().position(|s| s == &a.name);
@@ -230,7 +230,7 @@ fn walk(dir: &PathBuf, rel: &str, order: &DocOrderMap) -> Vec<TreeNode> {
             children: Vec::new(),
         });
     }
-    sort_nodes(&mut nodes, order.get(rel));
+    sort_nodes(&mut nodes, order.get(rel).map(Vec::as_slice));
     nodes
 }
 

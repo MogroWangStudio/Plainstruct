@@ -1,6 +1,6 @@
 /** 站点命令:创建/打开/关闭、站点配置、logo */
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tauri::State;
 
 use crate::commands::app::touch_recent;
@@ -60,15 +60,15 @@ impl Default for SiteConfig {
     }
 }
 
-pub fn plainstruct_dir(root: &PathBuf) -> PathBuf {
+pub fn plainstruct_dir(root: &Path) -> PathBuf {
     root.join(".plainstruct")
 }
 
-fn site_config_path(root: &PathBuf) -> PathBuf {
+fn site_config_path(root: &Path) -> PathBuf {
     plainstruct_dir(root).join("site.json")
 }
 
-pub fn read_site_config_file(root: &PathBuf) -> Result<SiteConfig, String> {
+pub fn read_site_config_file(root: &Path) -> Result<SiteConfig, String> {
     let path = site_config_path(root);
     let text = std::fs::read_to_string(&path).map_err(|_| "not-a-site".to_string())?;
     let mut cfg: SiteConfig = serde_json::from_str(&text).map_err(|e| format!("site.json 解析失败: {e}"))?;
@@ -79,7 +79,7 @@ pub fn read_site_config_file(root: &PathBuf) -> Result<SiteConfig, String> {
     Ok(cfg)
 }
 
-fn write_site_config_file(root: &PathBuf, cfg: &SiteConfig) -> Result<(), String> {
+fn write_site_config_file(root: &Path, cfg: &SiteConfig) -> Result<(), String> {
     let dir = plainstruct_dir(root);
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let json = serde_json::to_string_pretty(cfg).map_err(|e| e.to_string())?;
@@ -241,7 +241,7 @@ pub fn save_site_config(window: tauri::WebviewWindow, state: State<'_, AppState>
 }
 
 /// 站点图片(logo / favicon)统一落盘:按固定前缀命名,换图时清掉同前缀的旧文件
-fn store_site_image(root: &PathBuf, src_path: &str, stem: &str) -> Result<String, String> {
+fn store_site_image(root: &Path, src_path: &str, stem: &str) -> Result<String, String> {
     let src = PathBuf::from(src_path);
     let ext = src
         .extension()
@@ -267,7 +267,7 @@ fn store_site_image(root: &PathBuf, src_path: &str, stem: &str) -> Result<String
 }
 
 /// 清空配置中的图片引用并删除文件(引用不清会"复活")
-fn clear_site_image(root: &PathBuf, stem: &str) -> Result<SiteConfig, String> {
+fn clear_site_image(root: &Path, stem: &str) -> Result<SiteConfig, String> {
     let mut cfg = read_site_config_file(root)?;
     let current = if stem == "favicon" { cfg.favicon.clone() } else { cfg.logo.clone() };
     if let Some(name) = current {
@@ -331,6 +331,7 @@ pub fn get_site_info(window: tauri::WebviewWindow, path: String) -> Result<SiteB
 
 /// 移动端目录浏览条目:子目录名 + 是否为素构站点(含 plainstruct/site.json)
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct BrowseEntry {
     pub name: String,
     pub is_site: bool,
@@ -369,6 +370,6 @@ pub fn list_browse_dirs(window: tauri::WebviewWindow, path: String) -> Result<Ve
         let is_site = entry.path().join("plainstruct").join("site.json").is_file();
         out.push(BrowseEntry { name, is_site });
     }
-    out.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    out.sort_by_key(|a| a.name.to_lowercase());
     Ok(out)
 }

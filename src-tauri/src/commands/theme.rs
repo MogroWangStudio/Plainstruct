@@ -2,7 +2,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::{Read, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tauri::State;
 
 use crate::fsutil::{rel_posix, safe_join, safe_name, unique_path};
@@ -26,16 +26,16 @@ pub struct ThemeMeta {
     pub source: String,
 }
 
-fn themes_root(root: &PathBuf) -> PathBuf {
+fn themes_root(root: &Path) -> PathBuf {
     root.join(".plainstruct").join("themes")
 }
 
 /// 目录名作为主题 id
-fn theme_dir(root: &PathBuf, theme_id: &str) -> Result<PathBuf, String> {
+fn theme_dir(root: &Path, theme_id: &str) -> Result<PathBuf, String> {
     safe_join(&themes_root(root), theme_id)
 }
 
-fn meta_from_dir(dir: &PathBuf, id: &str) -> ThemeMeta {
+fn meta_from_dir(dir: &Path, id: &str) -> ThemeMeta {
     let json_path = dir.join("theme.json");
     let value: serde_json::Value = std::fs::read_to_string(&json_path)
         .ok()
@@ -72,7 +72,7 @@ pub fn list_custom_themes(window: tauri::WebviewWindow, state: State<'_, AppStat
         }
         out.push(meta_from_dir(&entry.path(), &id));
     }
-    out.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    out.sort_by_key(|a| a.name.to_lowercase());
     Ok(out)
 }
 

@@ -230,7 +230,7 @@ fn newest_mtime(dir: &std::path::Path) -> Option<std::time::SystemTime> {
             continue;
         }
         if let Some(t) = entry.metadata().ok().and_then(|md| md.modified().ok()) {
-            if newest.map_or(true, |n| t > n) {
+            if newest.is_none_or(|n| t > n) {
                 newest = Some(t);
             }
         }
@@ -1129,7 +1129,7 @@ pub(crate) fn cleanup_update_task(current_version: &str) {
     if keep {
         return;
     }
-    if dir.file_name().map_or(false, |n| n == "plainstruct-update") {
+    if dir.file_name().is_some_and(|n| n == "plainstruct-update") {
         // 专属子目录:整目录删除
         let _ = std::fs::remove_dir_all(&dir);
         return;
@@ -1574,7 +1574,7 @@ fn write_update_helper(asset_path: &std::path::Path, latest_version: &str) -> Re
                 exe.parent() // MacOS
                     .and_then(|p| p.parent()) // Contents
                     .and_then(|p| p.parent()) // <App>.app
-                    .filter(|p| p.extension().map_or(false, |e| e == "app"))
+                    .filter(|p| p.extension().is_some_and(|e| e == "app"))
                     .map(|p| p.to_string_lossy().to_string())
             })
             .unwrap_or_else(|| "/Applications/Plainstruct.app".to_string());

@@ -11,7 +11,6 @@
  * - 拉取:GET /site?name=(对方须开启「信任此局域网」)。
  * - 站点包:单个 JSON 文档 {format, version, name, files: {相对路径: {text|b64}}},
  *   排除 build/ 产物与 .plainstruct/github.json(含 Token,不随同步离开设备)。 */
-
 use base64::Engine;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -179,7 +178,7 @@ pub fn local_sites(state: &AppState) -> Vec<LanSiteBrief> {
             })
         })
         .collect();
-    rows.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    rows.sort_by_key(|a| a.name.to_lowercase());
     rows
 }
 
@@ -415,7 +414,7 @@ pub fn bundle_site(root: &Path) -> Result<(Value, u64), String> {
         };
         files.insert(rel, item);
     }
-    let cfg = crate::commands::site::read_site_config_file(&root.to_path_buf())?;
+    let cfg = crate::commands::site::read_site_config_file(root)?;
     let bundle = serde_json::json!({
         "format": SITE_BUNDLE_FORMAT,
         "version": SITE_BUNDLE_VERSION,
