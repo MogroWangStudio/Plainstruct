@@ -1,11 +1,12 @@
 <script setup lang="ts">
 /** 移动端应用骨架:全局顶栏(桌面式品牌区 + 右侧常驻操作) + 视图容器 + 底部导航。
  *  顶栏在全部页面(含主菜单)常驻,顶部以 safe-area 避让状态栏;桌面顶栏的悬停入口
- *  (返回主菜单/查看发布状态/预览站点)在触屏上改为右侧常驻按钮,设置是唯一的应用级
+ *  (返回/查看发布状态/预览站点)在触屏上改为右侧常驻按钮,设置是唯一的应用级
  *  顶栏入口(「关于」内嵌于设置页,不再单独设入口) —— 主菜单不再堆叠两枚外观一致、
  *  上下相邻的按钮(此前点「设置」会误入「关于」)。
  *  底部一行容纳站点内全部页面入口(横向滑动):边缘渐隐 + 箭头提示还有更多,当前项
- *  自动滚入视野。系统返回手势经 lib/backGesture 分发:浮层 → 视图 → 站点 → 退出。 */
+ *  自动滚入视野。顶栏返回按钮与系统侧滑返回走同一条命令(navigateBack):浮层 →
+ *  视图 → 收起站点回主菜单 → 退出,逐层后退。 */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useAppStore, type AppView } from "@/stores/app";
@@ -14,7 +15,7 @@ import { useLanStore } from "@/stores/lan";
 import { useBuilderStore } from "@/stores/builder";
 import { usePublishStore } from "@/stores/publish";
 import { usePublishTaskStore } from "@/stores/publishTask";
-import { goToMenu, navigateBack, navigateView } from "@/lib/backGesture";
+import { navigateBack, navigateView } from "@/lib/backGesture";
 import AppIcon from "@/components/AppIcon.vue";
 import BrandLogo from "@/components/BrandLogo.vue";
 import BrandStatus from "@/components/BrandStatus.vue";
@@ -71,7 +72,7 @@ const tabStyle = computed(() => app.settings.mobileTabStyle ?? "both");
  *  「关于」没有独立视图 —— 内容内嵌于设置页「关于」分区,顶栏不再设「关于」入口 */
 const standalone = computed(() => app.view === "settings");
 
-/** 主菜单:站点未开且不在独立视图上(此时无路可退,「返回主菜单」置灰而非隐藏,
+/** 主菜单:站点未开且不在独立视图上(此时无路可退,返回按钮置灰而非隐藏,
  *  顶栏因此不会随状态跳格) */
 const atMenu = computed(() => !site.open && !standalone.value);
 
@@ -90,13 +91,12 @@ const showPublish = computed(
 /** 「预览站点」:站点构建完毕(已有产物)后出现 */
 const showPreview = computed(() => site.open && builder.report !== null);
 
-/** 返回:站点打开时是「返回主菜单」(收起工作区),独立视图上只是退回上一层 */
-const backLabel = computed(() => (site.open ? t("titlebar.backToMenu") : t("common.back")));
+/** 顶栏返回 = 系统侧滑返回的同一条命令(navigateBack):浮层 → 页面 → 收起站点回主菜单 → 退出,
+ *  逐层后退而不是一步跳回主菜单 —— 与安卓返回手势保持同一语义 */
+const backLabel = computed(() => t("common.back"));
 
-/** 返回主菜单:站点打开时收起工作区(自动保存后关闭),独立视图则弹回上一层 */
 function goBack() {
-  if (site.open) goToMenu();
-  else navigateBack();
+  navigateBack();
 }
 
 /** 查看发布状态:后台发布时先切回发起站点,再打开发布页(任务状态就地恢复) */
@@ -185,7 +185,7 @@ onBeforeUnmount(() => {
           </div>
         </div>
       </div>
-      <!-- 桌面顶栏的悬停入口在触屏上常驻右侧:返回主菜单、查看发布状态、预览站点;
+      <!-- 桌面顶栏的悬停入口在触屏上常驻右侧:返回、查看发布状态、预览站点;
            设置为主菜单与各页共用的应用级入口,同样常驻(「关于」在设置页内) -->
       <nav class="flex shrink-0 items-center gap-0.5">
         <button
@@ -197,9 +197,8 @@ onBeforeUnmount(() => {
           :title="backLabel"
           @click="goBack"
         >
-          <!-- 站点内用主菜单语义的单一图标:后退箭头在真机上易被误读为「上一步」,
-               让人找不到返回主菜单的入口;独立视图(设置页)才是「返回上一层」 -->
-          <AppIcon :name="site.open ? 'home' : 'arrowLeft'" :size="17" />
+          <!-- 统一返回箭头:逐层后退(页面 → 收起站点 → 主菜单),与系统侧滑同一条命令 -->
+          <AppIcon name="arrowLeft" :size="17" />
         </button>
         <button
           v-if="showPublish"
