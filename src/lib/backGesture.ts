@@ -42,7 +42,10 @@ function pushHistory() {
   history.pushState({ psBack: Date.now() }, "");
 }
 
-/** 吃掉 n 条历史记录(无对应返回层时用) */
+/** 吃掉 n 条历史记录(无对应返回层时用)。
+ *  history.go(-n) 无论跨多少条都只触发一次 popstate(HTML 规范,Chromium WebView 如此),
+ *  因此忽略计数只加 1 与之对齐 —— 若按次数累加,多出的次数会吞掉下一次真实的系统返回,
+ *  返回层滞留栈中而历史指针已被回退,栈与界面自此脱节 */
 function consumeHistory(n = 1) {
   if (n <= 0) return;
   ignorePops += 1;
@@ -161,7 +164,16 @@ export function navigateView(view: AppView) {
     app.setView(view);
     return;
   }
-  if (lastStep("view")?.view === view) return;
+  // 栈顶已记录目标视图:通常是当前页重复点按,无事可做;
+  // 但若实际视图并不在该层,栈已与界面脱节(异步窗口中的返回/关闭交错所致) ——
+  // 此时绝不能静默吞掉导航(表现为「点击设置无反应」):摘掉陈旧层后按普通导航压栈。
+  // 陈旧层的历史条目要么已被错位的返回消耗,要么将被随后的 pushState 截断,无需再回退。
+  if (lastStep("view")?.view === view) {
+    if (app.view === view) return;
+    const stale = lastStep("view");
+    steps.splice(steps.indexOf(stale!), 1);
+    stale!.consumed = true;
+  }
   const from = app.view;
   if (previousViewStep()?.view === view) {
     setViewQuiet(view);
@@ -203,6 +215,12 @@ export function goToMenu() {
   }
   const index = steps.findIndex((s) => s.kind === "site");
   if (index < 0) {
+    // 站点开着但站点层不在栈中(异步窗口中栈已被先一步清掉):只重置视图不够,
+    // 残留的视图层会让下一次导航被「已在目标页」的检查静默吞掉 —— 一并摘除。
+    // 这些层的历史条目已随此前的错位消耗,不再额外回退。
+    for (let i = steps.length - 1; i >= 0; i--) {
+      if (steps[i].kind === "view") steps.splice(i, 1);
+    }
     setViewQuiet("editor");
     return;
   }
