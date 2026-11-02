@@ -136,7 +136,9 @@ watch(
       </button>
     </footer>
 
-    <!-- 文件树抽屉:左缘滑入;遮罩点击收起 -->
+    <!-- 文件树抽屉:左缘滑入;遮罩点击收起。
+         抽屉为全高浮层,顶部以 safe-area 避让系统状态栏(否则文件树标题与状态栏重叠),
+         底部以 safe-area 避让手势条 -->
     <Teleport to="body">
       <Transition name="drawer-scrim">
         <div v-if="treeOpen" class="fixed inset-0 z-40" @click="treeOpen = false">
@@ -146,7 +148,7 @@ watch(
       <Transition name="drawer">
         <aside
           v-if="treeOpen"
-          class="fixed inset-y-0 left-0 z-40 flex w-[84vw] max-w-[340px] flex-col border-r border-line bg-surface"
+          class="fixed inset-y-0 left-0 z-40 flex w-[84vw] max-w-[340px] flex-col border-r border-line bg-surface pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
         >
           <div class="flex min-h-0 flex-1 flex-col">
             <FileTree />
