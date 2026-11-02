@@ -354,6 +354,8 @@ export const useAppStore = defineStore("app", {
         settings: { ...this.settings, locale },
       };
       i18n.global.locale.value = locale as I18nLocale;
+      // html lang 同步:部分插件(站内搜索、图片预览)按 documentElement.lang 判定文案
+      document.documentElement.lang = locale;
       await ipc.saveSettings({ locale });
     },
 

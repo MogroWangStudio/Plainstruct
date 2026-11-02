@@ -19,6 +19,7 @@ import { fireConfetti } from "@/lib/confetti";
 import { formatSize } from "@/lib/format";
 import { isMobilePlatform } from "@/lib/platform";
 import { navigateBack, navigateView } from "@/lib/backGesture";
+import { locales } from "@/i18n";
 import AppIcon from "@/components/AppIcon.vue";
 import SelectMenu from "@/components/SelectMenu.vue";
 import AboutPanel from "@/components/AboutPanel.vue";
@@ -26,11 +27,6 @@ import AboutPanel from "@/components/AboutPanel.vue";
 const { t } = useI18n();
 const app = useAppStore();
 const ui = useUiStore();
-
-const localeOptions: { value: Locale; label: string }[] = [
-  { value: "zh-CN", label: "简体中文" },
-  { value: "en-US", label: "English" },
-];
 
 const localeModel = computed({
   get: () => app.settings.locale,
@@ -501,7 +497,7 @@ function openRelease(url: string) {
                   <div class="min-w-0">
                     <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.language") }}</p>
                   </div>
-                  <SelectMenu v-model="localeModel" :options="localeOptions" align="right" class="shrink-0" />
+                  <SelectMenu v-model="localeModel" :options="locales" align="right" class="shrink-0" />
                 </div>
               </div>
             </template>

@@ -3,12 +3,17 @@
  *  避免无装饰窗口在内容就绪前的白屏闪烁。 */
 import { createApp } from "vue";
 import PreviewShell from "@/views/PreviewShell.vue";
-import { i18n } from "@/i18n";
+import { i18n, locales, type Locale } from "@/i18n";
 import "./assets/main.css";
 
 const params = new URLSearchParams(location.search);
 
-i18n.global.locale.value = params.get("locale") === "en-US" ? "en-US" : "zh-CN";
+// 语言随主窗口透传,仅接受已知 locale(未知值回落中文,不信任 URL 参数)
+const localeParam = params.get("locale");
+i18n.global.locale.value = locales.some((l) => l.value === localeParam)
+  ? (localeParam as Locale)
+  : "zh-CN";
+document.documentElement.lang = i18n.global.locale.value;
 
 const theme = params.get("theme");
 if (theme) document.documentElement.dataset.theme = theme;

@@ -1,7 +1,7 @@
 /** 前后端共享的数据契约 -- 与 Rust 侧 serde 结构一一对应 */
 
 export type Platform = "windows" | "macos" | "android" | "ios" | "browser";
-export type Locale = "zh-CN" | "en-US";
+export type Locale = "zh-CN" | "en-US" | "ja-JP" | "ko-KR" | "fr-FR" | "de-DE" | "es-ES" | "pt-BR" | "ru-RU";
 export type ThemeSource = "builtin" | "custom";
 /** 站点类型:文档站 / 博客站,决定可选主题与主页形态 */
 export type SiteType = "docs" | "blog";
