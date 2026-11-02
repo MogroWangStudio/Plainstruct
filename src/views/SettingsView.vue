@@ -13,7 +13,7 @@ import {
 } from "@/stores/app";
 import { useUiStore } from "@/stores/ui";
 import { ipc } from "@/ipc/ipc";
-import type { ConfettiLevel, EditorBreakKey, EditorFontMode, EditorIndentKey, Locale, ModalBackdropClose, PublishNotifyMode, UiFontMode } from "@/ipc/types";
+import type { ConfettiLevel, EditorBreakKey, EditorFontMode, EditorIndentKey, Locale, MobileTabStyle, ModalBackdropClose, PublishNotifyMode, UiFontMode } from "@/ipc/types";
 import { APP_THEMES, type AppThemeSwatch } from "@/lib/app-themes";
 import { fireConfetti } from "@/lib/confetti";
 import { formatSize } from "@/lib/format";
@@ -245,6 +245,18 @@ function stepScale(dir: 1 | -1) {
   const next = Math.min(UI_FONT_SCALE_MAX, Math.max(UI_FONT_SCALE_MIN, grid + dir * UI_SCALE_STEP));
   void app.setAppearance({ uiFontSize: Number(next.toFixed(2)) });
 }
+
+/* ---------- 移动端底栏显示方式:图标+文字 或 仅图标 ---------- */
+
+const tabStyleOptions = computed<{ value: string; label: string }[]>(() => [
+  { value: "both", label: t("settings.tabStyleBoth") },
+  { value: "icon", label: t("settings.tabStyleIcon") },
+]);
+
+const tabStyleModel = computed({
+  get: () => app.settings.mobileTabStyle ?? "both",
+  set: (v: string) => void app.setAppearance({ mobileTabStyle: v as MobileTabStyle }),
+});
 
 const uiFontModel = computed({
   get: () => app.settings.uiFont ?? "system",
@@ -771,6 +783,14 @@ function openRelease(url: string) {
                       :class="app.settings.modalBlur !== false ? 'translate-x-[22px]' : 'translate-x-[4px]'"
                     />
                   </button>
+                </div>
+
+                <!-- 底栏显示(移动端):图标+文字 或 仅图标 -->
+                <div v-if="isMobilePlatform" class="settings-row" style="--i: 8">
+                  <div class="min-w-0">
+                    <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.tabBar") }}</p>
+                  </div>
+                  <SelectMenu v-model="tabStyleModel" :options="tabStyleOptions" align="right" class="shrink-0" />
                 </div>
               </div>
             </template>

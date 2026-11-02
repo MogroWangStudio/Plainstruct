@@ -64,6 +64,9 @@ const navItems: { view: AppView; icon: string; label: string }[] = [
   { view: "lan", icon: "refresh", label: "nav.lan" },
 ];
 
+/** 底栏显示方式(个性化设置):图标+文字(默认)或仅图标 */
+const tabStyle = computed(() => app.settings.mobileTabStyle ?? "both");
+
 /** 设置不依赖站点:站点未打开时也可作为独立视图渲染。
  *  「关于」没有独立视图 —— 内容内嵌于设置页「关于」分区,顶栏不再设「关于」入口 */
 const standalone = computed(() => app.view === "settings");
@@ -248,6 +251,7 @@ onBeforeUnmount(() => {
       <nav
         ref="navEl"
         class="nav-scroll flex items-stretch border-t border-line bg-surface pb-[env(safe-area-inset-bottom)]"
+        :class="{ 'icon-only': tabStyle === 'icon' }"
         @scroll.passive="updateNavEdges"
       >
         <button
@@ -459,17 +463,18 @@ onBeforeUnmount(() => {
   }
 }
 
-/* 底部导航项:图标 + 文字纵向排布,加高便于点按;按下即时缩小(apple-design:反馈在触点上,不等抬起) */
+/* 底部导航项:图标 + 文字纵向排布,加高便于点按;按下即时缩小(apple-design:反馈在触点上,不等抬起)。
+   图标、间距与文字随界面缩放(--ui-font-scale)整体呼吸,底栏与全界面同一节奏 */
 .tab-btn {
   position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
+  gap: calc(3px * var(--ui-font-scale));
   flex: 1 0 auto;
   min-width: 66px;
-  padding: 11px 0 9px;
+  padding: calc(11px * var(--ui-font-scale)) 0 calc(9px * var(--ui-font-scale));
   border: none;
   background: transparent;
   color: var(--color-ink-3);
@@ -485,8 +490,12 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 26px;
+  height: calc(26px * var(--ui-font-scale));
   transition: transform var(--duration-fast) ease-out;
+}
+.tab-icon svg {
+  width: calc(21px * var(--ui-font-scale));
+  height: calc(21px * var(--ui-font-scale));
 }
 .tab-dot {
   position: absolute;
@@ -500,6 +509,14 @@ onBeforeUnmount(() => {
 .tab-label {
   font-size: calc(10px * var(--ui-font-scale));
   line-height: 1.2;
+}
+/* 仅图标:文字隐藏,按钮垂直居中(热区与横向容量不变),选中态顶缘指示条保留 */
+.icon-only .tab-label {
+  display: none;
+}
+.icon-only .tab-btn {
+  gap: 0;
+  padding: calc(6px * var(--ui-font-scale)) 0;
 }
 .tab-btn.active {
   color: var(--color-ink);

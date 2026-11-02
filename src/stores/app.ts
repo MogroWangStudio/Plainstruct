@@ -16,6 +16,7 @@ import type {
   RecentSite,
   UiFontMode,
   UpdateProgress,
+  MobileTabStyle,
 } from "@/ipc/types";
 import { i18n, type Locale as I18nLocale } from "@/i18n";
 import { appThemeDef } from "@/lib/app-themes";
@@ -45,6 +46,8 @@ export interface AppearanceSettings {
   modalBlur?: boolean;
   /** 点击弹窗空白区域的关窗方式(默认两次点击) */
   modalBackdropClose?: ModalBackdropClose;
+  /** 移动端底栏显示方式(默认图标+文字) */
+  mobileTabStyle?: MobileTabStyle;
 }
 
 /** 编辑器写作偏好(空白标记、键位、自动保存行为与预览刷新动画) */

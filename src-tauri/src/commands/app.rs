@@ -169,6 +169,7 @@ pub(crate) fn settings_defaults() -> Value {
         "modalBlur": true,
         "modalBackdropClose": "double",
         "confetti": "standard",
+        "mobileTabStyle": "both",
     })
 }
 

@@ -54,6 +54,8 @@ export interface AppSettings {
   modalBlur?: boolean;
   /** 点击弹窗空白区域(模糊遮罩)的关窗方式:never=不关闭 single=一次 double=两次(默认) */
   modalBackdropClose?: ModalBackdropClose;
+  /** 移动端底栏显示方式:both=图标+文字(默认) icon=仅图标 */
+  mobileTabStyle?: MobileTabStyle;
   /** 局域网同步:随应用启动恢复服务 */
   lanEnabled?: boolean;
   /** 局域网同步:信任当前局域网(收到推送自动接受、允许对方直接拉取) */
@@ -61,6 +63,9 @@ export interface AppSettings {
   /** 局域网同步:对外展示的设备名(空 = 用平台默认名) */
   lanDeviceName?: string;
 }
+
+/** 移动端底栏显示方式 */
+export type MobileTabStyle = "both" | "icon";
 
 /** 弹窗空白区域点击的关窗方式 */
 export type ModalBackdropClose = "never" | "single" | "double";
