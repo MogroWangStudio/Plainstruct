@@ -2,6 +2,11 @@ node_modules
 dist
 release
 src-tauri/target
+# 签名材料绝不入库:keystore / 属性文件 / base64 导出件(CI 运行时解出,用完即删)
+*.keystore
+*.jks
+*.p12
+keystore.b64
 # Android 工程:gen/android 提交仓库(含签名配置补丁);构建产物与本机密钥
 # 由 gen/android/.gitignore 排除,这里只放行 android 子目录
 src-tauri/gen/*

@@ -7,8 +7,20 @@
 #
 # 产物形态:Windows x64 免安装 zip(内含 exe)、macOS arm64 dmg / zip 与
 # 安卓 arm64 APK,命名统一为 Plainstruct_版本号_平台(版本取自 package.json/Cargo.toml)。
-# 安卓签名:secrets ANDROID_RELEASE_KEYSTORE_B64 / ANDROID_RELEASE_KEYSTORE_PASSWORD
-# 解出到 gen/android/keystore.properties;未配置时回退临时 debug 密钥(无法覆盖安装)。
+#
+# 安卓签名(重要):签名稳定性取决于「每次构建用的是不是同一把私钥」。
+# 因此本流水线 fail-closed ——
+#   1. secrets ANDROID_RELEASE_KEYSTORE_B64 / ANDROID_RELEASE_KEYSTORE_PASSWORD
+#      缺失时安卓 job 直接失败,不再静默回退到 runner 临时的 debug 密钥
+#      (那会让每次构建的签名都不同,APK 无法覆盖升级);
+#   2. 构建后用 scripts/android-signing.sh 把产物证书指纹与仓库基线
+#      src-tauri/gen/android/android-cert-sha256.txt 比对,漂移即失败;
+#   3. 生成 signing-report.json 与 .sha256 一并留档,便于人工复核。
+# 只想要一次性验证包时,把仓库变量 ANDROID_ALLOW_DEBUG_SIGNING 设为 true。
+# 详见 docs/android-signing.md。
+#
+# 说明:macOS 为 ad-hoc 签名(无 Apple 开发者证书),Windows 产物未做 Authenticode;
+# 这两端没有稳定身份可言,签名一致性只对 APK 做硬性保证,详见上述文档。
 
 name: Build Plainstruct
 
@@ -16,6 +28,9 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -70,6 +85,18 @@ jobs:
             if [ -e "$app" ]; then codesign --force --deep --sign - "$app"; fi
           done
 
+      # 签名有效性必须显式验证:ad-hoc 签名一旦失效,Gatekeeper 会直接判「已损坏」。
+      # cdhash 每次构建都会变(ad-hoc 没有稳定身份,内容一变哈希就变),这里只做留档。
+      - name: Verify macOS app signature
+        if: runner.os == 'macOS'
+        run: |
+          set -e
+          APP="src-tauri/target/release/bundle/macos/Plainstruct.app"
+          [ -d "$APP" ]
+          codesign --verify --strict --verbose=2 "$APP"
+          echo "--- 签名摘要(ad-hoc,无稳定身份) ---"
+          codesign -dv --verbose=4 "$APP" 2>&1 | grep -E "Identifier|Signature|CDHash|TeamIdentifier" || true
+
       # 打包 macOS 产物:压缩包(zip,内含 .app 与「损坏修复.command」)与磁盘镜像(dmg)同名成对,
       # 统一为 Plainstruct_版本号_macOS_arm64。
       # tauri 的 dmg 不支持注入自定义文件,故先签名 .app 再用 hdiutil 重打,最后签 dmg。
@@ -116,11 +143,17 @@ jobs:
 
   # 安卓 APK(arm64-v8a):前端构建 + Rust 交叉编译 + gradle 打包。
   # 签名:从 secrets 解出 keystore 写入 gen/android/keystore.properties(工程内
-  # build.gradle.kts 已配置读取);secrets 未配置时回退 runner 临时 debug 密钥
-  # —— 仅可用于安装验证,不能覆盖安装旧版本,发版前必须配置正式密钥。
+  # build.gradle.kts 严格校验四项必填);缺 secrets 时默认失败,仅在仓库变量
+  # ANDROID_ALLOW_DEBUG_SIGNING=true 时降级为临时 debug 密钥(仅供安装验证)。
   android-apk:
     name: Android apk (arm64)
     runs-on: ubuntu-latest
+    env:
+      # 与签名无关,但固定住影响产物字节的隐性输入,减少「同提交不同哈希」的噪声
+      SOURCE_DATE_EPOCH: "1700000000"
+      CARGO_INCREMENTAL: "0"
+      PIN_FILE: src-tauri/gen/android/android-cert-sha256.txt
+      KEYSTORE_FILE: src-tauri/gen/android/plainstruct-release.keystore
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -152,36 +185,152 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      # 失败要早、原因要明确:密钥缺失 / 密码错 / 别名错,都在打包前报出来,
+      # 而不是等 gradle 跑到 signingConfig 阶段抛一句看不懂的异常。
       - name: Restore release keystore
         id: keystore
         env:
           KEYSTORE_B64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_B64 }}
           KEYSTORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ vars.ANDROID_RELEASE_KEY_ALIAS || 'plainstruct-release' }}
+          ALLOW_DEBUG_SIGNING: ${{ vars.ANDROID_ALLOW_DEBUG_SIGNING }}
         run: |
-          cd src-tauri/gen/android
-          if [ -n "$KEYSTORE_B64" ] && [ -n "$KEYSTORE_PASSWORD" ]; then
-            echo "$KEYSTORE_B64" | base64 -d > plainstruct-release.keystore
-            printf 'storeFile=plainstruct-release.keystore\nstorePassword=%s\nkeyAlias=plainstruct-release\nkeyPassword=%s\n' \
-              "$KEYSTORE_PASSWORD" "$KEYSTORE_PASSWORD" > keystore.properties
-            echo "signed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "signed=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::Secrets ANDROID_RELEASE_KEYSTORE_B64 / ANDROID_RELEASE_KEYSTORE_PASSWORD are not set. Falling back to the runner's ephemeral debug key — this APK will NOT upgrade-install over existing releases."
+          set -euo pipefail
+          if [ -z "${KEYSTORE_B64}" ] || [ -z "${KEYSTORE_PASSWORD}" ]; then
+            if [ "${ALLOW_DEBUG_SIGNING}" = "true" ]; then
+              echo "signed=false" >> "$GITHUB_OUTPUT"
+              echo "::warning title=临时 debug 签名::已按仓库变量 ANDROID_ALLOW_DEBUG_SIGNING=true 降级。此产物签名每次构建都不同,不能覆盖升级,不得用于发布。"
+              exit 0
+            fi
+            echo "::error title=缺少发布签名::secrets ANDROID_RELEASE_KEYSTORE_B64 / ANDROID_RELEASE_KEYSTORE_PASSWORD 未配置。没有固定密钥,每次构建的 APK 签名都会不同、无法覆盖升级。生成密钥见 docs/android-signing.md;临时验证包请把仓库变量 ANDROID_ALLOW_DEBUG_SIGNING 设为 true。"
+            exit 1
           fi
 
+          printf '%s' "${KEYSTORE_B64}" | tr -d ' \r\n' | base64 -d > "${KEYSTORE_FILE}" \
+            || { echo "::error::ANDROID_RELEASE_KEYSTORE_B64 不是合法的 base64"; exit 1; }
+          chmod 600 "${KEYSTORE_FILE}"
+
+          # 密码只写进被 git 忽略的文件;反斜杠需转义,其余字符按 Properties 规则原样保留
+          PW_ESC=${KEYSTORE_PASSWORD//\\/\\\\}
+          printf 'storeFile=plainstruct-release.keystore\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
+            "${PW_ESC}" "${KEY_ALIAS}" "${PW_ESC}" > src-tauri/gen/android/keystore.properties
+          chmod 600 src-tauri/gen/android/keystore.properties
+
+          # 密码或别名不对时立刻失败,避免带着坏密钥跑完整个交叉编译
+          if ! keytool -list -keystore "${KEYSTORE_FILE}" -storepass "${KEYSTORE_PASSWORD}" \
+            -alias "${KEY_ALIAS}" > /dev/null 2>&1; then
+            echo "::error::无法用给定密码 / 别名(${KEY_ALIAS})打开密钥库:请核对 ANDROID_RELEASE_KEYSTORE_PASSWORD 与 ANDROID_RELEASE_KEY_ALIAS"
+            exit 1
+          fi
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+          echo "key_alias=${KEY_ALIAS}" >> "$GITHUB_OUTPUT"
+
+      # 密钥与基线必须成对:secrets 换了密钥却没更新基线,说明「这次签名和上次不一样」,
+      # 此时构建出来也失去意义,直接失败。
+      - name: Check keystore against committed fingerprint baseline
+        if: steps.keystore.outputs.signed == 'true'
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ steps.keystore.outputs.key_alias }}
+        run: |
+          set -euo pipefail
+          KEYSTORE_FP=$(bash scripts/android-signing.sh fingerprint-keystore "${KEYSTORE_FILE}")
+          PIN_FP=$(grep -oiE '[0-9a-f]{64}' "${PIN_FILE}" | head -n 1 | tr 'A-F' 'a-f' || true)
+          echo "密钥证书指纹 : ${KEYSTORE_FP}"
+          echo "基线证书指纹 : ${PIN_FP:-未设置}"
+          if [ -z "${PIN_FP}" ]; then
+            echo "::error title=缺少证书指纹基线::${PIN_FILE} 仍是占位值。请运行 scripts/android-signing.sh pin --keystore <keystore> 并把生成的指纹提交到仓库,否则无法判定跨构建签名是否一致。"
+            exit 1
+          fi
+          if [ "${KEYSTORE_FP}" != "${PIN_FP}" ]; then
+            echo "::error title=密钥与基线不一致::secrets 里的密钥(${KEYSTORE_FP})与仓库基线(${PIN_FP})不是同一把。要么换回原密钥,要么按 docs/android-signing.md 做密钥轮换并同步更新基线。"
+            exit 1
+          fi
+
+      - name: Ensure apksigner is available
+        run: |
+          set -euo pipefail
+          if ! ls "${ANDROID_HOME}"/build-tools/*/apksigner > /dev/null 2>&1; then
+            yes | "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" "build-tools;35.0.0" > /dev/null
+          fi
+
+      # gradle 侧对「无正式密钥 + CI 环境」是 fail-closed 的,降级为一次性验证包时
+      # 必须把这个开关一并传下去,否则上面放行、下面照样抛错(变量名以 gradle 为准)。
       - name: Build release apk
+        env:
+          PLAINSTRUCT_ALLOW_DEBUG_SIGNING: ${{ steps.keystore.outputs.signed == 'false' && '1' || '' }}
         run: npm run android:build
 
+      # 产物挑选必须确定:同一提交里若有多个 apk,固定优先级取一个,
+      # 避免「这次传 universal、下次传 arm64」这种产物漂移。
       - name: Collect apk
+        id: collect
         run: |
+          set -euo pipefail
+          APK_BASE="src-tauri/gen/android/app/build/outputs/apk"
+          APK=""
+          for candidate in \
+            "${APK_BASE}/arm64/release/app-arm64-release.apk" \
+            "${APK_BASE}/universal/release/app-universal-release.apk" \
+            "${APK_BASE}/aarch64/release/app-aarch64-release.apk"; do
+            if [ -f "${candidate}" ]; then APK="${candidate}"; break; fi
+          done
+          if [ -z "${APK}" ]; then
+            APK=$(find "${APK_BASE}" -path "*/arm64/release/*.apk" | sort | head -n 1)
+          fi
+          if [ -z "${APK}" ]; then
+            APK=$(find "${APK_BASE}" -path "*/universal/release/*.apk" | sort | head -n 1)
+          fi
+          if [ -z "${APK}" ]; then
+            APK=$(find "${APK_BASE}" -name "*.apk" -path "*/release/*" | sort | head -n 1)
+          fi
+          if [ -z "${APK}" ]; then
+            echo "No release apk found." >&2
+            exit 1
+          fi
+          echo "选定产物:${APK}"
+          unzip -l "${APK}" | grep -q "lib/arm64-v8a/" || { echo "::error::APK 内缺少 arm64-v8a 原生库"; exit 1; }
           mkdir -p dist
           VERSION=$(node -p "require('./package.json').version")
-          APK=$(find src-tauri/gen/android/app/build/outputs/apk -name "*.apk" -path "*release*" | head -n 1)
-          if [ -z "$APK" ]; then echo "No release apk found." >&2; exit 1; fi
-          cp "$APK" "dist/Plainstruct_${VERSION}_android.apk"
+          OUT="dist/Plainstruct_${VERSION}_android.apk"
+          cp "${APK}" "${OUT}"
+          echo "apk=${OUT}" >> "$GITHUB_OUTPUT"
+
+      # 签名一致性红线:产物证书必须等于基线,且必须使用 v2/v3 签名方案。
+      # 失败即代表「这次构建的签名和既定密钥不一致」,不能作为发布件。
+      - name: Verify apk signature against baseline
+        env:
+          SIGNED: ${{ steps.keystore.outputs.signed }}
+        run: |
+          set -euo pipefail
+          APK="${{ steps.collect.outputs.apk }}"
+          if [ "${SIGNED}" = "true" ]; then
+            bash scripts/android-signing.sh verify-apk "${APK}" \
+              --pin-file "${PIN_FILE}" --require-pin --report dist/signing-report.json
+          else
+            bash scripts/android-signing.sh verify-apk "${APK}" --report dist/signing-report.json
+            echo "::warning title=产物未使用发布密钥::该 APK 仅用于安装验证,签名不具一致性保证。"
+          fi
+          (cd dist && sha256sum ./*.apk > SHA256SUMS.txt && cat SHA256SUMS.txt)
+
+      - name: Upload signing report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: plainstruct-android-signing-report
+          path: |
+            dist/signing-report.json
+            dist/SHA256SUMS.txt
+          if-no-files-found: warn
 
       - uses: actions/upload-artifact@v4
         with:
           name: plainstruct-android-apk
           path: dist/Plainstruct_*_android.apk
           if-no-files-found: error
+
+      # 密钥只在本 job 内短暂存在,构建结束立即抹掉,避免误入缓存 / 后续步骤 / 日志
+      - name: Remove keystore from workspace
+        if: always()
+        run: |
+          rm -f "${KEYSTORE_FILE}" src-tauri/gen/android/keystore.properties
