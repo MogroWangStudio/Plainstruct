@@ -1,13 +1,6 @@
 # 素构 Plainstruct —— APK 签名证书基线(SHA-256,小写十六进制)
 #
-# 这是「同一版本多次构建必须由同一把密钥签发」的判定依据:CI 在构建后用
-# scripts/android-signing.sh verify-apk 把产物证书指纹与这里比对,不一致即失败。
-#
-# 当前为占位值,说明正式发布密钥尚未生成。生成方式:
-#   scripts/android-signing.sh gen-keystore --out ~/plainstruct-release.p12 --b64-out ~/keystore.b64
-#   KEYSTORE_PASSWORD=*** scripts/android-signing.sh pin --keystore ~/plainstruct-release.p12
-# 然后把上一行命令打印出的 64 位指纹替换到本文件末尾并提交。
-#
-# 在这之前,CI 的安卓 job 会以「未配置发布密钥」失败(不再静默产出临时签名的包),
-# 只会产出一次性验证包:仓库变量 ANDROID_ALLOW_DEBUG_SIGNING=true。
-UNSET
+# 由 scripts/android-signing.sh pin 生成;CI 用它判定「本次产物是否由同一把密钥签发」。
+# 这一行一旦变化,已发布版本就无法覆盖升级 —— 除非是计划内的密钥轮换
+# (见 docs/android-signing.md),否则不要改。
+c219487e02dfdd562307aa603438215a04f8906c5fade144316b83218450c34f
