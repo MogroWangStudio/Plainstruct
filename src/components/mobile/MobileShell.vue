@@ -308,14 +308,15 @@ onBeforeUnmount(() => {
   background: var(--color-surface);
 }
 
-/* 顶栏状态区:窄屏收紧问候语宽度,给站点名与右侧操作留位 */
+/* 顶栏状态区:窄屏收紧问候语宽度,给站点名与右侧操作留位。
+   祝福语不受这条上限约束(BrandStatus 内以 .is-bless 占满文本位并允许换行),
+   壳层只需在折行时留出上下呼吸 —— 单行仍落在 48px 最小高度内,不多出一像素 */
 .topbar-status :deep(.status-text) {
   max-width: 12ch;
 }
-/* 祝福语播报期间(发布完成,与发布页彩带同帧的 12s)放开上限:此刻状态语是顶栏最高
-   优先级的信息,Logo 与站点名让位后文本位全归它,最长一条也能完整显示 */
-.topbar-status.is-bless :deep(.status-text) {
-  max-width: none;
+.topbar:has(.topbar-status.is-bless) {
+  padding-top: calc(env(safe-area-inset-top) + 6px);
+  padding-bottom: 6px;
 }
 
 /* 祝福语播报期间的品牌区让位:发布成功是一切之上的时刻,顶栏文本位整个让给这句祝福,

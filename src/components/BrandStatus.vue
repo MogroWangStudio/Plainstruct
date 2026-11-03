@@ -118,6 +118,25 @@ const status = computed<{ kind: StatusKind; text: string }>(() => {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* 祝福语:发布成功后的这 12s,它是顶栏唯一要读的信息 —— 省略号在这里没有意义。
+   此前放宽的只是「最大宽度」,但文本仍受可用宽度限制(行内块按容器收缩),长句照旧被
+   省略号截断;现在改为占满文本位并允许换行:小字按 1.45 行高排版,长句折行后完整
+   呈现,壳层随内容自然增高。 */
+.brand-status.is-bless {
+  flex: 1 1 auto;
+  color: var(--color-ink);
+  white-space: normal;
+}
+.brand-status.is-bless .status-text {
+  max-width: none;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+  font-weight: 500;
+  line-height: 1.45;
+}
 /* 状态类别切换:短距淡入淡出(位移极小,保持克制);倒计时数字跳动同 kind 不触发 */
 .status-swap-enter-active,
 .status-swap-leave-active {

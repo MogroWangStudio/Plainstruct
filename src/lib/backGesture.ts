@@ -34,6 +34,9 @@ interface Step {
 const steps: Step[] = [];
 /** UI 主动回退历史时,需要跳过的 popstate 次数 */
 let ignorePops = 0;
+/** 已登记「平台确认后安装」的意图(避免重复挂 watch) */
+let hooked = false;
+/** popstate 分发已真正挂上 */
 let installed = false;
 /** 由本模块驱动的视图切换:watcher 不再重复补栈 */
 let expectedView: AppView | null = null;
@@ -87,9 +90,26 @@ function popStep(): Step | undefined {
   return step;
 }
 
-/** 安装 popstate 分发(仅移动平台;应用启动时调用一次) */
+/** 安装 popstate 分发(仅移动平台;应用启动时调用一次)。
+ *
+ *  平台来自异步的 bootstrap:应用挂载的那一刻还读不到,此时若直接返回,监听将永远
+ *  不会被挂上 —— 系统返回只走 WebView 自身的历史回退,而我们压入的返回层无人接管,
+ *  表现就是「侧滑返回无效」。因此这里只登记安装意图,待平台确认为移动端后再真正挂载;
+ *  桌面平台从头到尾不安装(所有调用点保持 no-op)。 */
 export function installBackGesture() {
-  if (installed || !isMobilePlatform.value) return;
+  if (hooked) return;
+  hooked = true;
+  watch(
+    isMobilePlatform,
+    (mobile) => {
+      if (mobile) installDispatcher();
+    },
+    { immediate: true },
+  );
+}
+
+function installDispatcher() {
+  if (installed) return;
   installed = true;
   const app = useAppStore();
   const site = useSiteStore();
