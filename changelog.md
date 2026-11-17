@@ -9,13 +9,14 @@
 
 ### 新增
 
-- **发布流水线重做为三阶段**：新增 `.github/workflows/release.yml`，把「发布」拆成三件事各管一段 —— **版本判定**（读 `package.json`，并与 `Cargo.toml`、`tauri.conf.json` 三方校验；`x.y.z` 判为正式版、`x.y.z-betax` 判为测试版，同版本 Release 已存在直接失败）、**三平台打包**（Windows / macOS / Android 并行）、**建 Release**（汇总三个包，发布说明自动取自 `changelog.md` 同版本小节，测试版自动勾选 Pre-Release）。原 `ci.yml` 保留为手动构建验证，**推送 main 不再自动构建**
+- **发布流水线重做为三阶段**：新增 `.github/workflows/release.yml`，把「发布」拆成三件事各管一段 —— **版本判定**（读 `package.json`，并与 `Cargo.toml`、`tauri.conf.json` 三方校验；`x.y.z` 判为正式版、`x.y.z-betax` 判为测试版，同版本 Release 已存在直接失败）、**三平台打包**（Windows / macOS / Android 并行）、**建 Release**（汇总三个包，发布说明自动取自 `changelog.md` 同版本小节，测试版自动勾选 Pre-Release）。原 `ci.yml` 保留为手动构建验证，**推送 main 不再跑编译验证**
 - **发行包形态统一为「一个可执行程序一个包」**：`Plainstruct_版本号_平台_架构.zip` —— Windows 包内只有 `Plainstruct.exe`（可执行文件按发行要求改名，构建脚本与更新向导同步适配），Android 包内只有 `Plainstruct.apk`，macOS 包内为 `Plainstruct.app` 加「损坏修复.command」。包名即协议：应用内检查更新只按「平台 + 架构」识别产物，不再解析文件名里的版本号与分隔符
 - **更新设置：通道与下载源**：设置页「关于」新增 **更新通道**（稳定版只看正式版 / 测试版把 Pre-Release 也算进来，按完整语义化版本比较 —— `4.4.0-beta1 < 4.4.0`、`beta10 > beta9`）与 **下载源**（GitHub 直连 / GitHub 代理）。两个源并排成卡，点一次「测速」并行实测各自速度（真实拉取当前平台更新包的前 1 MiB，量首字节延迟与吞吐），数值落在各自卡内，选谁与凭什么选在同一处
 - **下载后读秒自动安装**：检查到新版本先问「要不要下」，下载完成后自动开始 **8 秒读秒**，到点拉起更新向导覆盖安装并启动新版本；读秒弹窗实时显示剩余秒数与余量条，随时可「取消自动安装」—— 取消后停在「已就绪」，仍可手动「重启并更新」
 
 ### 变更
 
+- **推送即发版**：`release.yml` 增加 `push: branches: [main]` + `paths: ['package.json']` 触发 —— 版本号一改、推上去就自动跑完判定与打包；版本没动过的提交不会惊动发布。门禁按触发方式区分：推送触发遇到已发布的版本**整轮跳过**（结论仍是 success，不报红），手动触发遇到同版本才**明确失败**（避免误以为重发成功）
 - 应用版本升至 **4.4.0-beta1**（测试版，作为 Pre-Release 发布）
 - 发布仓库地址更正为 `MogroWangStudio/Plainstruct`（应用内检查更新、README 链接同源）
 - macOS 发行包不再提供 dmg，只提供含「损坏修复.command」的 zip；应用内更新向导同时支持 zip 与旧版 dmg（解压 / 挂载两条路径共用同一段安装流程），旧包仍可正常升级

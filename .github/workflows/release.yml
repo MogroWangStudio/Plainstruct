@@ -1,10 +1,15 @@
 # 素构 Plainstruct —— 发布流水线(三阶段)。
 #
+# 触发:推送 main(含版本号变更)自动跑,也可手动 workflow_dispatch。
+#   - 版本门禁:prepare 先看 package.json 的版本号,若该版本已有 Release,
+#     推送触发时整轮「跳过」(结论 success,不报红),手动触发时「失败」并说明原因
+#     —— 同一个版本号只发布一次,想再发就改版本号。
+#   - 日常提交(未改版本号)同样会走 prepare 后跳过,只花十几秒。
+#
 #   1. prepare:读取 package.json 的版本号(并与 Cargo.toml / tauri.conf.json 三方校验),
 #      据此判定这次是正式版还是测试版:
 #        x.y.z         → 正式版,建 tag v x.y.z,发布 Release
 #        x.y.z-betax   → 测试版,建同一格式的 tag,发布 Pre-Release
-#      Release 已存在时直接失败 —— 同一个版本号只发布一次,补版本请改版本号。
 #   2. build:三平台并行打包,全部产出「只含可执行程序」的压缩包:
 #        Plainstruct_版本号_Windows_x64.zip   → 单个 Plainstruct.exe
 #        Plainstruct_版本号_Android_arm64.zip → 单个 Plainstruct.apk
@@ -20,6 +25,10 @@
 name: Release Plainstruct
 
 on:
+  push:
+    branches: [main]
+    # 只有版本号文件变动才需要判断是否发版:代码提交不惊动发布
+    paths: ['package.json']
   workflow_dispatch:
 
 permissions:
@@ -39,6 +48,7 @@ jobs:
       tag: ${{ steps.meta.outputs.tag }}
       prerelease: ${{ steps.meta.outputs.prerelease }}
       channel: ${{ steps.meta.outputs.channel }}
+      should_release: ${{ steps.meta.outputs.should_release }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -74,35 +84,49 @@ jobs:
           fi
 
           TAG="v$VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$PRERELEASE" >> "$GITHUB_OUTPUT"
+          echo "channel=$CHANNEL" >> "$GITHUB_OUTPUT"
+
           STATUS=$(curl -s -o /dev/null -w '%{http_code}' \
             -H "Authorization: Bearer ${GH_TOKEN}" \
             -H "Accept: application/vnd.github+json" \
             "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}")
           echo "tag=${TAG} 的 Release 查询结果:${STATUS}"
           if [ "$STATUS" = "200" ]; then
-            echo "::error::Release ${TAG} 已存在。同一版本号只发布一次:请先升级版本号再发布。"
-            exit 1
+            if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+              echo "::error::Release ${TAG} 已存在。同一版本号只发布一次:请先升级版本号再发布。"
+              exit 1
+            fi
+            # 推送触发:版本号没动过就是「无需发版」,不是错误 —— 跳过而不是报红
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=跳过发布::Release ${TAG} 已存在,本次推送不发版(改版本号才会发新版本)。"
+            {
+              echo "### 跳过发布"
+              echo ""
+              echo "版本号 \`$VERSION\` 对应的 Release 已存在,本次推送没有新版本可发。"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
           fi
           if [ "$STATUS" != "404" ]; then
             echo "::warning::无法确认 ${TAG} 是否已发布(HTTP ${STATUS}),继续执行。"
           fi
-
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "prerelease=$PRERELEASE" >> "$GITHUB_OUTPUT"
-          echo "channel=$CHANNEL" >> "$GITHUB_OUTPUT"
+          echo "should_release=true" >> "$GITHUB_OUTPUT"
           {
             echo "### 版本判定"
             echo ""
             echo "- 版本号:\`$VERSION\`"
             echo "- Tag:\`$TAG\`"
             echo "- 通道:$([ "$CHANNEL" = beta ] && echo '测试版(Pre-Release)' || echo '正式版(Release)')"
+            echo "- 触发:${GITHUB_EVENT_NAME}"
           } >> "$GITHUB_STEP_SUMMARY"
 
   # ---------- 阶段 2:三平台打包 ----------
   build-desktop:
     name: Build ${{ matrix.label }}
     needs: prepare
+    if: needs.prepare.outputs.should_release == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -223,6 +247,7 @@ jobs:
   build-android:
     name: Build Android arm64
     needs: prepare
+    if: needs.prepare.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     env:
       SOURCE_DATE_EPOCH: "1700000000"
@@ -382,6 +407,7 @@ jobs:
   release:
     name: Publish release
     needs: [prepare, build-desktop, build-android]
+    if: needs.prepare.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write

@@ -180,9 +180,9 @@ npm run android:build                  # Android arm64 APK (needs Android SDK/ND
 
 The version lives in three places — `package.json`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json` — and the release pipeline verifies all three agree before building.
 
-Releasing: pushing to main no longer builds anything. Run **Release Plainstruct** manually in GitHub Actions; it works in three stages:
+Releasing: change the version and push to main — **Release Plainstruct** picks it up automatically (the workflow only watches `package.json`, so ordinary code commits never touch releases). It reads the version: if that version has not been released yet it runs the three stages below, otherwise the whole run is skipped without failing. You can also trigger it manually; a manual run with an already-released version fails loudly instead of pretending to re-release.
 
-1. **Resolve version** — read `package.json`: `x.y.z` means stable (tag + Release), `x.y.z-betax` means beta (same tag format + Pre-Release). If a release for that version already exists, the run fails.
+1. **Resolve version** — read `package.json`: `x.y.z` means stable (tag + Release), `x.y.z-betax` means beta (same tag format + Pre-Release). When the push already has a release for that version the run is skipped; a manual run fails instead.
 2. **Build three platforms** — `Plainstruct_<version>_Windows_x64.zip` (one `Plainstruct.exe`), `Plainstruct_<version>_macOS_arm64.zip` (`.app` + repair script), `Plainstruct_<version>_Android_arm64.zip` (one `Plainstruct.apk`). File names are the contract: in-app update detection matches platform + arch, so check `pick_asset` in `src-tauri/src/commands/github.rs` before renaming anything.
 3. **Create the release** — upload the three packages, take the notes from the matching section of `changelog.md`, and mark beta builds as pre-release.
 
