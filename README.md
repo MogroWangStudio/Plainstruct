@@ -181,7 +181,7 @@ npm run android:build                  # Android arm64 APK（需 Android SDK/NDK
 
 版本号在 `package.json`、`src-tauri/Cargo.toml`、`src-tauri/tauri.conf.json` 三处同步（发布流水线会先做三方校验）。
 
-发布：把版本号改动推到 main，**Release Plainstruct** 会自动接手（流水线只监听 `package.json` 的变更，纯代码提交不惊动发布）——它先看版本号，这个版本还没发过就依次跑完下面三个阶段，已经发过就整轮跳过、不报红。也可以在 Actions 里手动触发；手动触发遇到同版本会明确失败，避免误以为重发成功。
+发布：推到 main，**Release Plainstruct** 会自动接手 —— 它先看 `package.json` 的版本号，这个版本还没发过就依次跑完下面三个阶段；已经发过就整轮跳过（结论仍是 success，不报红，只花十几秒）。刻意不加 `paths` 过滤：漏发一次得手动补，代价比「多跑十几秒再跳过」高。也可以在 Actions 里手动触发；手动触发遇到同版本会明确失败，避免误以为重发成功。
 
 1. **版本判定**：读 `package.json` 的版本号，`x.y.z` 判为正式版（建 tag、发 Release），`x.y.z-betax` 判为测试版（同格式 tag，发 Pre-Release）；推送触发时若同版本已发布则跳过，手动触发则失败。
 2. **三平台打包**：`Plainstruct_版本号_Windows_x64.zip`（单个 `Plainstruct.exe`）、`Plainstruct_版本号_macOS_arm64.zip`（`.app` + 损坏修复.command）、`Plainstruct_版本号_Android_arm64.zip`（单个 `Plainstruct.apk`）。包名即协议 —— 应用内检查更新靠「平台 + 架构」识别产物，改名先看 `src-tauri/src/commands/github.rs` 的 `pick_asset`。

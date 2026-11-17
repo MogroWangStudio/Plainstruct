@@ -1,10 +1,11 @@
 # 素构 Plainstruct —— 发布流水线(三阶段)。
 #
-# 触发:推送 main(含版本号变更)自动跑,也可手动 workflow_dispatch。
-#   - 版本门禁:prepare 先看 package.json 的版本号,若该版本已有 Release,
-#     推送触发时整轮「跳过」(结论 success,不报红),手动触发时「失败」并说明原因
-#     —— 同一个版本号只发布一次,想再发就改版本号。
-#   - 日常提交(未改版本号)同样会走 prepare 后跳过,只花十几秒。
+# 触发:推送 main 自动跑,也可手动 workflow_dispatch。
+#   - 版本门禁:prepare 先看 package.json 的版本号 —— 同一版本号只发布一次,
+#     若该版本已有 Release:推送触发时整轮「跳过」(结论 success,不报红),
+#     手动触发时「失败」并说明原因。想再发就改版本号。
+#   - 不用 paths 过滤:漏发一次就得手动补,代价比「多跑十几秒再跳过」高得多;
+#     日常提交只会走完 prepare 就结束(步骤摘要里写明「跳过发布」)。
 #
 #   1. prepare:读取 package.json 的版本号(并与 Cargo.toml / tauri.conf.json 三方校验),
 #      据此判定这次是正式版还是测试版:
@@ -27,8 +28,6 @@ name: Release Plainstruct
 on:
   push:
     branches: [main]
-    # 只有版本号文件变动才需要判断是否发版:代码提交不惊动发布
-    paths: ['package.json']
   workflow_dispatch:
 
 permissions:
