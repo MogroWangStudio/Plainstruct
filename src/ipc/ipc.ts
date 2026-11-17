@@ -16,12 +16,15 @@ import type {
   SiteConfig,
   SitePluginEntry,
   SitePluginFiles,
+  SpeedTestResult,
   SyncProgress,
   SyncResult,
   ThemeMeta,
   TreeNode,
+  UpdateChannel,
   UpdateDownloadResult,
   UpdateInfo,
+  UpdateSource,
   VerifyResult,
 } from "./types";
 import { Events, listen } from "./events";
@@ -71,12 +74,19 @@ export const ipc = {
   systemNotify(title: string, body: string, actions?: NotifyAction[]): Promise<void> {
     return inTauri ? invoke<void>("system_notify", { title, body, actions }) : Promise.resolve();
   },
-  checkUpdate(): Promise<UpdateInfo> {
-    return inTauri ? invoke<UpdateInfo>("check_update") : mock.checkUpdate();
+  /** 检查更新:channel=stable 只看正式版,beta 连 Pre-Release 一起看 */
+  checkUpdate(channel: UpdateChannel): Promise<UpdateInfo> {
+    return inTauri ? invoke<UpdateInfo>("check_update", { channel }) : mock.checkUpdate(channel);
   },
-  /** 下载官方最新 Release 的当前平台更新包;可再次调用以续传,paused=true 表示已暂停返回 */
-  updateDownload(): Promise<UpdateDownloadResult> {
-    return inTauri ? invoke<UpdateDownloadResult>("update_download") : mock.updateDownload();
+  /** 下载源测速:失败以 ok=false 返回,便于两个源并排比较 */
+  speedtestUpdateSource(source: UpdateSource, channel: UpdateChannel): Promise<SpeedTestResult> {
+    return inTauri
+      ? invoke<SpeedTestResult>("speedtest_update_source", { source, channel })
+      : mock.speedtestUpdateSource(source);
+  },
+  /** 下载通道内最新的当前平台更新包;可再次调用以续传,paused=true 表示已暂停返回 */
+  updateDownload(channel: UpdateChannel, source: UpdateSource): Promise<UpdateDownloadResult> {
+    return inTauri ? invoke<UpdateDownloadResult>("update_download", { channel, source }) : mock.updateDownload();
   },
   /** 暂停下载(保留断点) */
   updatePause(): Promise<void> {

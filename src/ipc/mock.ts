@@ -16,12 +16,15 @@ import type {
   ImportedPlugin,
   SitePluginEntry,
   SitePluginFiles,
+  SpeedTestResult,
   SyncProgress,
   SyncResult,
   ThemeMeta,
   TreeNode,
+  UpdateChannel,
   UpdateDownloadResult,
   UpdateInfo,
+  UpdateSource,
   VerifyResult,
 } from "./types";
 import { Events, mockEmit } from "./events";
@@ -985,22 +988,37 @@ async readSiteConfig(): Promise<SiteConfig> {
 
   async logFrontend(_msg: string): Promise<void> {},
 
-  async checkUpdate(): Promise<UpdateInfo> {
+  async checkUpdate(channel: UpdateChannel): Promise<UpdateInfo> {
     await delay(400);
     return {
       currentVersion: __APP_VERSION__,
       latestVersion: MOCK_LATEST_VERSION,
       hasUpdate: true,
-      releaseUrl: "https://github.com/MogroWang/Plainstruct/releases/latest",
+      releaseUrl: "https://github.com/MogroWangStudio/Plainstruct/releases/latest",
       releaseNotes: "",
       publishedAt: "",
+      prerelease: channel === "beta",
+      channel,
+    };
+  },
+
+  /** 浏览器 mock:两源各自给一个稳定的模拟速度(代理更快,便于对照界面) */
+  async speedtestUpdateSource(source: UpdateSource): Promise<SpeedTestResult> {
+    await delay(700);
+    const proxy = source === "proxy";
+    return {
+      source,
+      ok: true,
+      bytesPerSec: proxy ? 3_400_000 : 1_150_000,
+      latencyMs: proxy ? 120 : 260,
+      message: "",
     };
   },
 
   /** 浏览器 mock:模拟分块下载(事件驱动进度/速度),支持暂停、取消与续传 */
   async updateDownload(): Promise<UpdateDownloadResult> {
     const version = MOCK_LATEST_VERSION;
-    const assetName = `Plainstruct_${version}_Windows_x64_Portable.zip`;
+    const assetName = `Plainstruct_${version}_Windows_x64.zip`;
     const total = 24_117_248;
     mockDownload.paused = false;
     mockDownload.cancelled = false;
@@ -1045,9 +1063,10 @@ const mockDownload = { paused: false, cancelled: false, received: 0, running: fa
 /** mock 发布模拟器的取消标志(githubSync 循环轮询) */
 const mockPublish = { cancelled: false };
 
-/** mock 模拟的「最新版本」:始终比当前应用版本新一个补丁位,版本升级后无需手动同步 */
+/** mock 模拟的「最新版本」:始终比当前应用版本新一个补丁位,版本升级后无需手动同步。
+ *  当前版本可能是预发布(4.4.0-beta1),先剥掉后缀再拆分,否则补丁位会算成 NaN */
 const MOCK_LATEST_VERSION = (() => {
-  const [maj, min, pat] = __APP_VERSION__.split(".").map(Number);
+  const [maj, min, pat] = __APP_VERSION__.split("-")[0].split(".").map(Number);
   return `${maj}.${min}.${(pat ?? 0) + 1}`;
 })();
 

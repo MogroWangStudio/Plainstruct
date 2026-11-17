@@ -248,6 +248,7 @@ pub fn run() {
             commands::report_boot_success,
             commands::repair_webview_data,
             commands::check_update,
+            commands::speedtest_update_source,
             commands::set_data_dir,
             commands::update_download,
             commands::update_pause,

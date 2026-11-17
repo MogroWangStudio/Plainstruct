@@ -15,7 +15,9 @@ import type {
   PublishNotifyMode,
   RecentSite,
   UiFontMode,
+  UpdateChannel,
   UpdateProgress,
+  UpdateSource,
   MobileTabStyle,
   BootAnimCurve,
   BootAnimPreset,
@@ -26,14 +28,19 @@ import { useUiStore } from "./ui";
 
 export type AppView = "editor" | "assets" | "site" | "build" | "theme" | "plugins" | "publish" | "settings" | "about" | "lan";
 
-/**
- * 自动更新阶段:idle=未开始 downloading=下载中 paused=已暂停(可续传)
- * ready=已就绪待「重启并更新」 error=失败
+/** 自动更新阶段:idle=未开始 downloading=下载中 paused=已暂停(可续传)
+ *  ready=已就绪待「重启并更新」 error=失败
  */
 export type UpdatePhase = "idle" | "downloading" | "paused" | "ready" | "error";
 
+/** 下载完成后自动重启安装的读秒时长(秒):留出「反悔」的时间,又不至于让人干等 */
+export const AUTO_INSTALL_SECONDS = 8;
+
 /** 速度平滑采样的上一次进度事件 */
 let lastSpeedSample: { received: number; ts: number } | null = null;
+
+/** 读秒定时器:与组件生命周期无关,换视图也要继续走完,故放在 store 外 */
+let autoInstallTimer: ReturnType<typeof setInterval> | null = null;
 
 /** 个性化外观(主题与字体) */
 export interface AppearanceSettings {
@@ -134,6 +141,8 @@ interface State {
   updateError: string;
   /** 「重启并更新」执行中:防止重复拉起向导 */
   restartUpdating: boolean;
+  /** 下载完成后的自动安装读秒:>0 表示正在读秒,0 表示未在读秒 */
+  autoInstallLeft: number;
 }
 
 export const useAppStore = defineStore("app", {
@@ -152,6 +161,7 @@ export const useAppStore = defineStore("app", {
     updateError: "",
     /** 「重启并更新」执行中:防止重复拉起向导 */
     restartUpdating: false,
+    autoInstallLeft: 0,
   }),
 
   getters: {
@@ -176,6 +186,8 @@ export const useAppStore = defineStore("app", {
           editorIndentWidth: 2,
           modalBlur: true,
           modalBackdropClose: "double",
+          updateChannel: "stable",
+          updateSource: "github",
         }
       );
     },
@@ -188,6 +200,19 @@ export const useAppStore = defineStore("app", {
     },
     version(): string {
       return this.bootstrap?.version ?? "";
+    },
+    /** 更新通道(缺省稳定通道):决定检查更新时是否把 Pre-Release 算进来 */
+    updateChannel(): UpdateChannel {
+      return this.settings.updateChannel ?? "stable";
+    },
+    /** 更新包下载源(缺省 GitHub 直连) */
+    updateSource(): UpdateSource {
+      return this.settings.updateSource ?? "github";
+    },
+    /** 应用内下载安装只在桌面成立(安卓需手动安装 APK,只给发布页入口);
+     *  浏览器 mock 开发态视作桌面,便于在 npm run dev 下走通整条更新流程 */
+    canSelfUpdate(): boolean {
+      return this.platform !== "android" && this.platform !== "ios";
     },
     /** 软件当前是否处于暗色(固定深色主题,或跟随系统时取系统深浅) */
     isDark(state): boolean {
@@ -256,6 +281,7 @@ export const useAppStore = defineStore("app", {
 
     /** 重置下载展示状态(取消/失败时回到初始) */
     resetDownloadState() {
+      this.cancelAutoInstall();
       this.updatePhase = "idle";
       this.updateProgress = 0;
       this.updateSpeed = 0;
@@ -267,7 +293,7 @@ export const useAppStore = defineStore("app", {
       lastSpeedSample = null;
     },
 
-    /** 下载(或从断点续传)更新包;完成后进入「重启并更新」 */
+    /** 下载(或从断点续传)更新包;完成后读秒自动重启安装 */
     async updateDownload() {
       const ui = useUiStore();
       const t = i18n.global.t;
@@ -282,11 +308,13 @@ export const useAppStore = defineStore("app", {
         lastSpeedSample = null;
       }
       try {
-        const r = await ipc.updateDownload();
+        const r = await ipc.updateDownload(this.updateChannel, this.updateSource);
         this.updateVersion = r.version;
         this.updateName = r.assetName;
         this.updatePhase = r.paused ? "paused" : "ready";
         this.updateSpeed = 0;
+        // 下载完成即开始读秒:给用户一段能取消的时间,而不是下载完就静默停住
+        if (!r.paused) this.startAutoInstall();
       } catch (e) {
         this.updateError = ipc.errText(e);
         if (this.updateError === "update-cancelled") {
@@ -296,6 +324,45 @@ export const useAppStore = defineStore("app", {
         this.updatePhase = "error";
         ui.toast(t("settings.updateDownloadFailed", { msg: this.updateError }), "error");
       }
+    },
+
+    /** 开始自动安装读秒:每秒递减,归零后拉起更新向导;取消即停在「已就绪」不动 */
+    startAutoInstall() {
+      this.cancelAutoInstall();
+      if (this.updatePhase !== "ready") return;
+      this.autoInstallLeft = AUTO_INSTALL_SECONDS;
+      autoInstallTimer = setInterval(() => {
+        if (this.updatePhase !== "ready") {
+          this.cancelAutoInstall();
+          return;
+        }
+        this.autoInstallLeft -= 1;
+        if (this.autoInstallLeft <= 0) {
+          this.cancelAutoInstall();
+          void this.restartToUpdate();
+        }
+      }, 1000);
+    },
+
+    /** 取消自动安装(定时器与读秒数值一起收掉);已下载的更新包保留,可手动重启安装 */
+    cancelAutoInstall() {
+      if (autoInstallTimer !== null) {
+        clearInterval(autoInstallTimer);
+        autoInstallTimer = null;
+      }
+      this.autoInstallLeft = 0;
+    },
+
+    /** 保存更新通道;通道变化不影响已下载的包,仅改变「检查更新」的筛选范围 */
+    async setUpdateChannel(channel: UpdateChannel) {
+      this.bootstrap = { ...this.bootstrap!, settings: { ...this.settings, updateChannel: channel } };
+      await ipc.saveSettings({ updateChannel: channel });
+    },
+
+    /** 保存下载源;下一次下载/测速按新源拼接地址 */
+    async setUpdateSource(source: UpdateSource) {
+      this.bootstrap = { ...this.bootstrap!, settings: { ...this.settings, updateSource: source } };
+      await ipc.saveSettings({ updateSource: source });
     },
 
     /** 暂停下载:保留断点,可继续 */
@@ -347,6 +414,7 @@ export const useAppStore = defineStore("app", {
       if (this.restartUpdating) return;
       const ui = useUiStore();
       const t = i18n.global.t;
+      this.cancelAutoInstall();
       this.restartUpdating = true;
       try {
         await ipc.updateRestartInstall();

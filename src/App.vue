@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { useAppStore } from "@/stores/app";
+import { AUTO_INSTALL_SECONDS, useAppStore } from "@/stores/app";
 import { useSiteStore } from "@/stores/site";
 import { useEditorStore } from "@/stores/editor";
 import { useLanStore } from "@/stores/lan";
@@ -89,6 +89,12 @@ async function closeDiscard() {
 function closeCancel() {
   closeAskOpen.value = false;
   closeAsked = false;
+}
+
+/** 读秒中的「立即重启」:先收掉倒计时再交接给更新向导,避免重复拉起 */
+function restartNow() {
+  app.cancelAutoInstall();
+  void app.restartToUpdate();
 }
 
 const viewMap = {
@@ -185,10 +191,48 @@ onMounted(() => {
         <button class="btn btn-primary" @click="closeSaveAndExit">{{ t("editor.closeSave") }}</button>
       </template>
     </Modal>
+
+    <!-- 更新读秒:下载完成即开始,留足反悔时间;取消后停在「已就绪」,可随时手动重启 -->
+    <Modal
+      v-if="app.autoInstallLeft > 0"
+      :title="t('settings.updateAutoInstallTitle')"
+      :width="400"
+      :backdrop-disabled="true"
+      @cancel="app.cancelAutoInstall()"
+    >
+      <p class="text-[calc(13.5px*var(--ui-font-scale))] leading-relaxed text-ink-2">
+        {{ t("settings.updateAutoInstallBody", { n: app.autoInstallLeft, v: app.updateVersion }) }}
+      </p>
+      <!-- 余量条与读秒同节奏缩短:不读数字也能看出还剩多久 -->
+      <div class="mt-4 h-1 w-full overflow-hidden rounded-full bg-surface-3" aria-hidden="true">
+        <div
+          class="countdown-fill"
+          :style="{ transform: `scaleX(${app.autoInstallLeft / AUTO_INSTALL_SECONDS})` }"
+        />
+      </div>
+      <template #footer>
+        <button class="btn btn-secondary" @click="app.cancelAutoInstall()">
+          {{ t("settings.updateAutoInstallCancel") }}
+        </button>
+        <button class="btn btn-primary" @click="restartNow">
+          {{ t("settings.updateAutoInstallNow") }}
+        </button>
+      </template>
+    </Modal>
   </div>
 </template>
 
 <style scoped>
+/* 读秒余量条:墨色实条自左向右收尽,1s 线性跟进每秒的读秒节奏;
+   系统减弱动态时去掉过渡,让宽度直接跳到当前值 */
+.countdown-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--color-ink);
+  transform-origin: left center;
+  transition: transform 1s linear;
+}
+
 /* 启动画面:全屏覆盖(桌面含标题栏,移动含顶栏底栏),时长与曲线由设置注入(--boot-dur/--boot-ease) */
 .boot-layer {
   position: absolute;
@@ -261,6 +305,9 @@ onMounted(() => {
   }
   .boot-leave-active {
     transition: opacity 80ms linear;
+  }
+  .countdown-fill {
+    transition: none;
   }
 }
 </style>

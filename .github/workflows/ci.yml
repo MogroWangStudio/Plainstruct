@@ -1,12 +1,14 @@
-# 素构 Plainstruct —— 推送 main 或手动触发时构建,产物作为 Artifact 留档。
-# 触发方式:
-#   - 推送 main 分支(构建验证与留档)
-#   - 手动触发(workflow_dispatch)
-# 打版本标签不再触发构建:发布 Release 时从对应提交的构建工件(Artifacts)
-# 下载产物手动上传,产物命名已由流水线统一,无需改名。
+# 素构 Plainstruct —— 手动触发的构建验证(不产出 Release)。
 #
-# 产物形态:Windows x64 免安装 zip(内含 exe)、macOS arm64 dmg / zip 与
-# 安卓 arm64 APK,命名统一为 Plainstruct_版本号_平台(版本取自 package.json/Cargo.toml)。
+# 触发方式:仅 workflow_dispatch。推送 main 不再自动构建 —— 发布走
+# release.yml(版本判定 → 三平台打包 → 建 Release),本流水线只用于
+# 日常验证「当前提交能否编译通过」。
+#
+# 产物形态(仅留档,不发布):
+#   - Windows x64:免安装 zip,内含单个 Plainstruct.exe
+#   - macOS arm64:zip,内含 Plainstruct.app 与「损坏修复.command」
+#   - Android arm64:APK(保留原样,供验签脚本直接校验;发行包才封成 zip)
+# Windows / macOS 的包名与 release.yml 完全一致,便于把验证包与发行包对照。
 #
 # 安卓签名(重要):签名稳定性取决于「每次构建用的是不是同一把私钥」。
 # 因此本流水线 fail-closed ——
@@ -25,8 +27,6 @@
 name: Build Plainstruct
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -64,20 +64,21 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      # Windows x64:免安装 zip(内含 exe)。脚本内部以 --no-bundle 编译,不再产出 NSIS/MSI 安装包
+      # Windows x64:免安装 zip(内含单个 Plainstruct.exe)。脚本内部以 --no-bundle 编译,
+      # 不再产出 NSIS/MSI 安装包;可执行文件按发行要求统一命名为 Plainstruct.exe
       - name: Build Windows x64 portable zip
         if: runner.os == 'Windows'
         run: npm run windows:portable
         shell: powershell
 
-      # macOS arm64:只构建 .app;dmg 与 zip 由后续步骤自行打包,以注入「损坏修复」脚本
+      # macOS arm64:只构建 .app;zip 由后续步骤自行打包,以注入「损坏修复」脚本
       - name: Build Tauri bundle (macOS arm64 app)
         if: runner.os == 'macOS'
         run: npm run tauri -- build --bundles app
 
       # ad-hoc 重签 .app:无 Apple 开发者证书无法公证,但有效的 ad-hoc 签名
       # 可避免 Gatekeeper 把应用直接判定为「已损坏」(未签名会触发更严重的拦截)。
-      # 下载后的隔离属性由 dmg/zip 内的「损坏修复.command」解除。
+      # 下载后的隔离属性由 zip 内的「损坏修复.command」解除。
       - name: Ad-hoc sign macOS app
         if: runner.os == 'macOS'
         run: |
@@ -97,48 +98,38 @@ jobs:
           echo "--- 签名摘要(ad-hoc,无稳定身份) ---"
           codesign -dv --verbose=4 "$APP" 2>&1 | grep -E "Identifier|Signature|CDHash|TeamIdentifier" || true
 
-      # 打包 macOS 产物:压缩包(zip,内含 .app 与「损坏修复.command」)与磁盘镜像(dmg)同名成对,
-      # 统一为 Plainstruct_版本号_macOS_arm64。
-      # tauri 的 dmg 不支持注入自定义文件,故先签名 .app 再用 hdiutil 重打,最后签 dmg。
-      - name: Pack macOS dmg and zip with repair script
+      # 打包 macOS 产物:zip 内含 .app 与「损坏修复.command」,命名 Plainstruct_版本号_macOS_arm64.zip。
+      # 版本取自构建产物(与 tauri.conf.json/Cargo.toml 同源),产物命名不依赖触发方式。
+      - name: Pack macOS zip with repair script
         if: runner.os == 'macOS'
         run: |
           set -e
           APP="src-tauri/target/release/bundle/macos/Plainstruct.app"
           [ -d "$APP" ]
-          # 版本取自构建产物(与 tauri.conf.json/Cargo.toml 同源),产物命名不依赖触发方式
           VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")
-          STAGING="$(mktemp -d)"
-          cp -R "$APP" "$STAGING/"
-          ln -s /Applications "$STAGING/Applications"
-          cp scripts/损坏修复.command "$STAGING/损坏修复.command"
-          chmod +x "$STAGING/损坏修复.command"
-          BUNDLE_DIR="src-tauri/target/release/bundle/macos/Plainstruct_${VERSION}_macOS_arm64"
-          hdiutil create -volname "Plainstruct" -srcfolder "$STAGING" -ov -format UDZO \
-            "$BUNDLE_DIR.dmg"
-          codesign --force --sign - "$BUNDLE_DIR.dmg"
           ZIP_STAGE="$(mktemp -d)"
           cp -R "$APP" "$ZIP_STAGE/"
           cp scripts/损坏修复.command "$ZIP_STAGE/损坏修复.command"
           chmod +x "$ZIP_STAGE/损坏修复.command"
-          (cd "$ZIP_STAGE" && ditto -c -k --sequesterRsrc . "$GITHUB_WORKSPACE/$BUNDLE_DIR.zip")
+          OUT="dist/Plainstruct_${VERSION}_macOS_arm64.zip"
+          mkdir -p dist
+          (cd "$ZIP_STAGE" && ditto -c -k --sequesterRsrc . "$GITHUB_WORKSPACE/$OUT")
+          unzip -l "$OUT"
 
       - name: Upload Windows x64 portable artifact
         if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
         with:
-          name: plainstruct-windows-x64-portable
-          path: release/Plainstruct_*_Windows_x64_Portable.zip
+          name: plainstruct-windows-x64
+          path: release/Plainstruct_*_Windows_x64.zip
           if-no-files-found: error
 
-      - name: Upload macOS arm64 artifacts
+      - name: Upload macOS arm64 artifact
         if: runner.os == 'macOS'
         uses: actions/upload-artifact@v4
         with:
           name: plainstruct-macos-arm64
-          path: |
-            src-tauri/target/release/bundle/macos/Plainstruct_*_macOS_arm64.dmg
-            src-tauri/target/release/bundle/macos/Plainstruct_*_macOS_arm64.zip
+          path: dist/Plainstruct_*_macOS_arm64.zip
           if-no-files-found: error
 
   # 安卓 APK(arm64-v8a):前端构建 + Rust 交叉编译 + gradle 打包。

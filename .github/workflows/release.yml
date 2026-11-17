@@ -1,0 +1,445 @@
+# 素构 Plainstruct —— 发布流水线(三阶段)。
+#
+#   1. prepare:读取 package.json 的版本号(并与 Cargo.toml / tauri.conf.json 三方校验),
+#      据此判定这次是正式版还是测试版:
+#        x.y.z         → 正式版,建 tag v x.y.z,发布 Release
+#        x.y.z-betax   → 测试版,建同一格式的 tag,发布 Pre-Release
+#      Release 已存在时直接失败 —— 同一个版本号只发布一次,补版本请改版本号。
+#   2. build:三平台并行打包,全部产出「只含可执行程序」的压缩包:
+#        Plainstruct_版本号_Windows_x64.zip   → 单个 Plainstruct.exe
+#        Plainstruct_版本号_Android_arm64.zip → 单个 Plainstruct.apk
+#        Plainstruct_版本号_macOS_arm64.zip   → Plainstruct.app + 损坏修复.command
+#      命名即协议:应用内检查更新按「Windows/macOS/Android + x64/arm64」识别平台包,
+#      改名前先看 src-tauri/src/commands/github.rs 的 pick_asset。
+#   3. release:汇总三份压缩包建 Release(测试版自动勾选 Pre-Release),
+#      发布说明取自 changelog.md 中同版本号的小节。
+#
+# 安卓签名与 ci.yml 同一套红线(密钥 fail-closed + 指纹基线比对 + 产物验签),
+# 详见 docs/android-signing.md。
+
+name: Release Plainstruct
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  # ---------- 阶段 1:版本判定 ----------
+  prepare:
+    name: Resolve version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      tag: ${{ steps.meta.outputs.tag }}
+      prerelease: ${{ steps.meta.outputs.prerelease }}
+      channel: ${{ steps.meta.outputs.channel }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Resolve version and release kind
+        id: meta
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./package.json').version")
+          CARGO_VERSION=$(grep -m1 -E '^version = "' src-tauri/Cargo.toml | sed -E 's/.*"(.*)".*/\1/')
+          TAURI_VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          if [ "$VERSION" != "$CARGO_VERSION" ] || [ "$VERSION" != "$TAURI_VERSION" ]; then
+            echo "::error::版本号不一致:package.json=$VERSION Cargo.toml=$CARGO_VERSION tauri.conf.json=$TAURI_VERSION。三处必须同源,否则产物名与安装包内版本会对不上。"
+            exit 1
+          fi
+
+          if printf '%s' "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            CHANNEL=stable
+            PRERELEASE=false
+          elif printf '%s' "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+-beta[0-9]+$'; then
+            CHANNEL=beta
+            PRERELEASE=true
+          else
+            echo "::error::版本号 $VERSION 不符合约定:正式版为 x.y.z,测试版为 x.y.z-betax。"
+            exit 1
+          fi
+
+          TAG="v$VERSION"
+          STATUS=$(curl -s -o /dev/null -w '%{http_code}' \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}")
+          echo "tag=${TAG} 的 Release 查询结果:${STATUS}"
+          if [ "$STATUS" = "200" ]; then
+            echo "::error::Release ${TAG} 已存在。同一版本号只发布一次:请先升级版本号再发布。"
+            exit 1
+          fi
+          if [ "$STATUS" != "404" ]; then
+            echo "::warning::无法确认 ${TAG} 是否已发布(HTTP ${STATUS}),继续执行。"
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$PRERELEASE" >> "$GITHUB_OUTPUT"
+          echo "channel=$CHANNEL" >> "$GITHUB_OUTPUT"
+          {
+            echo "### 版本判定"
+            echo ""
+            echo "- 版本号:\`$VERSION\`"
+            echo "- Tag:\`$TAG\`"
+            echo "- 通道:$([ "$CHANNEL" = beta ] && echo '测试版(Pre-Release)' || echo '正式版(Release)')"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------- 阶段 2:三平台打包 ----------
+  build-desktop:
+    name: Build ${{ matrix.label }}
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            label: Windows x64
+          - os: macos-latest # Apple Silicon (arm64) runner
+            label: macOS arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          prefix-key: plainstruct-${{ matrix.os }}
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      # Windows:免安装 zip,包内只有可执行程序本体,文件名统一为 Plainstruct.exe
+      - name: Build Windows x64 zip
+        if: runner.os == 'Windows'
+        run: npm run windows:portable
+        shell: powershell
+
+      - name: Check Windows zip content
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          $version = "${{ needs.prepare.outputs.version }}"
+          $zipPath = "release/Plainstruct_${version}_Windows_x64.zip"
+          if (-not (Test-Path $zipPath)) { throw "未找到产物 $zipPath" }
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $zip = [System.IO.Compression.ZipFile]::OpenRead((Resolve-Path $zipPath))
+          try {
+            $names = @($zip.Entries | ForEach-Object { $_.FullName })
+          } finally { $zip.Dispose() }
+          Write-Host ("包内条目:" + ($names -join ", "))
+          if ($names.Count -ne 1) { throw "发行包必须只含一个可执行程序,实际 $($names.Count) 个条目" }
+          if ($names[0] -ne "Plainstruct.exe") { throw "可执行程序文件名必须为 Plainstruct.exe,实际 $($names[0])" }
+
+      # macOS:只构建 .app;zip 与「损坏修复.command」由后续步骤自行打包
+      - name: Build Tauri bundle (macOS arm64 app)
+        if: runner.os == 'macOS'
+        run: npm run tauri -- build --bundles app
+
+      # ad-hoc 重签:无 Apple 开发者证书无法公证,但有效的 ad-hoc 签名
+      # 可避免 Gatekeeper 把应用直接判定为「已损坏」
+      - name: Ad-hoc sign macOS app
+        if: runner.os == 'macOS'
+        run: |
+          for app in src-tauri/target/release/bundle/macos/*.app; do
+            if [ -e "$app" ]; then codesign --force --deep --sign - "$app"; fi
+          done
+
+      - name: Verify macOS app signature
+        if: runner.os == 'macOS'
+        run: |
+          set -e
+          APP="src-tauri/target/release/bundle/macos/Plainstruct.app"
+          [ -d "$APP" ]
+          codesign --verify --strict --verbose=2 "$APP"
+          echo "--- 签名摘要(ad-hoc,无稳定身份) ---"
+          codesign -dv --verbose=4 "$APP" 2>&1 | grep -E "Identifier|Signature|CDHash|TeamIdentifier" || true
+
+      # zip 内含 .app 与「损坏修复.command」(解锁 Gatekeeper 隔离标记的唯一入口)
+      - name: Pack macOS zip with repair script
+        if: runner.os == 'macOS'
+        run: |
+          set -e
+          APP="src-tauri/target/release/bundle/macos/Plainstruct.app"
+          [ -d "$APP" ]
+          VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")
+          if [ "$VERSION" != "${{ needs.prepare.outputs.version }}" ]; then
+            echo "::error::产物内版本 $VERSION 与 package.json 不一致"
+            exit 1
+          fi
+          ZIP_STAGE="$(mktemp -d)"
+          cp -R "$APP" "$ZIP_STAGE/"
+          cp scripts/损坏修复.command "$ZIP_STAGE/损坏修复.command"
+          chmod +x "$ZIP_STAGE/损坏修复.command"
+          mkdir -p dist
+          OUT="dist/Plainstruct_${VERSION}_macOS_arm64.zip"
+          (cd "$ZIP_STAGE" && ditto -c -k --sequesterRsrc . "$GITHUB_WORKSPACE/$OUT")
+          unzip -l "$OUT"
+          unzip -l "$OUT" | grep -q "损坏修复.command" || { echo "::error::压缩包缺少「损坏修复.command」"; exit 1; }
+
+      - name: Upload Windows zip
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-windows-x64
+          path: release/Plainstruct_*_Windows_x64.zip
+          if-no-files-found: error
+
+      - name: Upload macOS zip
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-macos-arm64
+          path: dist/Plainstruct_*_macOS_arm64.zip
+          if-no-files-found: error
+
+  # 安卓 APK(arm64-v8a):签名从 secrets 解出,fail-closed;打包为单文件 zip
+  build-android:
+    name: Build Android arm64
+    needs: prepare
+    runs-on: ubuntu-latest
+    env:
+      SOURCE_DATE_EPOCH: "1700000000"
+      CARGO_INCREMENTAL: "0"
+      PIN_FILE: src-tauri/gen/android/android-cert-sha256.txt
+      KEYSTORE_FILE: src-tauri/gen/android/plainstruct-release.keystore
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          prefix-key: plainstruct-android
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      # 发布件不接受临时密钥:缺 secrets 直接失败(不再有 debug 兜底开关)
+      - name: Restore release keystore
+        id: keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_B64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ vars.ANDROID_RELEASE_KEY_ALIAS || 'plainstruct-release' }}
+        run: |
+          set -euo pipefail
+          if [ -z "${KEYSTORE_B64}" ] || [ -z "${KEYSTORE_PASSWORD}" ]; then
+            echo "::error title=缺少发布签名::secrets ANDROID_RELEASE_KEYSTORE_B64 / ANDROID_RELEASE_KEYSTORE_PASSWORD 未配置。发布件必须用固定密钥签名,否则无法覆盖升级。见 docs/android-signing.md。"
+            exit 1
+          fi
+          printf '%s' "${KEYSTORE_B64}" | tr -d ' \r\n' | base64 -d > "${KEYSTORE_FILE}" \
+            || { echo "::error::ANDROID_RELEASE_KEYSTORE_B64 不是合法的 base64"; exit 1; }
+          chmod 600 "${KEYSTORE_FILE}"
+          PW_ESC=${KEYSTORE_PASSWORD//\\/\\\\}
+          printf 'storeFile=plainstruct-release.keystore\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
+            "${PW_ESC}" "${KEY_ALIAS}" "${PW_ESC}" > src-tauri/gen/android/keystore.properties
+          chmod 600 src-tauri/gen/android/keystore.properties
+          if ! keytool -list -keystore "${KEYSTORE_FILE}" -storepass "${KEYSTORE_PASSWORD}" \
+            -alias "${KEY_ALIAS}" > /dev/null 2>&1; then
+            echo "::error::无法用给定密码 / 别名(${KEY_ALIAS})打开密钥库:请核对 ANDROID_RELEASE_KEYSTORE_PASSWORD 与 ANDROID_RELEASE_KEY_ALIAS"
+            exit 1
+          fi
+
+      - name: Check keystore against committed fingerprint baseline
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ vars.ANDROID_RELEASE_KEY_ALIAS || 'plainstruct-release' }}
+        run: |
+          set -euo pipefail
+          KEYSTORE_FP=$(bash scripts/android-signing.sh fingerprint-keystore "${KEYSTORE_FILE}")
+          PIN_FP=$(grep -oiE '[0-9a-f]{64}' "${PIN_FILE}" | head -n 1 | tr 'A-F' 'a-f' || true)
+          echo "密钥证书指纹 : ${KEYSTORE_FP}"
+          echo "基线证书指纹 : ${PIN_FP:-未设置}"
+          if [ -z "${PIN_FP}" ]; then
+            echo "::error title=缺少证书指纹基线::${PIN_FILE} 仍是占位值。运行 scripts/android-signing.sh pin --keystore <keystore> 并把指纹提交到仓库。"
+            exit 1
+          fi
+          if [ "${KEYSTORE_FP}" != "${PIN_FP}" ]; then
+            echo "::error title=密钥与基线不一致::secrets 里的密钥(${KEYSTORE_FP})与仓库基线(${PIN_FP})不是同一把。"
+            exit 1
+          fi
+
+      - name: Ensure apksigner is available
+        run: |
+          set -euo pipefail
+          if ! ls "${ANDROID_HOME}"/build-tools/*/apksigner > /dev/null 2>&1; then
+            yes | "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" "build-tools;35.0.0" > /dev/null
+          fi
+
+      - name: Build release apk
+        run: npm run android:build
+
+      - name: Collect apk
+        id: collect
+        run: |
+          set -euo pipefail
+          APK_BASE="src-tauri/gen/android/app/build/outputs/apk"
+          APK=""
+          for candidate in \
+            "${APK_BASE}/arm64/release/app-arm64-release.apk" \
+            "${APK_BASE}/universal/release/app-universal-release.apk" \
+            "${APK_BASE}/aarch64/release/app-aarch64-release.apk"; do
+            if [ -f "${candidate}" ]; then APK="${candidate}"; break; fi
+          done
+          if [ -z "${APK}" ]; then
+            APK=$(find "${APK_BASE}" -path "*/arm64/release/*.apk" | sort | head -n 1)
+          fi
+          if [ -z "${APK}" ]; then
+            APK=$(find "${APK_BASE}" -name "*.apk" -path "*/release/*" | sort | head -n 1)
+          fi
+          if [ -z "${APK}" ]; then
+            echo "No release apk found." >&2
+            exit 1
+          fi
+          echo "选定产物:${APK}"
+          unzip -l "${APK}" | grep -q "lib/arm64-v8a/" || { echo "::error::APK 内缺少 arm64-v8a 原生库"; exit 1; }
+          mkdir -p dist
+          cp "${APK}" dist/Plainstruct.apk
+          echo "apk=dist/Plainstruct.apk" >> "$GITHUB_OUTPUT"
+
+      - name: Verify apk signature against baseline
+        run: |
+          set -euo pipefail
+          bash scripts/android-signing.sh verify-apk "${{ steps.collect.outputs.apk }}" \
+            --pin-file "${PIN_FILE}" --require-pin --report dist/signing-report.json
+
+      # 与桌面同构:压缩包只含可执行程序(此处为 APK),文件名固定 Plainstruct.apk
+      - name: Pack apk into zip
+        run: |
+          set -euo pipefail
+          VERSION="${{ needs.prepare.outputs.version }}"
+          OUT="dist/Plainstruct_${VERSION}_Android_arm64.zip"
+          (cd dist && zip -q -j "$(basename "$OUT")" Plainstruct.apk)
+          unzip -l "$OUT"
+
+      - name: Upload signing report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: plainstruct-android-signing-report
+          path: dist/signing-report.json
+          if-no-files-found: warn
+
+      - name: Upload Android zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-android-arm64
+          path: dist/Plainstruct_*_Android_arm64.zip
+          if-no-files-found: error
+
+      - name: Remove keystore from workspace
+        if: always()
+        run: |
+          rm -f "${KEYSTORE_FILE}" src-tauri/gen/android/keystore.properties
+
+  # ---------- 阶段 3:建 Release ----------
+  release:
+    name: Publish release
+    needs: [prepare, build-desktop, build-android]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download built packages
+        uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: dist
+          merge-multiple: true
+
+      - name: List packages
+        run: |
+          set -euo pipefail
+          ls -lh dist
+          COUNT=$(ls dist/*.zip 2>/dev/null | wc -l | tr -d ' ')
+          if [ "$COUNT" != "3" ]; then
+            echo "::error::应有 3 个平台压缩包,实际 ${COUNT} 个"
+            exit 1
+          fi
+
+      # 发布说明取自 changelog.md 同版本号小节;没有对应小节时退回一句标题
+      - name: Compose release notes
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          set -euo pipefail
+          node -e '
+            const fs = require("fs");
+            const version = process.env.VERSION;
+            const lines = fs.readFileSync("changelog.md", "utf8").split(/\r?\n/);
+            const start = lines.findIndex((l) => l.trim().startsWith(`## [${version}]`));
+            let body = "";
+            if (start >= 0) {
+              const rest = lines.slice(start + 1);
+              const end = rest.findIndex((l) => l.startsWith("## ["));
+              body = (end >= 0 ? rest.slice(0, end) : rest).join("\n").trim();
+            }
+            if (!body) body = `素构 Plainstruct v${version}`;
+            fs.writeFileSync("release-notes.md", body + "\n");
+          '
+          wc -l release-notes.md
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          PRERELEASE: ${{ needs.prepare.outputs.prerelease }}
+        run: |
+          set -euo pipefail
+          FLAGS=(--title "Plainstruct $VERSION" --notes-file release-notes.md --target "$GITHUB_SHA")
+          if [ "$PRERELEASE" = "true" ]; then
+            FLAGS+=(--prerelease)
+          fi
+          gh release create "$TAG" dist/*.zip "${FLAGS[@]}"
+          gh release view "$TAG" --json tagName,isPrerelease,assets \
+            --jq '{tag: .tagName, prerelease: .isPrerelease, assets: [.assets[].name]}'

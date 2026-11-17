@@ -13,7 +13,7 @@ import {
 } from "@/stores/app";
 import { useUiStore } from "@/stores/ui";
 import { ipc } from "@/ipc/ipc";
-import type { BootAnimCurve, BootAnimPreset, ConfettiLevel, EditorBreakKey, EditorFontMode, EditorIndentKey, Locale, MobileTabStyle, ModalBackdropClose, PublishNotifyMode, UiFontMode } from "@/ipc/types";
+import type { BootAnimCurve, BootAnimPreset, ConfettiLevel, EditorBreakKey, EditorFontMode, EditorIndentKey, Locale, MobileTabStyle, ModalBackdropClose, PublishNotifyMode, SpeedTestResult, UiFontMode, UpdateChannel, UpdateSource } from "@/ipc/types";
 import { APP_THEMES, type AppThemeSwatch } from "@/lib/app-themes";
 import { fireConfetti } from "@/lib/confetti";
 import { formatSize } from "@/lib/format";
@@ -384,7 +384,7 @@ function goTo(id: string) {
   active.value = id;
 }
 
-/* ---------- 检查更新(以 GitHub 最新 Release 为准) ---------- */
+/* ---------- 检查更新(通道 + 下载源 + 下载与安装) ---------- */
 
 type UpdateState =
   | { kind: "idle" }
@@ -394,6 +394,65 @@ type UpdateState =
   | { kind: "error"; message: string };
 
 const update = ref<UpdateState>({ kind: "idle" });
+
+/** 更新通道:稳定通道只看正式版,测试通道把 Pre-Release 也算进来 */
+const channelOptions = computed<{ value: UpdateChannel; label: string }[]>(() => [
+  { value: "stable", label: t("settings.updateChannelStable") },
+  { value: "beta", label: t("settings.updateChannelBeta") },
+]);
+
+const channelModel = computed({
+  get: () => app.updateChannel,
+  set: (v: UpdateChannel) => void app.setUpdateChannel(v),
+});
+
+/** 下载源:两个源并排展示,测速结果直接落在各自下方 —— 选谁与凭什么选在同一处 */
+const sourceOptions = computed<{ value: UpdateSource; label: string }[]>(() => [
+  { value: "github", label: t("settings.updateSourceGithub") },
+  { value: "proxy", label: t("settings.updateSourceProxy") },
+]);
+
+const speeds = ref<Partial<Record<UpdateSource, SpeedTestResult>>>({});
+const testing = ref<Partial<Record<UpdateSource, boolean>>>({});
+const speedTesting = computed(() => Object.values(testing.value).some(Boolean));
+
+function speedLabel(s: UpdateSource): string {
+  if (testing.value[s]) return t("settings.updateSpeedTesting");
+  const r = speeds.value[s];
+  if (!r) return "—";
+  if (!r.ok) return t("settings.updateSpeedFailed");
+  const v = formatSize(r.bytesPerSec);
+  return v ? `${v}/s` : t("settings.updateSpeedFailed");
+}
+
+function speedTone(s: UpdateSource): string {
+  const r = speeds.value[s];
+  if (r && !r.ok) return "text-danger";
+  if (r?.ok) return "text-ink-2";
+  return "text-ink-3";
+}
+
+/** 两个源并行测速:各自独立结算,谁先回来谁先显示,不互相等 */
+async function testSources() {
+  if (speedTesting.value) return;
+  speeds.value = {};
+  await Promise.all(
+    sourceOptions.value.map(async ({ value }) => {
+      testing.value = { ...testing.value, [value]: true };
+      try {
+        const r = await ipc.speedtestUpdateSource(value, app.updateChannel);
+        speeds.value = { ...speeds.value, [value]: r };
+      } catch (e) {
+        speeds.value = {
+          ...speeds.value,
+          [value]: { source: value, ok: false, bytesPerSec: 0, latencyMs: 0, message: ipc.errText(e) },
+        };
+      } finally {
+        testing.value = { ...testing.value, [value]: false };
+      }
+    }),
+  );
+}
 
 /** 更新流程进行中(下载/暂停):左栏展示包名与进度明细 */
 const downloading = computed(() => app.updatePhase === "downloading" || app.updatePhase === "paused");
@@ -406,7 +465,10 @@ const updateHint = computed(() => {
     case "paused":
       return t("settings.updatePaused");
     case "ready":
-      return t("settings.updateReady", { v: app.updateVersion });
+      // 读秒中就把「几秒后自动装」摆在状态行,和弹窗里是同一份事实
+      return app.autoInstallLeft > 0
+        ? t("settings.updateAutoInstallHint", { n: app.autoInstallLeft })
+        : t("settings.updateReady", { v: app.updateVersion });
   }
   switch (update.value.kind) {
     case "checking":
@@ -438,8 +500,10 @@ const speedText = computed(() => {
   return s ? `${s}/s` : "";
 });
 
-/** 重启并更新:确认后关闭应用并拉起更新向导 */
+/** 重启并更新:确认后关闭应用并拉起更新向导。
+ *  先停掉读秒 —— 手动路径一旦开始,自动流程不该在确认框还开着时把应用抢走 */
 async function restartUpdate() {
+  app.cancelAutoInstall();
   const go = await app.confirmRestart(app.updateVersion);
   if (go) await app.restartToUpdate();
 }
@@ -447,13 +511,14 @@ async function restartUpdate() {
 async function checkUpdate() {
   update.value = { kind: "checking" };
   try {
-    const info = await ipc.checkUpdate();
+    const info = await ipc.checkUpdate(app.updateChannel);
     if (!info.hasUpdate) {
       update.value = { kind: "latest" };
       return;
     }
     update.value = { kind: "available", version: info.latestVersion, url: info.releaseUrl };
-    // 检测到新版本:询问用户是否立即下载更新
+    // 检测到新版本:先问「要不要下」,用户点头才开始下载(移动端只给发布页,不代下)
+    if (!app.canSelfUpdate) return;
     const go = await app.confirmUpdate(info.latestVersion);
     if (go) void app.updateDownload();
   } catch (e) {
@@ -938,9 +1003,47 @@ function openRelease(url: string) {
                     {{ t("nav.about") }}
                   </button>
                 </div>
+              </div>
 
-                <!-- 检查更新与自动更新 -->
-                <div class="settings-row" style="--i: 1">
+              <!-- 更新:通道决定「看哪个版本」,下载源决定「从哪下」,两者都不藏着 -->
+              <div class="settings-card" :class="isMobilePlatform && 'mt-4'">
+                <div class="settings-row" style="--i: 0">
+                  <div class="min-w-0">
+                    <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.updateChannel") }}</p>
+                  </div>
+                  <SelectMenu v-model="channelModel" :options="channelOptions" align="right" class="shrink-0" />
+                </div>
+
+                <!-- 下载源:两源并排,测速结果落在各自下方 -->
+                <div class="settings-block" style="--i: 1">
+                  <div class="flex items-center justify-between gap-4">
+                    <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.updateSource") }}</p>
+                    <button class="btn btn-secondary btn-sm" :disabled="speedTesting" @click="testSources">
+                      <AppIcon name="refresh" :size="12" :class="{ 'animate-spin': speedTesting }" />
+                      {{ speedTesting ? t("settings.updateSpeedTesting") : t("settings.updateSpeedTest") }}
+                    </button>
+                  </div>
+                  <div class="mt-3 grid grid-cols-2 gap-2">
+                    <button
+                      v-for="s in sourceOptions"
+                      :key="s.value"
+                      class="source-card"
+                      :class="{ active: app.updateSource === s.value }"
+                      @click="app.setUpdateSource(s.value)"
+                    >
+                      <span class="truncate text-[calc(12.5px*var(--ui-font-scale))] font-medium">{{ s.label }}</span>
+                      <span
+                        class="mt-1 truncate text-[calc(11.5px*var(--ui-font-scale))] mono tabular-nums"
+                        :class="speedTone(s.value)"
+                      >
+                        {{ speedLabel(s.value) }}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- 检查更新与安装 -->
+                <div class="settings-row" style="--i: 2">
                   <div class="min-w-0">
                     <p class="text-[calc(13.5px*var(--ui-font-scale))] font-medium">{{ t("settings.checkUpdate") }}</p>
                     <p v-if="updateHint" class="mt-0.5 truncate text-[calc(12px*var(--ui-font-scale))] leading-relaxed" :class="hintTone">
@@ -957,12 +1060,10 @@ function openRelease(url: string) {
                           :style="{ width: updateBar }"
                         />
                       </div>
-                      <p class="text-[calc(11.5px*var(--ui-font-scale))] text-ink-3">
-                        <template v-if="app.updateTotal">
-                          {{ formatSize(app.updateReceived) }} / {{ formatSize(app.updateTotal) }}
-                        </template>
-                        <template v-else>{{ formatSize(app.updateReceived) }}</template>
-                        <template v-if="app.updatePhase === 'downloading' && speedText"> {{ speedText }}</template>
+                      <p class="flex items-center gap-2 text-[calc(11.5px*var(--ui-font-scale))] text-ink-3">
+                        <span v-if="app.updateTotal">{{ formatSize(app.updateReceived) }} / {{ formatSize(app.updateTotal) }}</span>
+                        <span v-else>{{ formatSize(app.updateReceived) }}</span>
+                        <span v-if="app.updatePhase === 'downloading' && speedText">{{ speedText }}</span>
                       </p>
                     </div>
                   </div>
@@ -985,7 +1086,7 @@ function openRelease(url: string) {
                         {{ t("settings.updateCancelDownload") }}
                       </button>
                     </template>
-                    <!-- 已就绪:重启并更新 / 放弃更新 -->
+                    <!-- 已就绪:重启并更新(读秒中可先取消自动安装)/ 放弃更新 -->
                     <template v-else-if="app.updatePhase === 'ready'">
                       <button class="btn btn-primary" :disabled="app.restartUpdating" @click="restartUpdate">
                         <AppIcon name="refresh" :size="14" />
@@ -995,10 +1096,10 @@ function openRelease(url: string) {
                         {{ t("settings.updateCancelUpdate") }}
                       </button>
                     </template>
-                    <!-- 其余阶段:下载更新与查看发布页(检测到新版时) -->
+                    <!-- 其余阶段:下载更新与查看发布页(检测到新版时);移动端只给发布页 -->
                     <template v-else>
                       <button
-                        v-if="update.kind === 'available'"
+                        v-if="update.kind === 'available' && app.canSelfUpdate"
                         class="btn btn-primary"
                         @click="app.updateDownload()"
                       >
@@ -1246,6 +1347,36 @@ function openRelease(url: string) {
   font-weight: 500;
   color: var(--color-ink);
   font-variant-numeric: tabular-nums;
+}
+
+/* 下载源卡片:两个源等宽并排,选中项以墨色描边标记(与主题卡片同一套选中语言);
+   测速数值在卡片内以等宽数字排版,刷新时行宽不跳动 */
+.source-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 9px 11px;
+  border: 1px solid var(--color-line);
+  border-radius: 10px;
+  background: var(--color-bg);
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    border-color var(--duration-base) var(--ease-plain),
+    background-color var(--duration-base) var(--ease-plain),
+    transform var(--duration-fast) ease-out;
+}
+.source-card:hover {
+  border-color: var(--color-line-strong);
+}
+.source-card:active {
+  transform: scale(0.985);
+}
+.source-card.active {
+  border-color: var(--color-ink);
+  background: var(--color-surface);
+  box-shadow: inset 0 0 0 0.5px var(--color-ink);
 }
 
 /* 软件主题:配色预览卡片网格 */

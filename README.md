@@ -39,7 +39,7 @@
 - **移动端（安卓）** —— 功能与桌面端一致的 Android 应用（arm64 APK）：抽屉式文件树的专属布局、全屏编辑／预览切换、长按文件树唤出操作菜单、模态改为底部面板。桌面式全局顶栏覆盖所有页面（含主菜单），品牌区在左（Logo、状态语、站点名 —— 发布成功时顶栏播报祝福语，Logo 与站点名让位，祝福语用满整个文本位并自动折行完整显示、不再截断成省略号，播报结束原样回归）、右侧是一组常驻图标操作：返回（与系统侧滑同语义，逐层后退）、查看发布状态、预览站点、设置（按上下文出现，当前页高亮），顶部按状态栏高度留出安全边距；「关于」不再单独设入口，完整内容内嵌于设置页「关于」分区；设置页「个性化」中界面缩放（界面字号）在移动端以增减按钮步进调整（桌面为预设下拉与自定义数值），底栏的图标、间距与文字随之整体缩放，底栏显示方式可选图标+文字或仅图标，下拉选择面板在页面滚动时跟随触发器移动而非消失；底部导航只收站点内页面（内容、资产、站点、主题、插件、构建、发布、同步），超出一屏时两侧以边缘渐隐与箭头提示可滑动，当前项自动滚入视野。侧滑（系统返回）贯通全部层级：先关浮层，再退页面，再收起站点回到主菜单，栈空了才退出应用（与顶栏返回按钮同一条命令）。主菜单合并显示本地站点库与最近打开的站点，「打开站点」可浏览手机上任意文件夹；新建站点默认保存在应用数据目录，也可自选其他文件夹（需授予「所有文件访问」权限，界面内引导）。新建、编辑、构建、发布与局域网同步全部可用。
 - **GitHub Pages 发布** —— 使用访问令牌一键推送，发布时自动重新构建站点内容（无需先手动构建），自动创建仓库、分支并开启 Pages，无需安装 Git；支持个人与组织账户、自定义域名，并可配置代理加速上传；发布成功后系统通知带「查看发布情况／查看站点」动作按钮。
 - **后台发布与取消** —— 发布期间切换到其他站点，发布会在后台继续进行，右下角显示发布状态药丸栏：点开即见进度与运行日志，可快速查看已发布网页、跳回发布页或取消发布；取消会中止上传并把站点引用回退到原版本，线上内容保持不变。
-- **应用更新检查** —— 设置页一键检查 GitHub 最新版本，新版本可一键下载（支持暂停与断点续传），更新向导自动完成覆盖安装。
+- **应用更新检查** —— 设置页「关于」一键检查 GitHub Release：**更新通道**可选稳定版（只看正式版）或测试版（把 Pre-Release 也算进来）；**下载源**可选 GitHub 直连或 GitHub 代理，两个源并排测速后再决定用哪个。检查到新版本先问要不要下载，下载支持暂停与断点续传；下载完成后开始 **8 秒读秒**，到点自动重启并交给更新向导覆盖安装，读秒期间可随时取消（取消后仍可手动「重启并更新」）。
 - **启动自愈** —— 启动失败时自动分级恢复（重载 → 清理缓存 → 显示诊断信息），界面层数据损坏导致的白屏多数无需手动处理。
 - **本地优先** —— 所有数据保存在你选择的站点文件夹内，备份即复制；无后端、无遥测。
 - **九种界面语言** —— 简体中文、English、日本語、한국어、Français、Deutsch、Español、Português (Brasil)、Русский，设置页切换。
@@ -53,11 +53,11 @@
 
 ### 普通用户
 
-从 [GitHub Releases](https://github.com/MogroWang/Plainstruct/releases) 下载对应平台的安装包：
+从 [GitHub Releases](https://github.com/MogroWangStudio/Plainstruct/releases) 下载对应平台的压缩包。三个平台的包名统一为 `Plainstruct_版本号_平台_架构.zip`，包内只放一个可执行程序（macOS 额外附「损坏修复.command」）：
 
-- **Windows x64**：免安装版 zip（`Plainstruct-版本号-Windows-x64-Portable.zip`，解压后双击 `plainstruct.exe`），自动更新也以此包覆盖升级。
-- **macOS（Apple Silicon）**：dmg 磁盘镜像（拖入「应用程序」）或 zip 压缩包（解压后移入「应用程序」），两者均附「损坏修复.command」。应用为 ad-hoc 签名、未经 Apple 公证，首次打开若提示「已损坏」，双击包内的**「损坏修复.command」**并输入开机密码（仅用于移除隔离标记）即可；也可在终端手动执行 `sudo xattr -r -d com.apple.quarantine /Applications/Plainstruct.app`。本软件开源，该修复仅移除 Gatekeeper 对未公证应用的「隔离」标记，不改动应用内容。
-- **Android（arm64-v8a）**：APK 安装包（`Plainstruct-版本号-android.apk`）。安装时允许「安装未知来源应用」即可；升级直接覆盖安装（同一签名）。手机端站点保存在应用私有数据目录，卸载应用会连同站点一起删除，重要内容请先经「同步」传回电脑。
+- **Windows x64**（`Plainstruct_版本号_Windows_x64.zip`）：免安装，解压得到 `Plainstruct.exe`，双击即用；应用内自动更新也以这个包覆盖升级。
+- **macOS（Apple Silicon）**（`Plainstruct_版本号_macOS_arm64.zip`）：解压得到 `Plainstruct.app` 与**「损坏修复.command」**，把 app 拖入「应用程序」。应用为 ad-hoc 签名、未经 Apple 公证，首次打开若提示「已损坏」，双击包内的**「损坏修复.command」**并输入开机密码（仅用于移除隔离标记）即可；也可在终端手动执行 `sudo xattr -r -d com.apple.quarantine /Applications/Plainstruct.app`。本软件开源，该修复仅移除 Gatekeeper 对未公证应用的「隔离」标记，不改动应用内容。
+- **Android（arm64-v8a）**（`Plainstruct_版本号_Android_arm64.zip`）：解压得到 `Plainstruct.apk`，安装时允许「安装未知来源应用」即可；升级直接覆盖安装（同一签名）。手机端站点保存在应用私有数据目录，卸载应用会连同站点一起删除，重要内容请先经「同步」传回电脑。
 
 首次使用：
 
@@ -174,12 +174,22 @@ npm run build        # 前端类型检查 + 生产构建
 cargo check          # 在 src-tauri/ 下，Rust 编译检查
 
 npm run icons                          # 由 icon.png 生成全套应用图标
-npm run windows:portable               # Windows x64 免安装构建 -> release/Plainstruct_版本号_Windows_x64_Portable.zip
-npm run tauri -- build                 # 平台产物（dmg / app）
+npm run windows:portable               # Windows x64 免安装构建 -> release/Plainstruct_版本号_Windows_x64.zip（内含单个 Plainstruct.exe）
+npm run tauri -- build                 # 平台产物（app / dmg）
 npm run android:build                  # Android arm64 APK（需 Android SDK/NDK 与 Rust android target）
 ```
 
-安卓 APK 的发布签名：CI 从 secrets `ANDROID_RELEASE_KEYSTORE_B64` / `ANDROID_RELEASE_KEYSTORE_PASSWORD` 解出 keystore 写入 `src-tauri/gen/android/keystore.properties`（git 忽略）；本地构建时按同一格式自行放置即可，缺失时回退 debug 密钥（无法覆盖安装正式版）。
+版本号在 `package.json`、`src-tauri/Cargo.toml`、`src-tauri/tauri.conf.json` 三处同步（发布流水线会先做三方校验）。
+
+发布：推送 main 不再自动构建。在 GitHub Actions 里手动运行 **Release Plainstruct**，它分三阶段走完 ——
+
+1. **版本判定**：读 `package.json` 的版本号，`x.y.z` 判为正式版（建 tag、发 Release），`x.y.z-betax` 判为测试版（同格式 tag，发 Pre-Release）；同版本 Release 已存在则直接失败。
+2. **三平台打包**：`Plainstruct_版本号_Windows_x64.zip`（单个 `Plainstruct.exe`）、`Plainstruct_版本号_macOS_arm64.zip`（`.app` + 损坏修复.command）、`Plainstruct_版本号_Android_arm64.zip`（单个 `Plainstruct.apk`）。包名即协议 —— 应用内检查更新靠「平台 + 架构」识别产物，改名先看 `src-tauri/src/commands/github.rs` 的 `pick_asset`。
+3. **建 Release**：上传三个包，发布说明取自 `changelog.md` 中同版本号的小节，测试版自动勾选 Pre-Release。
+
+另有 `Build Plainstruct` 流水线供手动验证编译（不产出 Release）。
+
+安卓 APK 的发布签名：CI 从 secrets `ANDROID_RELEASE_KEYSTORE_B64` / `ANDROID_RELEASE_KEYSTORE_PASSWORD` 解出 keystore 写入 `src-tauri/gen/android/keystore.properties`（git 忽略）；发布流水线缺密钥直接失败，本地构建时按同一格式自行放置即可（缺失会回退 debug 密钥，无法覆盖安装正式版）。
 
 ### 技术架构
 
@@ -192,8 +202,9 @@ npm run android:build                  # Android arm64 APK（需 Android SDK/NDK
 ## 目录结构
 
 ```
+├── .github/workflows/     # release.yml（版本判定 → 三平台打包 → 建 Release）/ ci.yml（手动构建验证）
 ├── public/                # 应用 Logo：logo.svg（单标）/ logo-full.svg（全字标，含 -dark 暗色变体）
-├── scripts/               # 图标生成（macOS 满铺图标适配 / 安卓启动图标重绘）/ 免安装打包脚本
+├── scripts/               # 图标生成（macOS 满铺图标适配 / 安卓启动图标重绘）/ 免安装打包脚本 / 安卓签名工具
 ├── src/                   # 前端源码
 │   ├── ipc/               # Tauri IPC 封装 + 浏览器 mock
 │   ├── lib/               # 路径映射 / Markdown / 主题引擎 / 构建管线

@@ -70,7 +70,17 @@ export interface AppSettings {
   lanTrusted?: boolean;
   /** 局域网同步:对外展示的设备名(空 = 用平台默认名) */
   lanDeviceName?: string;
+  /** 更新通道:stable=只看正式版(默认) beta=把 Pre-Release 也纳入 */
+  updateChannel?: UpdateChannel;
+  /** 更新包下载源:github=直连(默认) proxy=公共加速 */
+  updateSource?: UpdateSource;
 }
+
+/** 更新通道:稳定版只收正式版,测试版连 Pre-Release 一起收 */
+export type UpdateChannel = "stable" | "beta";
+
+/** 更新包下载源:GitHub 直连 / 公共加速前缀 */
+export type UpdateSource = "github" | "proxy";
 
 /** 移动端底栏显示方式 */
 export type MobileTabStyle = "both" | "icon";
@@ -164,6 +174,19 @@ export interface UpdateInfo {
   releaseUrl: string;
   releaseNotes: string;
   publishedAt: string;
+  /** 命中的是否为预发布(测试通道下可能出现) */
+  prerelease: boolean;
+  /** 本次检查实际使用的通道,回显给界面 */
+  channel: UpdateChannel;
+}
+
+/** 下载源测速结果:ok=false 时 message 为失败原因 */
+export interface SpeedTestResult {
+  source: UpdateSource;
+  ok: boolean;
+  bytesPerSec: number;
+  latencyMs: number;
+  message: string;
 }
 
 /** 自动更新包下载进度(name/version 用于下载中展示包名与目标版本) */

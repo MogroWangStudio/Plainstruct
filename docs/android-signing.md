@@ -5,7 +5,8 @@
 
 | 位置 | 作用 |
 | --- | --- |
-| `.github/workflows/ci.yml`(`android-apk` job) | 密钥注入、指纹比对、产物验签、留档 |
+| `.github/workflows/release.yml`(`build-android` job) | 密钥注入、指纹比对、产物验签(fail-closed,无 debug 兜底) |
+| `.github/workflows/ci.yml`(`android-apk` job) | 手动构建验证,同一套红线,可用仓库变量降级为一次性验证包 |
 | `src-tauri/gen/android/app/build.gradle.kts` | 签名配置严格校验、禁止静默回退 debug |
 | `scripts/android-signing.sh` | 生成密钥 / 读取指纹 / 写入基线 / 校验产物 |
 | `src-tauri/gen/android/android-cert-sha256.txt` | 证书指纹基线(跨构建判定的唯一依据) |
@@ -44,7 +45,7 @@ signingConfig = if (keystorePropertiesFile.exists()) release else signingConfigs
 
 ### 2. CI 提供了同一条静默回退路径
 
-原 workflow 的 `Restore release keystore` 在 secrets 缺失时只 `::warning::`,不失败:
+原 workflow 的 `Restore release keystore` 在 secrets 缺失时只 `::warning::`,不失败(发布流水线已改为直接失败):
 
 ```yaml
 else

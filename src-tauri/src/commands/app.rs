@@ -1,6 +1,7 @@
 /** 应用级命令:bootstrap、设置、日志、数据存储位置 */
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::cmp::Ordering;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::State;
@@ -174,6 +175,10 @@ pub(crate) fn settings_defaults() -> Value {
         "bootAnimDuration": 600,
         "bootAnimCurve": "plain",
         "bootAnimPreset": "fade",
+        // 更新通道:stable=只看正式版,beta=把 Pre-Release 也纳入
+        "updateChannel": "stable",
+        // 下载源:github=GitHub 直连,proxy=公共加速前缀
+        "updateSource": "github",
     })
 }
 
@@ -442,9 +447,22 @@ pub fn set_data_dir(
     Ok(())
 }
 
-/* ---------- 检查更新:对比 GitHub 最新 Release 与当前版本 ---------- */
+/* ---------- 检查更新:对比 GitHub Release 与当前版本 ---------- */
 
-pub(crate) const RELEASES_API: &str = "https://api.github.com/repos/MogroWang/Plainstruct/releases/latest";
+/// 正式通道:GitHub 的 /releases/latest 只返回非预发布的最新一条
+pub(crate) const RELEASES_API: &str = "https://api.github.com/repos/MogroWangStudio/Plainstruct/releases/latest";
+/// 测试通道:取其最近若干条,自行挑出版本号最高的一条(含预发布)
+pub(crate) const RELEASES_LIST_API: &str =
+    "https://api.github.com/repos/MogroWangStudio/Plainstruct/releases?per_page=30";
+
+/// 下载源:GitHub 直连,或经公共加速前缀转发(原始链接整段拼在后面)
+pub(crate) fn download_url(source: &str, raw: &str) -> String {
+    if source == "proxy" {
+        format!("https://gh-proxy.com/{raw}")
+    } else {
+        raw.to_string()
+    }
+}
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -455,34 +473,127 @@ pub struct UpdateInfo {
     pub release_url: String,
     pub release_notes: String,
     pub published_at: String,
+    /// 命中的是否为预发布(界面据此标注测试版)
+    pub prerelease: bool,
+    /// 命中的下载源通道(回显给界面,避免用户误以为设置未生效)
+    pub channel: String,
 }
 
-/// "v1.2.3" / "1.2.3" -> (1, 2, 3)
-fn parse_semver(s: &str) -> Option<(u64, u64, u64)> {
-    let core = s.trim().trim_start_matches(['v', 'V']);
-    let core = core.split(['-', '+']).next()?;
+/// 预发布标识的一个片段:数字、或「前缀 + 可选尾数」(beta1 / rc / preview2)
+#[derive(Clone, PartialEq, Eq, Debug)]
+enum Ident {
+    Num(u64),
+    Alnum(String, Option<u64>),
+}
+
+impl Ord for Ident {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match (self, other) {
+            (Ident::Num(a), Ident::Num(b)) => a.cmp(b),
+            // semver:数字标识优先级低于字母数字标识
+            (Ident::Num(_), Ident::Alnum(..)) => Ordering::Less,
+            (Ident::Alnum(..), Ident::Num(_)) => Ordering::Greater,
+            // 前缀按字典序;同一前缀下按尾数数值比较 —— beta10 必须大于 beta9,
+            // 纯字符串比较会把 beta10 排到 beta9 之前
+            (Ident::Alnum(pa, na), Ident::Alnum(pb, nb)) => {
+                pa.cmp(pb).then_with(|| match (na, nb) {
+                    (Some(a), Some(b)) => a.cmp(b),
+                    (None, Some(_)) => Ordering::Less,
+                    (Some(_), None) => Ordering::Greater,
+                    (None, None) => Ordering::Equal,
+                })
+            }
+        }
+    }
+}
+
+impl PartialOrd for Ident {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+/// 解析一个版本标识片段:纯数字为 Num,其余拆成「小写前缀 + 尾部数字」
+fn parse_ident(part: &str) -> Ident {
+    let s = part.trim();
+    if let Ok(n) = s.parse::<u64>() {
+        return Ident::Num(n);
+    }
+    let lower = s.to_ascii_lowercase();
+    // 尾部数字的起始位置:ASCII 数字各占一字节,按字节长度扣除即可
+    let digits = lower.chars().rev().take_while(|c| c.is_ascii_digit()).count();
+    let split = lower.len() - digits;
+    match lower[split..].parse::<u64>() {
+        Ok(n) if split > 0 => Ident::Alnum(lower[..split].to_string(), Some(n)),
+        // 纯字母,或整串数字超出 u64:退化为整串比较,不丢信息也不 panic
+        _ => Ident::Alnum(lower, None),
+    }
+}
+
+struct Version {
+    core: (u64, u64, u64),
+    /// 预发布标识;空 = 正式版
+    pre: Vec<Ident>,
+}
+
+/// "v4.4.0-beta1" / "4.4.0" / "4.4.0+build5" -> Version
+fn parse_version(s: &str) -> Option<Version> {
+    let t = s.trim().trim_start_matches(['v', 'V']);
+    let t = t.split('+').next()?;
+    let (core, pre) = match t.split_once('-') {
+        Some((c, p)) => (c, Some(p)),
+        None => (t, None),
+    };
     let mut it = core.split('.');
-    Some((it.next()?.parse().ok()?, it.next()?.parse().ok()?, it.next()?.parse().ok()?))
+    let core = (it.next()?.parse().ok()?, it.next()?.parse().ok()?, it.next()?.parse().ok()?);
+    let pre = pre
+        .map(|p| p.split('.').filter(|x| !x.is_empty()).map(parse_ident).collect())
+        .unwrap_or_default();
+    Some(Version { core, pre })
+}
+
+/// 版本比较:核心号相同、一侧是预发布时,正式版更大(4.4.0 > 4.4.0-beta1)
+fn cmp_version(a: &Version, b: &Version) -> Ordering {
+    a.core.cmp(&b.core).then_with(|| match (a.pre.is_empty(), b.pre.is_empty()) {
+        (true, true) => Ordering::Equal,
+        (true, false) => Ordering::Greater,
+        (false, true) => Ordering::Less,
+        (false, false) => a.pre.cmp(&b.pre),
+    })
 }
 
 pub(crate) fn is_newer(latest: &str, current: &str) -> bool {
-    match (parse_semver(latest), parse_semver(current)) {
-        (Some(a), Some(b)) => a > b,
+    match (parse_version(latest), parse_version(current)) {
+        (Some(a), Some(b)) => cmp_version(&a, &b) == Ordering::Greater,
         // 任一侧无法按 semver 解析时退化为字符串比较
         _ => latest.trim() != current.trim(),
     }
 }
 
-#[tauri::command]
-pub async fn check_update(window: tauri::WebviewWindow) -> Result<UpdateInfo, String> {
-    ensure_main(&window)?;
-    let current = env!("CARGO_PKG_VERSION").to_string();
-    let client = reqwest::Client::builder()
-        .user_agent(concat!("plainstruct/", env!("CARGO_PKG_VERSION")))
-        .build()
-        .map_err(|e| format!("网络客户端创建失败: {e}"))?;
-    let resp = client
-        .get(RELEASES_API)
+/// 拉取指定通道下版本号最高的 Release。
+/// stable 直接问 /releases/latest(GitHub 已排除预发布);beta 取最近 30 条,
+/// 跳过草稿后按版本号取最大 —— 不依赖接口返回顺序,预发布与正式版一视同仁。
+pub(crate) async fn latest_release(http: &reqwest::Client, channel: &str) -> Result<Value, String> {
+    if channel != "beta" {
+        let resp = http
+            .get(RELEASES_API)
+            .header("Accept", "application/vnd.github+json")
+            .timeout(std::time::Duration::from_secs(15))
+            .send()
+            .await
+            .map_err(|e| format!("网络错误: {e}"))?;
+        let status = resp.status();
+        if status == reqwest::StatusCode::NOT_FOUND {
+            return Err("仓库尚未发布任何 Release。".into());
+        }
+        if !status.is_success() {
+            return Err(format!("GitHub API 返回 {status}"));
+        }
+        return resp.json().await.map_err(|e| format!("解析响应失败: {e}"));
+    }
+
+    let resp = http
+        .get(RELEASES_LIST_API)
         .header("Accept", "application/vnd.github+json")
         .timeout(std::time::Duration::from_secs(15))
         .send()
@@ -495,7 +606,32 @@ pub async fn check_update(window: tauri::WebviewWindow) -> Result<UpdateInfo, St
     if !status.is_success() {
         return Err(format!("GitHub API 返回 {status}"));
     }
-    let json: Value = resp.json().await.map_err(|e| format!("解析响应失败: {e}"))?;
+    let list: Value = resp.json().await.map_err(|e| format!("解析响应失败: {e}"))?;
+    let items = list.as_array().ok_or("Release 列表格式异常")?;
+    let mut best: Option<(Version, &Value)> = None;
+    for item in items {
+        if item["draft"].as_bool().unwrap_or(false) {
+            continue;
+        }
+        let tag = item["tag_name"].as_str().unwrap_or("").trim();
+        let Some(v) = parse_version(tag) else { continue };
+        let better = best.as_ref().is_none_or(|(cur, _)| cmp_version(&v, cur) == Ordering::Greater);
+        if better {
+            best = Some((v, item));
+        }
+    }
+    best.map(|(_, item)| item.clone()).ok_or_else(|| "仓库尚未发布任何 Release。".into())
+}
+
+#[tauri::command]
+pub async fn check_update(window: tauri::WebviewWindow, channel: String) -> Result<UpdateInfo, String> {
+    ensure_main(&window)?;
+    let current = env!("CARGO_PKG_VERSION").to_string();
+    let client = reqwest::Client::builder()
+        .user_agent(concat!("plainstruct/", env!("CARGO_PKG_VERSION")))
+        .build()
+        .map_err(|e| format!("网络客户端创建失败: {e}"))?;
+    let json = latest_release(&client, &channel).await?;
     let tag = json["tag_name"].as_str().unwrap_or("").trim().to_string();
     if tag.is_empty() {
         return Err("Release 数据缺少版本号。".into());
@@ -506,6 +642,8 @@ pub async fn check_update(window: tauri::WebviewWindow) -> Result<UpdateInfo, St
         release_url: json["html_url"].as_str().unwrap_or("").to_string(),
         release_notes: json["body"].as_str().unwrap_or("").trim().to_string(),
         published_at: json["published_at"].as_str().unwrap_or("").to_string(),
+        prerelease: json["prerelease"].as_bool().unwrap_or(false),
+        channel,
         current_version: current,
     })
 }

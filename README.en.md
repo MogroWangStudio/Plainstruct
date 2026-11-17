@@ -39,7 +39,7 @@
 - **Mobile (Android)** — an Android app (arm64 APK) with the same feature set as the desktop: a dedicated layout with a drawer file tree, full-screen edit/preview switching, long-press menus in the file tree, and modals as bottom sheets. The desktop-style global top bar sits on every page (main menu included): brand on the left (on publish success the logo and site name yield, and the blessing line takes the whole text slot, wrapping instead of truncating), a row of permanent icon actions on the right — back to menu, publish status, preview site, settings, about (shown when relevant, current page highlighted) — with a status-bar safe-area inset on top. The bottom navigation holds only site pages (content, assets, site, theme, plugins, build, publish, sync); when it overflows, both edges fade and show an arrow, and the current item scrolls into view. Swipe-back (system back) walks the full stack — the same command as the top-bar back button: overlays, then pages, then it collapses the site back to the main menu, and only then leaves the app. Sites on the phone live in the app's private data directory — create, edit, build, publish and LAN-sync all work.
 - **GitHub Pages publishing** — push with a personal access token in one click; site content is rebuilt automatically on publish (no manual build needed first), the repo, branch and Pages are created automatically, no Git needed; works with personal and organization accounts and custom domains, and a proxy can be configured to speed up uploads; on Windows the success notification carries "View publish status / View site" action buttons.
 - **Background publishing & cancel** — switch to another site while publishing and the task keeps running in the background, with a status pill in the bottom-right corner: click it for progress and logs, quick actions to view the published site, jump back to the publish page, or cancel; cancelling stops the upload and reverts the site reference to the previous version, leaving the live site unchanged.
-- **Update check** — check for the latest GitHub release from Settings, download with one click (pause and resume supported), and an update wizard installs the new version automatically.
+- **Update check** — check GitHub Releases from the About section in Settings. Pick an **update channel** (stable = releases only, beta = pre-releases included) and a **download source** (GitHub direct or a GitHub proxy) after running a **speed test on both**. A new version is offered first, then downloaded (pause and resume supported). When the download finishes an **8-second countdown** starts and the update wizard takes over automatically — cancel it at any point and install later with "Restart & Update".
 - **Self-healing startup** — startup failures recover in steps (reload → clear cache → show diagnostics); white screens caused by corrupted UI-layer data mostly fix themselves.
 - **Local-first** — all data lives inside the folder you choose; backup = copy; no backend, no telemetry.
 - **Bilingual UI** — switch between Chinese and English from the title bar.
@@ -52,11 +52,11 @@ Plain (素) structure (构): a gray-white palette, a single ink accent, the syst
 
 ### Regular users
 
-Download an installer for your platform from [GitHub Releases](https://github.com/MogroWang/Plainstruct/releases):
+Download the package for your platform from [GitHub Releases](https://github.com/MogroWangStudio/Plainstruct/releases). All three are named `Plainstruct_<version>_<platform>_<arch>.zip` and contain a single executable (macOS also bundles the repair script):
 
-- **Windows x64** — portable zip (`Plainstruct-<version>-Windows-x64-Portable.zip`; unzip and run `plainstruct.exe`); auto-update overwrites the app with the same package.
-- **macOS (Apple Silicon)** — a dmg disk image (drag into Applications) or a zip archive (unzip and move into Applications), both bundling a repair script. The app is ad-hoc signed and not notarized; if macOS says it is "damaged", double-click **损坏修复.command (Repair Damaged)** inside the package and enter your password (only to remove the quarantine flag), or run `sudo xattr -r -d com.apple.quarantine /Applications/Plainstruct.app` in a terminal. Plainstruct is open source — this fix only clears Gatekeeper's quarantine flag on an un-notarized app and changes nothing inside it.
-- **Android (arm64-v8a)** — an APK package (`Plainstruct-<version>-android.apk`). Allow "install unknown apps" when prompted; upgrades install over the existing app (same signing key). Sites on the phone live in the app's private data directory — uninstalling removes them too, so send important sites back to your computer via Sync first.
+- **Windows x64** (`Plainstruct_<version>_Windows_x64.zip`) — portable: unzip to get `Plainstruct.exe` and double-click it. In-app auto-update overwrites the app with this same package.
+- **macOS (Apple Silicon)** (`Plainstruct_<version>_macOS_arm64.zip`) — unzip to get `Plainstruct.app` plus **损坏修复.command (Repair Damaged)**; drag the app into Applications. The app is ad-hoc signed and not notarized; if macOS says it is "damaged", double-click the repair script and enter your password (only to remove the quarantine flag), or run `sudo xattr -r -d com.apple.quarantine /Applications/Plainstruct.app` in a terminal. Plainstruct is open source — this fix only clears Gatekeeper's quarantine flag on an un-notarized app and changes nothing inside it.
+- **Android (arm64-v8a)** (`Plainstruct_<version>_Android_arm64.zip`) — unzip to get `Plainstruct.apk`. Allow "install unknown apps" when prompted; upgrades install over the existing app (same signing key). Sites on the phone live in the app's private data directory — uninstalling removes them too, so send important sites back to your computer via Sync first.
 
 First run:
 
@@ -173,12 +173,22 @@ npm run build        # type check + production frontend build
 cargo check          # Rust compile check (in src-tauri/)
 
 npm run icons                          # generate app icons from icon.png
-npm run windows:portable               # Windows x64 portable build -> release/Plainstruct_<version>_Windows_x64_Portable.zip
-npm run tauri -- build                 # platform artifacts (dmg / app)
+npm run windows:portable               # Windows x64 portable build -> release/Plainstruct_<version>_Windows_x64.zip (single Plainstruct.exe)
+npm run tauri -- build                 # platform artifacts (app / dmg)
 npm run android:build                  # Android arm64 APK (needs Android SDK/NDK and the Rust android target)
 ```
 
-Release signing for the Android APK: CI decodes secrets `ANDROID_RELEASE_KEYSTORE_B64` / `ANDROID_RELEASE_KEYSTORE_PASSWORD` into `src-tauri/gen/android/keystore.properties` (git-ignored); for local builds place the file there yourself in the same format. Without it the build falls back to the debug key (such APKs cannot upgrade-install over a release).
+The version lives in three places — `package.json`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json` — and the release pipeline verifies all three agree before building.
+
+Releasing: pushing to main no longer builds anything. Run **Release Plainstruct** manually in GitHub Actions; it works in three stages:
+
+1. **Resolve version** — read `package.json`: `x.y.z` means stable (tag + Release), `x.y.z-betax` means beta (same tag format + Pre-Release). If a release for that version already exists, the run fails.
+2. **Build three platforms** — `Plainstruct_<version>_Windows_x64.zip` (one `Plainstruct.exe`), `Plainstruct_<version>_macOS_arm64.zip` (`.app` + repair script), `Plainstruct_<version>_Android_arm64.zip` (one `Plainstruct.apk`). File names are the contract: in-app update detection matches platform + arch, so check `pick_asset` in `src-tauri/src/commands/github.rs` before renaming anything.
+3. **Create the release** — upload the three packages, take the notes from the matching section of `changelog.md`, and mark beta builds as pre-release.
+
+A separate `Build Plainstruct` workflow builds for verification only (no release).
+
+Release signing for the Android APK: CI decodes secrets `ANDROID_RELEASE_KEYSTORE_B64` / `ANDROID_RELEASE_KEYSTORE_PASSWORD` into `src-tauri/gen/android/keystore.properties` (git-ignored); the release pipeline fails without them, while local builds accept the same file and fall back to the debug key when it is missing (such APKs cannot upgrade-install over a release).
 
 ### Architecture
 
@@ -191,8 +201,9 @@ Release signing for the Android APK: CI decodes secrets `ANDROID_RELEASE_KEYSTOR
 ## Project layout
 
 ```
+├── .github/workflows/     # release.yml (resolve version → build 3 platforms → create release) / ci.yml (manual build check)
 ├── public/                # app logos: logo.svg (mark) / logo-full.svg (wordmark, with -dark variant)
-├── scripts/               # icon generation (incl. macOS full-bleed icon) / portable packaging
+├── scripts/               # icon generation (incl. macOS full-bleed icon) / portable packaging / android signing tools
 ├── src/                   # frontend source
 │   ├── ipc/               # Tauri IPC wrapper + browser mock
 │   ├── lib/               # path mapping / Markdown / theme engine / build pipeline

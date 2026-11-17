@@ -1149,24 +1149,37 @@ fn remove_task_files(dir: &std::path::Path, task: Option<&UpdateTask>) {
     }
 }
 
-/// 选择当前平台的更新包:按关键字符匹配(大小写不敏感),不依赖文件名里的版本号
-/// 与分隔符写法——Windows 一律为免安装 zip(解压覆盖更新),macOS 用 dmg;
-/// x64 字样用于区分架构,官方产物名均携带。
-fn asset_matches(name: &str) -> bool {
+/// 发行包命名即协议:`Plainstruct_版本号_平台_架构.zip`(由 .github/workflows/release.yml
+/// 与 scripts/build-portable.ps1 共同保证)。这里只按「平台 + 架构」识别,不解析文件名里的
+/// 版本号 —— 版本以 Release 的 tag 为准,文件名只是一层可读的壳。
+/// 返回优先级:0 = 首选(zip),1 = 兼容旧版产物(macOS 早期只有 dmg)。
+fn asset_rank(name: &str) -> Option<u8> {
     let n = name.to_ascii_lowercase();
-    #[cfg(target_os = "windows")]
-    {
-        n.ends_with(".zip") && n.contains("portable") && n.contains("x64")
+    if cfg!(target_os = "windows") {
+        // Windows 只认免安装 zip:更新向导按「解压覆盖」实现
+        return (n.ends_with(".zip") && n.contains("windows") && n.contains("x64")).then_some(0);
     }
-    #[cfg(target_os = "macos")]
-    {
-        n.ends_with(".dmg")
+    if cfg!(target_os = "macos") {
+        if n.ends_with(".zip") && n.contains("macos") && (n.contains("arm64") || n.contains("aarch64")) {
+            return Some(0);
+        }
+        // 旧版本仍在发布 dmg:保留识别,便于从老包升级上来
+        if n.ends_with(".dmg") && n.contains("macos") {
+            return Some(1);
+        }
+        return None;
     }
-    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
-    {
-        let _ = n;
-        false
-    }
+    None
+}
+
+/// 从 Release 的 assets 中挑出当前平台的更新包(命中优先级最高者)
+fn pick_asset(release: &Value) -> Option<&Value> {
+    release["assets"]
+        .as_array()?
+        .iter()
+        .filter_map(|a| asset_rank(a["name"].as_str().unwrap_or("")).map(|rank| (rank, a)))
+        .min_by_key(|(rank, _)| *rank)
+        .map(|(_, a)| a)
 }
 
 #[derive(Serialize)]
@@ -1178,13 +1191,16 @@ pub struct UpdateDownloadResult {
     pub paused: bool,
 }
 
-/// 下载官方最新 Release 的当前平台更新包。支持暂停(保留断点,再次调用自动续传)
-/// 与取消(清理残留);完成后生成更新向导脚本与任务文件,由「重启并更新」拉起向导。
+/// 下载指定通道(run)与下载源(source)的当前平台更新包。支持暂停(保留断点,
+/// 再次调用自动续传)与取消(清理残留);完成后生成更新向导脚本与任务文件,
+/// 由「重启并更新」拉起向导。
 #[tauri::command]
 pub async fn update_download(
     app: AppHandle,
     window: tauri::WebviewWindow,
     state: State<'_, AppState>,
+    channel: String,
+    source: String,
 ) -> Result<UpdateDownloadResult, String> {
     use crate::events::UPDATE_PROGRESS;
     use std::io::Write;
@@ -1196,11 +1212,8 @@ pub async fn update_download(
     state.update_pause.store(false, Ordering::SeqCst);
     state.update_cancel.store(false, Ordering::SeqCst);
 
-    // 1. 最新 Release 与版本比较
-    let (status, body) = request(&http, reqwest::Method::GET, crate::commands::app::RELEASES_API, "", None).await?;
-    if status != 200 {
-        return Err(format!("GitHub 返回 {status}"));
-    }
+    // 1. 通道内最新 Release 与版本比较(稳定通道只看正式版,测试通道含 Pre-Release)
+    let body = crate::commands::app::latest_release(&http, &channel).await?;
     let tag = body["tag_name"].as_str().unwrap_or("").trim().to_string();
     if tag.is_empty() {
         return Err("Release 数据缺少版本号。".into());
@@ -1210,16 +1223,14 @@ pub async fn update_download(
         return Err("already-latest".into());
     }
 
-    // 2. 选择当前平台的更新包
-    let asset = body["assets"]
-        .as_array()
-        .and_then(|list| list.iter().find(|a| asset_matches(a["name"].as_str().unwrap_or(""))))
-        .ok_or("Release 中没有当前平台的安装包")?;
+    // 2. 选择当前平台的更新包;下载地址按所选下载源拼接
+    let asset = pick_asset(&body).ok_or("Release 中没有当前平台的安装包")?;
     let asset_name = asset["name"].as_str().unwrap_or("").to_string();
-    let asset_url = asset["browser_download_url"].as_str().unwrap_or("").to_string();
-    if asset_url.is_empty() {
+    let raw_url = asset["browser_download_url"].as_str().unwrap_or("").to_string();
+    if raw_url.is_empty() {
         return Err("安装包下载地址缺失".into());
     }
+    let asset_url = crate::commands::app::download_url(&source, &raw_url);
     // 记录进行中的包名:取消时(含暂停后取消,此时任务文件尚未落盘)据此删除半成品
     if let Ok(mut guard) = state.update_asset.lock() {
         *guard = Some(asset_name.clone());
@@ -1335,6 +1346,89 @@ pub fn update_cancel(state: State<'_, AppState>, window: tauri::WebviewWindow) -
         }
     }
     Ok(())
+}
+
+/// 下载源测速结果:bytesPerSec 为实测吞吐,latencyMs 为首字节延迟。
+/// 失败以 ok=false 返回(而非 Err)—— 界面上两个下载源并排比较,
+/// 单个源不可用只该让那一格显示失败,不该中断整次测速。
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SpeedTestResult {
+    pub source: String,
+    pub ok: bool,
+    pub bytes_per_sec: u64,
+    pub latency_ms: u64,
+    pub message: String,
+}
+
+fn speed_fail(source: &str, message: impl Into<String>) -> SpeedTestResult {
+    SpeedTestResult { source: source.to_string(), ok: false, bytes_per_sec: 0, latency_ms: 0, message: message.into() }
+}
+
+/// 测速:按所选下载源真实拉取当前平台更新包的前 1 MiB,量出首字节延迟与吞吐。
+/// 只读前 1 MiB 即断开,几秒内可完成,且量的正是「更新时真正会走的那条路」。
+#[tauri::command]
+pub async fn speedtest_update_source(
+    window: tauri::WebviewWindow,
+    state: State<'_, AppState>,
+    source: String,
+    channel: String,
+) -> Result<SpeedTestResult, String> {
+    const SAMPLE_BYTES: u64 = 1024 * 1024;
+
+    ensure_main(&window)?;
+    let http = state.http.clone();
+    let release = match crate::commands::app::latest_release(&http, &channel).await {
+        Ok(v) => v,
+        Err(e) => return Ok(speed_fail(&source, e)),
+    };
+    let Some(asset) = pick_asset(&release) else {
+        return Ok(speed_fail(&source, "Release 中没有当前平台的安装包"));
+    };
+    let raw_url = asset["browser_download_url"].as_str().unwrap_or("");
+    if raw_url.is_empty() {
+        return Ok(speed_fail(&source, "安装包下载地址缺失"));
+    }
+    let url = crate::commands::app::download_url(&source, raw_url);
+
+    let started = std::time::Instant::now();
+    let mut resp = match http
+        .get(&url)
+        .header("Range", format!("bytes=0-{}", SAMPLE_BYTES - 1))
+        .timeout(std::time::Duration::from_secs(20))
+        .send()
+        .await
+    {
+        Ok(r) => r,
+        Err(e) => return Ok(speed_fail(&source, format!("连接失败: {e}"))),
+    };
+    let status = resp.status();
+    if !status.is_success() {
+        return Ok(speed_fail(&source, format!("下载源返回 {status}")));
+    }
+    let latency_ms = started.elapsed().as_millis() as u64;
+
+    // 吞吐只统计响应体传输耗时:首字节延迟单独给出,不被握手时间稀释
+    let body_start = std::time::Instant::now();
+    let mut got: u64 = 0;
+    while got < SAMPLE_BYTES {
+        match resp.chunk().await {
+            Ok(Some(chunk)) => got += chunk.len() as u64,
+            Ok(None) => break,
+            Err(e) => return Ok(speed_fail(&source, format!("传输中断: {e}"))),
+        }
+    }
+    if got == 0 {
+        return Ok(speed_fail(&source, "下载源未返回数据"));
+    }
+    let elapsed_ms = body_start.elapsed().as_millis().max(1) as u64;
+    Ok(SpeedTestResult {
+        source,
+        ok: true,
+        bytes_per_sec: got * 1000 / elapsed_ms,
+        latency_ms,
+        message: String::new(),
+    })
 }
 
 /// 用户点击「重启并更新」:复核任务与安装包、生成向导脚本,拉起更新向导。
@@ -1580,7 +1674,7 @@ fn write_update_helper(asset_path: &std::path::Path, latest_version: &str) -> Re
             .unwrap_or_else(|| "/Applications/Plainstruct.app".to_string());
         let script = MAC_WIZARD_SCRIPT
             .replace("__APP_PATH__", &app_path.replace('\'', "'\\''"))
-            .replace("__DMG__", &asset_path.to_string_lossy().replace('\'', "'\\''"))
+            .replace("__PKG__", &asset_path.to_string_lossy().replace('\'', "'\\''"))
             .replace("__VER_NEW__", latest_version);
         let path = dir.join(format!("{UPDATE_HELPER_FILE}.command"));
         std::fs::write(&path, script).map_err(|e| e.to_string())?;
@@ -1825,7 +1919,11 @@ try {
   foreach ($f in @($taskFile, $installer, $PSCommandPath, $logPath)) {
     Remove-Item -LiteralPath $f -Force -ErrorAction SilentlyContinue
   }
-  Start-Process -FilePath $appExe -WorkingDirectory $appDir
+  # 发行包内的可执行程序统一命名为 Plainstruct.exe(旧版本为 plainstruct.exe)。
+  # NTFS 大小写不敏感,覆盖解压后两者就是同一个文件,按新名字启动即可。
+  $launch = Join-Path $appDir 'Plainstruct.exe'
+  if (-not (Test-Path -LiteralPath $launch)) { $launch = $appExe }
+  Start-Process -FilePath $launch -WorkingDirectory $appDir
   $pctLabel.Text = "更新完成,正在启动 v$verNew …"
   for ($i = 0; $i -lt 15; $i++) {
     [System.Windows.Forms.Application]::DoEvents()
@@ -1843,33 +1941,56 @@ try {
 const MAC_WIZARD_SCRIPT: &str = r#"#!/bin/bash
 # Plainstruct 自动更新向导(终端窗口即向导,按阶段显示进度)
 APP_PATH='__APP_PATH__'
-DMG='__DMG__'
-echo '── Plainstruct 更新 → v__VER_NEW__ ──'
+PKG='__PKG__'
+VERSION='__VER_NEW__'
+
+# 失败必须停在窗口里说清原因:向导是在应用退出之后跑的,静默退出等于什么都没发生
+fail() {
+  echo "更新失败:$1"
+  read -r -p '按回车键退出...'
+  exit 1
+}
+
+echo "── Plainstruct 更新 → v$VERSION ──"
 echo '等待 Plainstruct 退出...'
 while pgrep -x plainstruct >/dev/null 2>&1; do sleep 1; done
-echo '挂载更新镜像...'
-MOUNT=$(hdiutil attach -nobrowse -readonly "$DMG" 2>/dev/null | awk -F'\t' '/Volumes/{print $NF}' | head -1)
-if [ -z "$MOUNT" ]; then
-  echo '无法挂载更新镜像,更新已取消。'
-  read -r -p '按回车键退出...'
-  exit 1
-fi
+
+# 更新包有两种形态:现行 zip(.app + 损坏修复.command)与旧版 dmg,两者都要能装
+STAGE="$(mktemp -d)"
+MOUNT=""
+case "$PKG" in
+  *.zip)
+    echo '解压更新包...'
+    ditto -x -k "$PKG" "$STAGE" || fail '更新包解压失败,请回到应用重新下载。'
+    SRC="$STAGE/Plainstruct.app"
+    ;;
+  *.dmg)
+    echo '挂载更新镜像...'
+    MOUNT=$(hdiutil attach -nobrowse -readonly "$PKG" 2>/dev/null | awk -F'\t' '/Volumes/{print $NF}' | head -1)
+    [ -n "$MOUNT" ] || fail '无法挂载更新镜像,请回到应用重新下载。'
+    SRC="$MOUNT/Plainstruct.app"
+    ;;
+  *)
+    fail '无法识别的更新包格式。'
+    ;;
+esac
+[ -d "$SRC" ] || fail '更新包内缺少 Plainstruct.app。'
+
 echo '正在安装新版本到 '"$APP_PATH"' ...'
-rm -rf "$APP_PATH"
-if ! cp -R "$MOUNT/Plainstruct.app" "$APP_PATH"; then
-  echo '安装失败,请手动打开 dmg 拖入「应用程序」。'
-  hdiutil detach "$MOUNT" 2>/dev/null
-  read -r -p '按回车键退出...'
-  exit 1
+rm -rf "$APP_PATH" || fail '无法移除旧版本(可能位于只读位置)。'
+if ! ditto "$SRC" "$APP_PATH"; then
+  [ -n "$MOUNT" ] && hdiutil detach "$MOUNT" 2>/dev/null
+  fail '安装失败:请手动解压压缩包,把 Plainstruct.app 拖入「应用程序」。'
 fi
-hdiutil detach "$MOUNT" 2>/dev/null
+[ -n "$MOUNT" ] && hdiutil detach "$MOUNT" 2>/dev/null
+rm -rf "$STAGE"
 echo '检查隔离标记(应用内下载通常没有,无需修复)...'
 if xattr -p com.apple.quarantine "$APP_PATH" >/dev/null 2>&1; then
   echo '检测到隔离标记:正在移除,需要输入开机密码...'
   if sudo xattr -r -d com.apple.quarantine "$APP_PATH"; then
     echo '已移除隔离标记。'
   else
-    echo '移除未完成:若打开时提示「已损坏」,请运行 dmg 内的「损坏修复.command」。'
+    echo '移除未完成:若打开时提示「已损坏」,请运行压缩包内的「损坏修复.command」。'
   fi
 else
   echo '未检测到隔离标记,无需修复。'
