@@ -114,7 +114,12 @@ jobs:
           OUT="dist/Plainstruct_${VERSION}_macOS_arm64.zip"
           mkdir -p dist
           (cd "$ZIP_STAGE" && ditto -c -k --sequesterRsrc . "$GITHUB_WORKSPACE/$OUT")
-          unzip -l "$OUT"
+          # 解压后按真实文件名校验:unzip -l 的清单把非 ASCII 名字按 CP437 解出来会变乱码
+          CHECK="$(mktemp -d)"
+          ditto -x -k "$OUT" "$CHECK"
+          ls -la "$CHECK"
+          [ -f "$CHECK/损坏修复.command" ] || { echo "::error::压缩包缺少「损坏修复.command」"; exit 1; }
+          rm -rf "$CHECK"
 
       - name: Upload Windows x64 portable artifact
         if: runner.os == 'Windows'

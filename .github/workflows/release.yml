@@ -223,8 +223,15 @@ jobs:
           mkdir -p dist
           OUT="dist/Plainstruct_${VERSION}_macOS_arm64.zip"
           (cd "$ZIP_STAGE" && ditto -c -k --sequesterRsrc . "$GITHUB_WORKSPACE/$OUT")
-          unzip -l "$OUT"
-          unzip -l "$OUT" | grep -q "损坏修复.command" || { echo "::error::压缩包缺少「损坏修复.command」"; exit 1; }
+          # 内容校验必须解压后按真实文件名判定:unzip -l 把非 ASCII 名字按 CP437 解出来,
+          # 「损坏修复.command」在清单里是乱码,字符串匹配会误判成「缺文件」
+          CHECK="$(mktemp -d)"
+          ditto -x -k "$OUT" "$CHECK"
+          ls -la "$CHECK"
+          [ -d "$CHECK/Plainstruct.app" ] || { echo "::error::压缩包缺少 Plainstruct.app"; exit 1; }
+          [ -f "$CHECK/损坏修复.command" ] || { echo "::error::压缩包缺少「损坏修复.command」"; exit 1; }
+          [ -x "$CHECK/损坏修复.command" ] || { echo "::error::「损坏修复.command」缺少可执行权限"; exit 1; }
+          rm -rf "$CHECK" "$ZIP_STAGE"
 
       - name: Upload Windows zip
         if: runner.os == 'Windows'
